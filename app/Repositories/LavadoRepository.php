@@ -4,8 +4,11 @@ namespace App\Repositories;
 
 use App\Contracts\LavadoRepositoryInterface;
 use App\Models\Lavado;
+use App\Models\Ingreso;
+use App\Models\Vehiculo;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class LavadoRepository implements LavadoRepositoryInterface
@@ -55,9 +58,44 @@ class LavadoRepository implements LavadoRepositoryInterface
         return Lavado::with(['vehiculo.cliente', 'empleado'])->find($id);
     }
 
-    public function create(array $data): Lavado
+    public function create(array $data): array
     {
-        return Lavado::create($data);
+        try {
+            return DB::transaction(function () use ($data) {
+                // Verificar que el vehículo existe
+                $vehiculo = Vehiculo::with('cliente')->find($data['vehiculo_id']);
+                if (!$vehiculo) {
+                    return ['success' => false, 'message' => 'Vehículo no encontrado'];
+                }
+                
+                $data['fecha'] = $data['fecha'] ?? now()->format('Y-m-d');
+                
+                // Crear el lavado
+                $lavado = Lavado::create($data);
+                
+                // Crear el ingreso correspondiente
+                $descripcion = 'Lavado ' . $data['tipo_lavado'] . ' - ' . $vehiculo->cliente->nombre;
+                if ($vehiculo->matricula) {
+                    $descripcion .= ' (' . $vehiculo->matricula . ')';
+                }
+                
+                $ingreso = Ingreso::create([
+                    'fecha' => $data['fecha'],
+                    'tipo' => 'lavado',
+                    'referencia_id' => $lavado->lavado_id,
+                    'monto' => $lavado->precio,
+                    'descripcion' => $descripcion,
+                ]);
+                
+                return [
+                    'success' => true,
+                    'lavado' => $lavado->load(['vehiculo.cliente', 'empleado']),
+                    'ingreso' => $ingreso
+                ];
+            });
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => 'Error al crear el lavado: ' . $e->getMessage()];
+        }
     }
 
     public function update(int $id, array $data): Lavado

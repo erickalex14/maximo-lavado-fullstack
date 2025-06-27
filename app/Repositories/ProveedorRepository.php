@@ -5,7 +5,9 @@ namespace App\Repositories;
 use App\Contracts\ProveedorRepositoryInterface;
 use App\Models\Proveedor;
 use App\Models\PagoProveedor;
+use App\Models\Egreso;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class ProveedorRepository implements ProveedorRepositoryInterface
 {
@@ -78,24 +80,49 @@ class ProveedorRepository implements ProveedorRepositoryInterface
         return null;
     }
 
-    public function registrarPago(int $id, float $monto, string $descripcion = null): bool
+    public function registrarPago(int $id, float $monto, string $descripcion = null): array
     {
         $proveedor = $this->findById($id);
-        if ($proveedor && $proveedor->deuda_pendiente >= $monto) {
-            // Crear el registro de pago
-            PagoProveedor::create([
-                'proveedor_id' => $id,
-                'monto' => $monto,
-                'descripcion' => $descripcion,
-                'fecha' => now(),
-            ]);
-            
-            // Reducir la deuda pendiente
-            $nuevaDeuda = $proveedor->deuda_pendiente - $monto;
-            $proveedor->update(['deuda_pendiente' => $nuevaDeuda]);
-            
-            return true;
+        if (!$proveedor) {
+            return ['success' => false, 'message' => 'Proveedor no encontrado'];
         }
-        return false;
+
+        if ($proveedor->deuda_pendiente < $monto) {
+            return ['success' => false, 'message' => 'El monto del pago excede la deuda pendiente'];
+        }
+
+        try {
+            return DB::transaction(function () use ($proveedor, $id, $monto, $descripcion) {
+                // Crear el registro de pago
+                $pago = PagoProveedor::create([
+                    'proveedor_id' => $id,
+                    'monto' => $monto,
+                    'descripcion' => $descripcion,
+                    'fecha' => now(),
+                ]);
+                
+                // Crear el egreso correspondiente
+                $egreso = Egreso::create([
+                    'fecha' => now()->format('Y-m-d'),
+                    'tipo' => 'proveedor',
+                    'referencia_id' => $pago->id_pago_proveedor,
+                    'monto' => $monto,
+                    'descripcion' => $descripcion ?? 'Pago a proveedor: ' . $proveedor->nombre,
+                ]);
+                
+                // Reducir la deuda pendiente
+                $nuevaDeuda = $proveedor->deuda_pendiente - $monto;
+                $proveedor->update(['deuda_pendiente' => $nuevaDeuda]);
+                
+                return [
+                    'success' => true,
+                    'pago' => $pago,
+                    'egreso' => $egreso,
+                    'proveedor' => $proveedor->fresh()
+                ];
+            });
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => 'Error al registrar el pago: ' . $e->getMessage()];
+        }
     }
 }

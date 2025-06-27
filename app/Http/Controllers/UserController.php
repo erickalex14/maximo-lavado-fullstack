@@ -2,186 +2,286 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use App\Services\UserService;
+use App\Http\Requests\User\CreateUserRequest;
+use App\Http\Requests\User\UpdateUserRequest;
+use App\Http\Requests\User\UpdatePasswordRequest;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    // Mostrar vista de usuarios
-    public function indexView()
+    protected $userService;
+
+    public function __construct(UserService $userService)
     {
-        return view('usuarios.index');
+        $this->userService = $userService;
     }
 
-    // Listar usuarios (API)
-    public function index()
+    /**
+     * Display a listing of users.
+     */
+    public function index(): JsonResponse
     {
-        $users = User::select('id', 'name', 'email', 'created_at')->get();
-        return response()->json([
-            'users' => $users
-        ]);
-    }
-
-    // Crear usuario
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6|confirmed',
-        ]);
-
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'email_verified_at' => now(),
-        ]);
-
-        return response()->json([
-            'message' => 'Usuario creado exitosamente',
-            'user' => $user->only(['id', 'name', 'email', 'created_at'])
-        ], 201);
-    }
-
-    // Mostrar usuario específico
-    public function show($id)
-    {
-        $user = User::findOrFail($id);
-        return response()->json([
-            'user' => $user->only(['id', 'name', 'email', 'created_at'])
-        ]);
-    }
-
-    // Actualizar usuario
-    public function update(Request $request, $id)
-    {
-        $user = User::findOrFail($id);
-        
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
-            'password' => 'nullable|string|min:6|confirmed',
-        ]);
-
-        $updateData = [
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-        ];
-
-        if (!empty($validated['password'])) {
-            $updateData['password'] = Hash::make($validated['password']);
-        }
-
-        $user->update($updateData);
-
-        return response()->json([
-            'message' => 'Usuario actualizado exitosamente',
-            'user' => $user->only(['id', 'name', 'email', 'created_at'])
-        ]);
-    }
-
-    // Eliminar usuario
-    public function destroy($id)
-    {
-        $user = User::findOrFail($id);
-        
-        // No permitir eliminar el usuario actual
-        if ($user->id === auth()->id()) {
+        try {
+            $users = $this->userService->getAllUsers();
+            
             return response()->json([
-                'message' => 'No puedes eliminar tu propio usuario'
-            ], 403);
+                'status' => 'success',
+                'data' => $users
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener los usuarios: ' . $e->getMessage()
+            ], 500);
         }
-
-        $user->delete();
-
-        return response()->json([
-            'message' => 'Usuario eliminado exitosamente'
-        ]);
     }
 
-    // Mostrar perfil del usuario actual
-    public function profile()
+    /**
+     * Store a newly created user.
+     */
+    public function store(CreateUserRequest $request): JsonResponse
     {
-        return view('usuarios.profile');
+        try {
+            $user = $this->userService->createUser($request->validated());
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Usuario creado correctamente',
+                'data' => $user->only(['id', 'name', 'email', 'created_at'])
+            ], 201);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 400);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al crear el usuario: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
-    // Actualizar perfil del usuario actual
-    public function updateProfile(Request $request)
+    /**
+     * Display the specified user.
+     */
+    public function show(int $id): JsonResponse
     {
-        $user = auth()->user();
-        
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
-            'current_password' => 'required_with:password',
-            'password' => 'nullable|string|min:6|confirmed',
-        ]);
-
-        // Verificar contraseña actual si se quiere cambiar
-        if (!empty($validated['password'])) {
-            if (!Hash::check($validated['current_password'], $user->password)) {
+        try {
+            $user = $this->userService->getUserProfile($id);
+            
+            if (!$user) {
                 return response()->json([
-                    'message' => 'La contraseña actual es incorrecta'
-                ], 422);
+                    'status' => 'error',
+                    'message' => 'Usuario no encontrado'
+                ], 404);
             }
-        }
 
-        $updateData = [
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-        ];
-
-        if (!empty($validated['password'])) {
-            $updateData['password'] = Hash::make($validated['password']);
-        }
-
-        $user->update($updateData);
-
-        return response()->json([
-            'message' => 'Perfil actualizado exitosamente',
-            'user' => $user->only(['id', 'name', 'email'])
-        ]);
-    }
-
-    // Mostrar formulario de creación de usuario
-    public function create()
-    {
-        return view('usuarios.create');
-    }
-
-    // Mostrar formulario de edición de usuario
-    public function edit($id)
-    {
-        $user = User::findOrFail($id);
-        return view('usuarios.edit', compact('user'));
-    }
-
-    // Actualizar contraseña del usuario actual
-    public function updatePassword(Request $request)
-    {
-        $user = auth()->user();
-        
-        $validated = $request->validate([
-            'current_password' => 'required',
-            'password' => 'required|string|min:6|confirmed',
-        ]);
-
-        // Verificar contraseña actual
-        if (!Hash::check($validated['current_password'], $user->password)) {
             return response()->json([
-                'message' => 'La contraseña actual es incorrecta'
-            ], 422);
+                'status' => 'success',
+                'data' => $user
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener el usuario: ' . $e->getMessage()
+            ], 500);
         }
+    }
 
-        $user->update([
-            'password' => Hash::make($validated['password'])
+    /**
+     * Update the specified user.
+     */
+    public function update(UpdateUserRequest $request, int $id): JsonResponse
+    {
+        try {
+            $user = $this->userService->updateUser($id, $request->validated());
+            
+            if (!$user) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Usuario no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Usuario actualizado correctamente',
+                'data' => $user->only(['id', 'name', 'email', 'email_verified_at', 'updated_at'])
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 400);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al actualizar el usuario: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Remove the specified user.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        try {
+            $deleted = $this->userService->deleteUser($id);
+            
+            if (!$deleted) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Usuario no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Usuario eliminado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al eliminar el usuario: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get active users.
+     */
+    public function getActiveUsers(): JsonResponse
+    {
+        try {
+            $users = $this->userService->getActiveUsers();
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $users
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener usuarios activos: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update user password.
+     */
+    public function updatePassword(UpdatePasswordRequest $request, int $id): JsonResponse
+    {
+        try {
+            $updated = $this->userService->updatePassword(
+                $id,
+                $request->current_password,
+                $request->new_password
+            );
+            
+            if (!$updated) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No se pudo actualizar la contraseña'
+                ], 400);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Contraseña actualizada correctamente'
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 400);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al actualizar la contraseña: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Reset user password (admin action).
+     */
+    public function resetPassword(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'new_password' => 'required|string|min:8|confirmed'
         ]);
 
-        return response()->json([
-            'message' => 'Contraseña actualizada exitosamente'
-        ]);
+        try {
+            $updated = $this->userService->resetPassword($id, $request->new_password);
+            
+            if (!$updated) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Usuario no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Contraseña restablecida correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al restablecer la contraseña: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Verify user email.
+     */
+    public function verifyEmail(int $id): JsonResponse
+    {
+        try {
+            $verified = $this->userService->verifyEmail($id);
+            
+            if (!$verified) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Usuario no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Email verificado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al verificar el email: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get user statistics.
+     */
+    public function getStats(): JsonResponse
+    {
+        try {
+            $stats = $this->userService->getUserStats();
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $stats
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener estadísticas: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

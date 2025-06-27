@@ -25,8 +25,17 @@ class PagoProveedorService
         return $this->pagoProveedorRepository->findById($id);
     }
 
-    public function createPagoProveedor(array $data): PagoProveedor
+    public function createPagoProveedor(array $data): array
     {
+        // Validaciones de negocio
+        if (!isset($data['proveedor_id']) || !isset($data['monto'])) {
+            return ['success' => false, 'message' => 'Datos incompletos'];
+        }
+
+        if ($data['monto'] <= 0) {
+            return ['success' => false, 'message' => 'El monto debe ser mayor a 0'];
+        }
+
         return $this->pagoProveedorRepository->create($data);
     }
 

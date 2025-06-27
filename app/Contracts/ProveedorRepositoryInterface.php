@@ -25,5 +25,5 @@ interface ProveedorRepositoryInterface
     
     public function updateDeuda(int $id, float $nuevaDeuda): ?Proveedor;
     
-    public function registrarPago(int $id, float $monto, string $descripcion = null): bool;
+    public function registrarPago(int $id, float $monto, string $descripcion = null): array;
 }

@@ -30,33 +30,33 @@ class LavadoService
         return $this->lavadoRepository->findById($id);
     }
 
-    public function createLavado(array $data): Lavado
+    public function createLavado(array $data): array
     {
         try {
-            DB::beginTransaction();
-
             // Validaciones de negocio
-            $this->validateBusinessRules($data);
+            $validation = $this->validateBusinessRules($data);
+            if (!$validation['valid']) {
+                return ['success' => false, 'message' => $validation['message']];
+            }
 
-            $lavado = $this->lavadoRepository->create($data);
+            $result = $this->lavadoRepository->create($data);
+            
+            if ($result['success']) {
+                Log::info('Lavado creado exitosamente', [
+                    'lavado_id' => $result['lavado']->lavado_id,
+                    'vehiculo_id' => $result['lavado']->vehiculo_id,
+                    'precio' => $result['lavado']->precio
+                ]);
+            }
 
-            DB::commit();
-
-            Log::info('Lavado creado exitosamente', [
-                'lavado_id' => $lavado->id,
-                'cliente_id' => $lavado->cliente_id,
-                'precio' => $lavado->precio
-            ]);
-
-            return $lavado;
+            return $result;
 
         } catch (\Exception $e) {
-            DB::rollBack();
             Log::error('Error al crear lavado', [
                 'data' => $data,
                 'error' => $e->getMessage()
             ]);
-            throw $e;
+            return ['success' => false, 'message' => 'Error interno: ' . $e->getMessage()];
         }
     }
 
@@ -71,7 +71,10 @@ class LavadoService
             }
 
             // Validaciones de negocio
-            $this->validateBusinessRules($data, $id);
+            $validation = $this->validateBusinessRules($data, $id);
+            if (!$validation['valid']) {
+                throw new \Exception($validation['message']);
+            }
 
             $lavadoActualizado = $this->lavadoRepository->update($id, $data);
 
@@ -169,27 +172,33 @@ class LavadoService
         return $this->updateLavado($id, ['estado' => $estado]);
     }
 
-    protected function validateBusinessRules(array $data, ?int $excludeId = null): void
+    protected function validateBusinessRules(array $data, ?int $excludeId = null): array
     {
-        // Verificar que el vehículo pertenezca al cliente
-        if (isset($data['cliente_id']) && isset($data['vehiculo_id'])) {
-            $vehiculo = \App\Models\Vehiculo::find($data['vehiculo_id']);
-            if ($vehiculo && $vehiculo->cliente_id != $data['cliente_id']) {
-                throw new \Exception('El vehículo no pertenece al cliente seleccionado');
+        try {
+            // Verificar que el vehículo existe
+            if (isset($data['vehiculo_id'])) {
+                $vehiculo = \App\Models\Vehiculo::find($data['vehiculo_id']);
+                if (!$vehiculo) {
+                    return ['valid' => false, 'message' => 'El vehículo seleccionado no existe'];
+                }
             }
-        }
 
-        // Verificar que el empleado esté activo
-        if (isset($data['empleado_id'])) {
-            $empleado = \App\Models\Empleado::find($data['empleado_id']);
-            if ($empleado && !$empleado->activo) {
-                throw new \Exception('El empleado seleccionado no está activo');
+            // Verificar que el empleado existe
+            if (isset($data['empleado_id'])) {
+                $empleado = \App\Models\Empleado::find($data['empleado_id']);
+                if (!$empleado) {
+                    return ['valid' => false, 'message' => 'El empleado seleccionado no existe'];
+                }
             }
-        }
 
-        // Validar precio según tipo de lavado
-        if (isset($data['tipo_lavado']) && isset($data['precio'])) {
-            $this->validatePrecioByTipo($data['tipo_lavado'], $data['precio']);
+            // Validar precio
+            if (isset($data['precio']) && $data['precio'] <= 0) {
+                return ['valid' => false, 'message' => 'El precio debe ser mayor a 0'];
+            }
+
+            return ['valid' => true];
+        } catch (\Exception $e) {
+            return ['valid' => false, 'message' => $e->getMessage()];
         }
     }
 

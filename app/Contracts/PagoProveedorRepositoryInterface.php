@@ -11,7 +11,7 @@ interface PagoProveedorRepositoryInterface
     
     public function findById(int $id): ?PagoProveedor;
     
-    public function create(array $data): PagoProveedor;
+    public function create(array $data): array;
     
     public function update(int $id, array $data): ?PagoProveedor;
     

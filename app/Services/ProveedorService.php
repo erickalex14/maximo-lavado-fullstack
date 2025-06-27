@@ -66,19 +66,19 @@ class ProveedorService
         return $this->proveedorRepository->updateDeuda($id, $nuevaDeuda);
     }
 
-    public function registrarPago(int $id, float $monto, string $descripcion = null): bool
+    public function registrarPago(int $id, float $monto, string $descripcion = null): array
     {
         if ($monto <= 0) {
-            return false;
+            return ['success' => false, 'message' => 'El monto debe ser mayor a 0'];
         }
 
         $proveedor = $this->findProveedorById($id);
         if (!$proveedor) {
-            return false;
+            return ['success' => false, 'message' => 'Proveedor no encontrado'];
         }
 
         if ($proveedor->deuda_pendiente < $monto) {
-            return false; // No se puede pagar más de lo que se debe
+            return ['success' => false, 'message' => 'No se puede pagar más de lo que se debe'];
         }
 
         return $this->proveedorRepository->registrarPago($id, $monto, $descripcion);

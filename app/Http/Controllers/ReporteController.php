@@ -2,288 +2,296 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ReporteService;
+use App\Http\Requests\Reporte\ReporteFechasRequest;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use App\Models\Ingreso;
-use App\Models\Egreso;
-use App\Models\ProductoAutomotriz;
-use App\Models\ProductoDespensa;
-use App\Models\VentaProductoAutomotriz;
-use App\Models\VentaProductoDespensa;
-use App\Models\PagoProveedor;
-use App\Models\Proveedor;
-use App\Models\Factura;
-use App\Models\Cliente;
-use App\Models\Empleado;
-use App\Models\Lavado;
-use PDF; // Requiere barryvdh/laravel-dompdf
 
 class ReporteController extends Controller
 {
-    // Mostrar la vista de reportes
-    public function indexView()
+    protected $reporteService;
+
+    public function __construct(ReporteService $reporteService)
     {
-        return view('reportes.index');
+        $this->reporteService = $reporteService;
     }
 
-    // Obtener datos del resumen financiero
-    public function getResumenFinanciero(Request $request)
+    /**
+     * Get available reports list.
+     */
+    public function index(): JsonResponse
     {
-        $fechaDesde = $request->get('fecha_desde', now()->startOfMonth()->toDateString());
-        $fechaHasta = $request->get('fecha_hasta', now()->toDateString());
-
-        $ingresosTotales = Ingreso::whereBetween('fecha', [$fechaDesde, $fechaHasta])->sum('monto');
-        $egresosTotales = Egreso::whereBetween('fecha', [$fechaDesde, $fechaHasta])->sum('monto');
-        $gananciaNeta = $ingresosTotales - $egresosTotales;
-        $margenPorcentaje = $ingresosTotales > 0 ? round(($gananciaNeta / $ingresosTotales) * 100, 2) : 0;
-
-        return response()->json([
-            'ingresosTotales' => $ingresosTotales,
-            'egresosTotales' => $egresosTotales,
-            'gananciaNeta' => $gananciaNeta,
-            'margenPorcentaje' => $margenPorcentaje
-        ]);
-    }    // Reporte de ingresos en PDF
-    public function ingresosPDF(Request $request)
-    {
-        $ingresos = Ingreso::orderByDesc('fecha')->get();
-        $pdf = PDF::loadView('reportes.ingresos', compact('ingresos'));
-        return $pdf->download('reporte_ingresos.pdf');
-    }
-
-    // Reporte de egresos en PDF
-    public function egresosPDF(Request $request)
-    {
-        $egresos = Egreso::orderByDesc('fecha')->get();
-        $pdf = PDF::loadView('reportes.egresos', compact('egresos'));
-        return $pdf->download('reporte_egresos.pdf');
-    }
-
-    // Reporte de inventario en PDF
-    public function inventarioPDF(Request $request)
-    {
-        $productosAutomotrices = ProductoAutomotriz::all();
-        $productosDespensa = ProductoDespensa::all();
-        $pdf = PDF::loadView('reportes.inventario', compact('productosAutomotrices', 'productosDespensa'));
-        return $pdf->download('reporte_inventario.pdf');
-    }
-
-    // Reporte de pagos a proveedores en PDF
-    public function pagosPDF(Request $request)
-    {
-        $pagos = PagoProveedor::with('proveedor')->orderByDesc('fecha_pago')->get();
-        $pdf = PDF::loadView('reportes.pagos', compact('pagos'));
-        return $pdf->download('reporte_pagos.pdf');
-    }
-
-    // Reporte de deudas a proveedores en PDF
-    public function deudasPDF(Request $request)
-    {
-        $proveedores = Proveedor::where('deuda_pendiente', '>', 0)->get();
-        $pdf = PDF::loadView('reportes.deudas', compact('proveedores'));
-        return $pdf->download('reporte_deudas.pdf');
-    }
-
-    // PDF de factura individual
-    public function facturaPDF($id)
-    {
-        $factura = Factura::with(['cliente', 'detalles'])->findOrFail($id);
-        $pdf = PDF::loadView('reportes.factura', compact('factura'));
-        return $pdf->download('factura_'.$factura->numero_factura.'.pdf');
-    }
-
-    // API para obtener datos de ventas
-    public function getVentasData(Request $request)
-    {
-        $fechaDesde = $request->get('fecha_desde', now()->startOfMonth()->toDateString());
-        $fechaHasta = $request->get('fecha_hasta', now()->toDateString());
-
-        // Ventas por día de la semana actual
-        $ventasPorDia = collect();
-        for ($i = 6; $i >= 0; $i--) {
-            $fecha = now()->subDays($i);
-            $monto = VentaProductoAutomotriz::whereDate('created_at', $fecha)->sum('total') +
-                     VentaProductoDespensa::whereDate('created_at', $fecha)->sum('total');
+        try {
+            $reportes = $this->reporteService->getReportesDisponibles();
             
-            $ventasPorDia->push([
-                'fecha' => $fecha->toDateString(),
-                'dia' => $fecha->format('D'),
-                'monto' => (float) $monto
+            return response()->json([
+                'status' => 'success',
+                'data' => $reportes
             ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener lista de reportes: ' . $e->getMessage()
+            ], 500);
         }
+    }
 
-        // Top productos más vendidos
-        $topProductosAuto = VentaProductoAutomotriz::with('producto')
-            ->whereBetween('created_at', [$fechaDesde, $fechaHasta])
-            ->selectRaw('producto_automotriz_id, SUM(cantidad) as total_cantidad, SUM(total) as total_monto')
-            ->groupBy('producto_automotriz_id')
-            ->orderByDesc('total_monto')
-            ->limit(5)
-            ->get();
-
-        $topProductosDespensa = VentaProductoDespensa::with('producto')
-            ->whereBetween('created_at', [$fechaDesde, $fechaHasta])
-            ->selectRaw('producto_despensa_id, SUM(cantidad) as total_cantidad, SUM(total) as total_monto')
-            ->groupBy('producto_despensa_id')
-            ->orderByDesc('total_monto')
-            ->limit(5)
-            ->get();
-
-        $topProductos = $topProductosAuto->map(function($venta) {
-            return [
-                'nombre' => $venta->producto->nombre ?? 'Producto no encontrado',
-                'cantidad' => $venta->total_cantidad,
-                'monto' => (float) $venta->total_monto
-            ];
-        })->concat($topProductosDespensa->map(function($venta) {
-            return [
-                'nombre' => $venta->producto->nombre ?? 'Producto no encontrado',
-                'cantidad' => $venta->total_cantidad,
-                'monto' => (float) $venta->total_monto
-            ];
-        }))->sortByDesc('monto')->take(5)->values();
-
-        // Detalle de ventas
-        $detalleVentas = collect();
-        
-        $ventasAuto = VentaProductoAutomotriz::with('producto')
-            ->whereBetween('created_at', [$fechaDesde, $fechaHasta])
-            ->latest()
-            ->limit(10)
-            ->get();
+    /**
+     * Get ventas report.
+     */
+    public function reporteVentas(ReporteFechasRequest $request): JsonResponse
+    {
+        try {
+            $reporte = $this->reporteService->getReporteVentas(
+                $request->fecha_inicio,
+                $request->fecha_fin,
+                $request->formato ?? 'json'
+            );
             
-        $ventasDespensa = VentaProductoDespensa::with('producto')
-            ->whereBetween('created_at', [$fechaDesde, $fechaHasta])
-            ->latest()
-            ->limit(10)
-            ->get();
-
-        foreach ($ventasAuto as $venta) {
-            $detalleVentas->push([
-                'id' => $venta->id,
-                'fecha' => $venta->created_at->format('d/m/Y'),
-                'producto' => $venta->producto->nombre ?? 'Producto no encontrado',
-                'cantidad' => $venta->cantidad,
-                'precio' => (float) $venta->precio_unitario,
-                'total' => (float) $venta->total
+            return response()->json([
+                'status' => 'success',
+                'data' => $reporte
             ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al generar reporte de ventas: ' . $e->getMessage()
+            ], 500);
         }
+    }
 
-        foreach ($ventasDespensa as $venta) {
-            $detalleVentas->push([
-                'id' => 'D' . $venta->id,
-                'fecha' => $venta->created_at->format('d/m/Y'),
-                'producto' => $venta->producto->nombre ?? 'Producto no encontrado',
-                'cantidad' => $venta->cantidad,
-                'precio' => (float) $venta->precio_unitario,
-                'total' => (float) $venta->total
+    /**
+     * Get lavados report.
+     */
+    public function reporteLavados(ReporteFechasRequest $request): JsonResponse
+    {
+        try {
+            $reporte = $this->reporteService->getReporteLavados(
+                $request->fecha_inicio,
+                $request->fecha_fin,
+                $request->formato ?? 'json'
+            );
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $reporte
             ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al generar reporte de lavados: ' . $e->getMessage()
+            ], 500);
         }
-
-        return response()->json([
-            'ventasPorDia' => $ventasPorDia,
-            'topProductos' => $topProductos,
-            'detalleVentas' => $detalleVentas->sortByDesc('fecha')->values()
-        ]);
     }
 
-    // API para obtener datos de servicios
-    public function getServiciosData(Request $request)
+    /**
+     * Get ingresos report.
+     */
+    public function reporteIngresos(ReporteFechasRequest $request): JsonResponse
     {
-        $fechaDesde = $request->get('fecha_desde', now()->startOfMonth()->toDateString());
-        $fechaHasta = $request->get('fecha_hasta', now()->toDateString());
-
-        // Servicios más populares (lavados)
-        $serviciosPopulares = Lavado::whereBetween('fecha', [$fechaDesde, $fechaHasta])
-            ->selectRaw('tipo_servicio, COUNT(*) as cantidad, SUM(precio) as ingresos')
-            ->groupBy('tipo_servicio')
-            ->orderByDesc('ingresos')
-            ->get()
-            ->map(function($servicio) {
-                return [
-                    'tipo' => $servicio->tipo_servicio ?? 'Lavado estándar',
-                    'cantidad' => $servicio->cantidad,
-                    'ingresos' => (float) $servicio->ingresos
-                ];
-            });
-
-        return response()->json([
-            'serviciosPopulares' => $serviciosPopulares
-        ]);
+        try {
+            $reporte = $this->reporteService->getReporteIngresos(
+                $request->fecha_inicio,
+                $request->fecha_fin,
+                $request->formato ?? 'json'
+            );
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $reporte
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al generar reporte de ingresos: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
-    // API para obtener datos de clientes
-    public function getClientesData(Request $request)
+    /**
+     * Get egresos report.
+     */
+    public function reporteEgresos(ReporteFechasRequest $request): JsonResponse
     {
-        $fechaDesde = $request->get('fecha_desde', now()->startOfMonth()->toDateString());
-        $fechaHasta = $request->get('fecha_hasta', now()->toDateString());
-
-        // Top clientes por facturación
-        $topClientes = Cliente::withSum(['facturas as total_gastado' => function($query) use ($fechaDesde, $fechaHasta) {
-            $query->whereBetween('fecha_emision', [$fechaDesde, $fechaHasta]);
-        }], 'monto_total')
-        ->withCount(['facturas as visitas' => function($query) use ($fechaDesde, $fechaHasta) {
-            $query->whereBetween('fecha_emision', [$fechaDesde, $fechaHasta]);
-        }])
-        ->having('total_gastado', '>', 0)
-        ->orderByDesc('total_gastado')
-        ->limit(5)
-        ->get()
-        ->map(function($cliente) {
-            return [
-                'nombre' => $cliente->nombre,
-                'visitas' => $cliente->visitas,
-                'gastado' => (float) $cliente->total_gastado
-            ];
-        });
-
-        // Análisis de clientes
-        $clientesTotales = Cliente::count();
-        $clientesNuevos = Cliente::whereBetween('created_at', [$fechaDesde, $fechaHasta])->count();
-        $clientesRecurrentes = Cliente::whereHas('facturas', function($query) use ($fechaDesde, $fechaHasta) {
-            $query->whereBetween('fecha_emision', [$fechaDesde, $fechaHasta]);
-        })->count();
-        
-        $promedioVisitas = $clientesTotales > 0 ? 
-            Factura::whereBetween('fecha_emision', [$fechaDesde, $fechaHasta])->count() / $clientesTotales : 0;
-
-        $analisisClientes = [
-            'nuevos' => $clientesNuevos,
-            'recurrentes' => $clientesRecurrentes,
-            'promedioVisitas' => round($promedioVisitas, 1)
-        ];
-
-        return response()->json([
-            'topClientes' => $topClientes,
-            'analisisClientes' => $analisisClientes
-        ]);
+        try {
+            $reporte = $this->reporteService->getReporteEgresos(
+                $request->fecha_inicio,
+                $request->fecha_fin,
+                $request->formato ?? 'json'
+            );
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $reporte
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al generar reporte de egresos: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
-    // API para obtener datos de empleados
-    public function getEmpleadosData(Request $request)
+    /**
+     * Get facturas report.
+     */
+    public function reporteFacturas(ReporteFechasRequest $request): JsonResponse
     {
-        $fechaDesde = $request->get('fecha_desde', now()->startOfMonth()->toDateString());
-        $fechaHasta = $request->get('fecha_hasta', now()->toDateString());
+        try {
+            $reporte = $this->reporteService->getReporteFacturas(
+                $request->fecha_inicio,
+                $request->fecha_fin,
+                $request->formato ?? 'json'
+            );
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $reporte
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al generar reporte de facturas: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 
-        // Productividad por empleado basada en lavados
-        $productividadEmpleados = Empleado::withCount(['lavados as servicios' => function($query) use ($fechaDesde, $fechaHasta) {
-            $query->whereBetween('fecha', [$fechaDesde, $fechaHasta]);
-        }])
-        ->withSum(['lavados as ingresos' => function($query) use ($fechaDesde, $fechaHasta) {
-            $query->whereBetween('fecha', [$fechaDesde, $fechaHasta]);
-        }], 'precio')
-        ->having('servicios', '>', 0)
-        ->orderByDesc('ingresos')
-        ->get()
-        ->map(function($empleado) {
-            return [
-                'nombre' => $empleado->nombre,
-                'servicios' => $empleado->servicios,
-                'ingresos' => (float) $empleado->ingresos
-            ];
-        });
+    /**
+     * Get empleados report.
+     */
+    public function reporteEmpleados(ReporteFechasRequest $request): JsonResponse
+    {
+        try {
+            $reporte = $this->reporteService->getReporteEmpleados(
+                $request->fecha_inicio,
+                $request->fecha_fin,
+                $request->formato ?? 'json'
+            );
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $reporte
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al generar reporte de empleados: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 
-        return response()->json([
-            'productividadEmpleados' => $productividadEmpleados
-        ]);
+    /**
+     * Get productos report.
+     */
+    public function reporteProductos(Request $request): JsonResponse
+    {
+        try {
+            $reporte = $this->reporteService->getReporteProductos(
+                $request->formato ?? 'json'
+            );
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $reporte
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al generar reporte de productos: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get clientes report.
+     */
+    public function reporteClientes(Request $request): JsonResponse
+    {
+        try {
+            $reporte = $this->reporteService->getReporteClientes(
+                $request->formato ?? 'json'
+            );
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $reporte
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al generar reporte de clientes: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get financial report.
+     */
+    public function reporteFinanciero(ReporteFechasRequest $request): JsonResponse
+    {
+        try {
+            $reporte = $this->reporteService->getReporteFinanciero(
+                $request->fecha_inicio,
+                $request->fecha_fin,
+                $request->formato ?? 'json'
+            );
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $reporte
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al generar reporte financiero: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get balance report.
+     */
+    public function reporteBalance(ReporteFechasRequest $request): JsonResponse
+    {
+        try {
+            $reporte = $this->reporteService->getReporteBalance(
+                $request->fecha_inicio,
+                $request->fecha_fin,
+                $request->formato ?? 'json'
+            );
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $reporte
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al generar reporte de balance: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get complete business report.
+     */
+    public function reporteCompleto(ReporteFechasRequest $request): JsonResponse
+    {
+        try {
+            $reporte = $this->reporteService->getReporteCompleto(
+                $request->fecha_inicio,
+                $request->fecha_fin
+            );
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $reporte
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al generar reporte completo: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

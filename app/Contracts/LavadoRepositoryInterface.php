@@ -26,7 +26,7 @@ interface LavadoRepositoryInterface
     /**
      * Crear nuevo lavado
      */
-    public function create(array $data): Lavado;
+    public function create(array $data): array;
 
     /**
      * Actualizar lavado

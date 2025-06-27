@@ -28,8 +28,17 @@ Route::middleware('auth:sanctum')->get('/user', [AuthController::class, 'user'])
 
 Route::middleware('auth:sanctum')->group(function () {
     // Dashboard
-    Route::get('/dashboard', [DashboardController::class, 'apiData']);
+    Route::get('/dashboard', [DashboardController::class, 'apiData']); // Legacy endpoint
+    Route::get('/dashboard/data', [DashboardController::class, 'getData']);
+    Route::get('/dashboard/metricas', [DashboardController::class, 'getMetricas']);
+    Route::get('/dashboard/actividad', [DashboardController::class, 'getActividadReciente']);
+    Route::get('/dashboard/citas', [DashboardController::class, 'getProximasCitas']);
     Route::get('/dashboard/charts', [DashboardController::class, 'getChartData']);
+    Route::get('/dashboard/alertas', [DashboardController::class, 'getAlertas']);
+    Route::get('/dashboard/estadisticas', [DashboardController::class, 'getEstadisticas']);
+    Route::get('/dashboard/analisis-financiero', [DashboardController::class, 'getAnalisisFinanciero']);
+    Route::get('/dashboard/rendimiento-operativo', [DashboardController::class, 'getRendimientoOperativo']);
+    Route::get('/dashboard/resumen-completo', [DashboardController::class, 'getResumenCompleto']);
     
     // Ruta de prueba
     Route::get('/test/data', [TestController::class, 'testData']);
@@ -161,12 +170,43 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/ventas/productos-disponibles', [VentaController::class, 'getProductosDisponibles']);
     Route::get('/ventas/clientes', [VentaController::class, 'getClientes']);
 
+    // Reportes
+    Route::get('/reportes', [ReporteController::class, 'index']);
+    Route::get('/reportes/ventas', [ReporteController::class, 'reporteVentas']);
+    Route::get('/reportes/lavados', [ReporteController::class, 'reporteLavados']);
+    Route::get('/reportes/ingresos', [ReporteController::class, 'reporteIngresos']);
+    Route::get('/reportes/egresos', [ReporteController::class, 'reporteEgresos']);
+    Route::get('/reportes/facturas', [ReporteController::class, 'reporteFacturas']);
+    Route::get('/reportes/empleados', [ReporteController::class, 'reporteEmpleados']);
+    Route::get('/reportes/productos', [ReporteController::class, 'reporteProductos']);
+    Route::get('/reportes/clientes', [ReporteController::class, 'reporteClientes']);
+    Route::get('/reportes/financiero', [ReporteController::class, 'reporteFinanciero']);
+    Route::get('/reportes/balance', [ReporteController::class, 'reporteBalance']);
+    Route::get('/reportes/completo', [ReporteController::class, 'reporteCompleto']);
+
     // CRUD de usuarios
     Route::get('/usuarios', [UserController::class, 'index']);
     Route::post('/usuarios', [UserController::class, 'store']);
+    Route::get('/usuarios/activos', [UserController::class, 'getActiveUsers']);
+    Route::get('/usuarios/estadisticas', [UserController::class, 'getStats']);
     Route::get('/usuarios/{id}', [UserController::class, 'show']);
     Route::put('/usuarios/{id}', [UserController::class, 'update']);
     Route::delete('/usuarios/{id}', [UserController::class, 'destroy']);
+    Route::put('/usuarios/{id}/password', [UserController::class, 'updatePassword']);
+    Route::put('/usuarios/{id}/reset-password', [UserController::class, 'resetPassword']);
+    Route::put('/usuarios/{id}/verify-email', [UserController::class, 'verifyEmail']);
+
+    // Balance y Análisis Financiero
+    Route::get('/balance/general', [BalanceController::class, 'balanceGeneral']);
+    Route::get('/balance/categorias', [BalanceController::class, 'balancePorCategoria']);
+    Route::get('/balance/mensual', [BalanceController::class, 'balancePorMes']);
+    Route::get('/balance/trimestral', [BalanceController::class, 'balancePorTrimestre']);
+    Route::get('/balance/anual', [BalanceController::class, 'balanceAnual']);
+    Route::get('/balance/flujo-caja', [BalanceController::class, 'flujoCaja']);
+    Route::get('/balance/indicadores', [BalanceController::class, 'indicadoresFinancieros']);
+    Route::get('/balance/comparativo', [BalanceController::class, 'comparativoMensual']);
+    Route::get('/balance/proyeccion', [BalanceController::class, 'proyeccion']);
+    Route::get('/balance/resumen', [BalanceController::class, 'resumenCompleto']);
 
     // Ruta de prueba para TestController
     Route::get('/test', [TestController::class, 'index']);

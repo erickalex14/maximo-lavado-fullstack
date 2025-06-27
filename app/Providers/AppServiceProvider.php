@@ -73,8 +73,38 @@ class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->bind(
+            \App\Contracts\VentaProductoAutomotrizRepositoryInterface::class,
+            \App\Repositories\VentaProductoAutomotrizRepository::class
+        );
+
+        $this->app->bind(
+            \App\Contracts\VentaProductoDespensaRepositoryInterface::class,
+            \App\Repositories\VentaProductoDespensaRepository::class
+        );
+
+        $this->app->bind(
             \App\Contracts\VentaRepositoryInterface::class,
             \App\Repositories\VentaRepository::class
+        );
+
+        $this->app->bind(
+            \App\Contracts\ReporteRepositoryInterface::class,
+            \App\Repositories\ReporteRepository::class
+        );
+
+        $this->app->bind(
+            \App\Contracts\UserRepositoryInterface::class,
+            \App\Repositories\UserRepository::class
+        );
+
+        $this->app->bind(
+            \App\Contracts\BalanceRepositoryInterface::class,
+            \App\Repositories\BalanceRepository::class
+        );
+
+        $this->app->bind(
+            \App\Contracts\DashboardRepositoryInterface::class,
+            \App\Repositories\DashboardRepository::class
         );
     }
 

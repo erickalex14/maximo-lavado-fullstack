@@ -11,7 +11,7 @@ interface VentaProductoAutomotrizRepositoryInterface
     
     public function findById(int $id): ?VentaProductoAutomotriz;
     
-    public function create(array $data): VentaProductoAutomotriz;
+    public function create(array $data): array;
     
     public function update(int $id, array $data): ?VentaProductoAutomotriz;
     
