@@ -244,4 +244,149 @@ class DashboardController extends Controller
             'lavadosPorDia' => $lavadosPorDia
         ]);
     }
+
+    // API para el dashboard (datos reales)
+    public function apiData()
+    {
+        try {
+            $today = Carbon::today();
+            $thisWeek = Carbon::now()->startOfWeek();
+            $thisMonth = Carbon::now()->startOfMonth();
+
+            // Estadísticas del día
+            $ingresosHoy = Ingreso::whereDate('created_at', $today)->sum('monto') ?? 0;
+            $lavadosHoy = Lavado::whereDate('created_at', $today)->count() ?? 0;
+            
+            // Productos vendidos hoy (tanto automotriz como despensa)
+            $productosAutomotrizHoy = VentaProductoAutomotriz::whereDate('created_at', $today)->sum('cantidad') ?? 0;
+            $productosDespensaHoy = VentaProductoDespensa::whereDate('created_at', $today)->sum('cantidad') ?? 0;
+            $productosVendidosHoy = $productosAutomotrizHoy + $productosDespensaHoy;
+            
+            // Clientes nuevos este mes
+            $clientesNuevos = Cliente::whereDate('created_at', '>=', $thisMonth)->count() ?? 0;
+
+            // Lavados recientes (últimos 5)
+            $lavadosRecientes = Lavado::with(['cliente', 'vehiculo'])
+                ->orderBy('created_at', 'desc')
+                ->limit(5)
+                ->get()
+                ->map(function ($lavado) {
+                    return [
+                        'id' => $lavado->id,
+                        'cliente' => $lavado->cliente->nombre ?? 'Cliente desconocido',
+                        'vehiculo' => ($lavado->vehiculo->marca ?? '') . ' ' . ($lavado->vehiculo->modelo ?? '') . ' ' . ($lavado->vehiculo->año ?? ''),
+                        'tipo_lavado' => $lavado->tipo_lavado ?? 'Básico',
+                        'total' => $lavado->precio_total ?? 0,
+                        'estado' => $lavado->estado ?? 'Completado',
+                        'fecha' => $lavado->created_at->toISOString(),
+                    ];
+                });
+
+            // Ingresos de la última semana
+            $ingresosSemanales = Ingreso::where('created_at', '>=', $thisWeek)
+                ->selectRaw('DATE(created_at) as fecha, SUM(monto) as total')
+                ->groupByRaw('DATE(created_at)')
+                ->orderBy('fecha')
+                ->get()
+                ->map(function ($ingreso) {
+                    return [
+                        'fecha' => $ingreso->fecha,
+                        'total' => $ingreso->total ?? 0
+                    ];
+                });
+
+            // Servicios más populares
+            $serviciosPopulares = Lavado::selectRaw('tipo_lavado, COUNT(*) as cantidad')
+                ->whereDate('created_at', '>=', $thisMonth)
+                ->groupBy('tipo_lavado')
+                ->orderBy('cantidad', 'desc')
+                ->limit(5)
+                ->get()
+                ->map(function ($servicio) {
+                    return [
+                        'nombre' => $servicio->tipo_lavado ?? 'Básico',
+                        'cantidad' => $servicio->cantidad ?? 0
+                    ];
+                });
+
+            // Alertas del sistema
+            $alertas = [];
+            
+            // Verificar stock bajo en productos automotriz
+            $productosStockBajo = ProductoAutomotriz::where('stock', '<=', 5)->count();
+            
+            if ($productosStockBajo > 0) {
+                $alertas[] = [
+                    'tipo' => 'warning',
+                    'titulo' => 'Stock Bajo',
+                    'mensaje' => "{$productosStockBajo} productos con stock bajo",
+                    'fecha' => now()->toISOString()
+                ];
+            }
+
+            // Verificar lavados pendientes
+            $lavadosPendientes = Lavado::where('estado', 'En proceso')->count();
+            
+            if ($lavadosPendientes > 0) {
+                $alertas[] = [
+                    'tipo' => 'info',
+                    'titulo' => 'Lavados Pendientes',
+                    'mensaje' => "{$lavadosPendientes} lavados en proceso",
+                    'fecha' => now()->toISOString()
+                ];
+            }
+
+            // Si no hay alertas, agregar una de bienvenida
+            if (empty($alertas)) {
+                $alertas[] = [
+                    'tipo' => 'info',
+                    'titulo' => 'Sistema Funcionando',
+                    'mensaje' => 'Todo está funcionando correctamente',
+                    'fecha' => now()->toISOString()
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'stats' => [
+                        'ingresos_hoy' => $ingresosHoy,
+                        'lavados_hoy' => $lavadosHoy,
+                        'productos_vendidos_hoy' => $productosVendidosHoy,
+                        'clientes_nuevos' => $clientesNuevos
+                    ],
+                    'lavados_recientes' => $lavadosRecientes,
+                    'ingresos_semanales' => $ingresosSemanales,
+                    'servicios_populares' => $serviciosPopulares,
+                    'alertas' => $alertas
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error en dashboard API: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'stats' => [
+                        'ingresos_hoy' => 0,
+                        'lavados_hoy' => 0,
+                        'productos_vendidos_hoy' => 0,
+                        'clientes_nuevos' => 0
+                    ],
+                    'lavados_recientes' => [],
+                    'ingresos_semanales' => [],
+                    'servicios_populares' => [],
+                    'alertas' => [
+                        [
+                            'tipo' => 'info',
+                            'titulo' => 'Sistema Nuevo',
+                            'mensaje' => 'No hay datos disponibles. Comienza agregando información.',
+                            'fecha' => now()->toISOString()
+                        ]
+                    ]
+                ]
+            ]);
+        }
+    }
 }

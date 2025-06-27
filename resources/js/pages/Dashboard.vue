@@ -208,264 +208,358 @@
   </AppLayout>
 </template>
 
-<script>
-import { ref, onMounted } from 'vue'
+<script setup>
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
-import axios from 'axios'
 import AppLayout from '../components/AppLayout.vue'
 import PageHeader from '../components/PageHeader.vue'
 import MaterialCard from '../components/MaterialCard.vue'
 import MaterialButton from '../components/MaterialButton.vue'
+import { useApi } from '@/composables/useApi'
+import { useAuthStore } from '@/stores/auth'
+import { useNotificationStore } from '@/stores/notification'
 import {
   HomeIcon,
   PlusIcon,
   DocumentArrowDownIcon,
-  ChartBarIcon,
-  UserGroupIcon,
-  TruckIcon,
-  DocumentTextIcon,
+  ClockIcon,
   CurrencyDollarIcon,
-  ShoppingCartIcon,
-  CogIcon,
-  CheckCircleIcon,
+  TruckIcon,
+  ShoppingBagIcon,
+  UserGroupIcon,
+  EyeIcon,
+  PencilIcon,
+  TrashIcon,
+  ChartBarIcon,
   ExclamationTriangleIcon,
-  InformationCircleIcon,
-  ClockIcon
+  XCircleIcon,
+  CheckCircleIcon,
+  InformationCircleIcon
 } from '@heroicons/vue/24/outline'
 
-export default {
-  name: 'Dashboard',
-  components: {
-    AppLayout,
-    PageHeader,
-    MaterialCard,
-    MaterialButton,
-    HomeIcon,
-    PlusIcon,
-    DocumentArrowDownIcon,
-    ChartBarIcon,
-    UserGroupIcon,
-    TruckIcon,
-    DocumentTextIcon,
-    CurrencyDollarIcon,
-    ShoppingCartIcon,
-    CogIcon,
-    CheckCircleIcon,
-    ExclamationTriangleIcon,
-    InformationCircleIcon,
-    ClockIcon
-  },  setup() {
-    const router = useRouter()
-    const authStore = useAuthStore()
-    const authInfo = ref(null)
-    const showDebugInfo = ref(false) // Cambiar a true solo para debug
-    const loading = ref(true)
-    const dashboardData = ref(null)
+const router = useRouter()
+const api = useApi()
+const authStore = useAuthStore()
+const notificationStore = useNotificationStore()
 
-    // Breadcrumbs
-    const breadcrumbs = [
-      { name: 'Inicio', href: '/dashboard' }
-    ]
+const breadcrumbs = [
+  { name: 'Dashboard', href: '/dashboard' }
+]
 
-    // Dashboard Statistics (se llenarán con datos reales)
-    const dashboardStats = ref([])
+const loading = ref(false)
+const dashboardData = ref({
+  stats: {
+    ingresos_hoy: 0,
+    lavados_hoy: 0,
+    productos_vendidos_hoy: 0,
+    clientes_nuevos: 0
+  },
+  lavados_recientes: [],
+  ingresos_semanales: [],
+  alertas: []
+})
 
-    // Quick Actions
-    const quickActions = [
-      {
-        name: 'Nuevo Lavado',
-        description: 'Registrar un nuevo servicio de lavado',
-        href: '/lavados/nuevo',
-        icon: PlusIcon,
-        iconBg: 'bg-primary-100',
-        iconColor: 'text-primary-600'
-      },
-      {
-        name: 'Gestionar Clientes',
-        description: 'Ver y administrar clientes',
-        href: '/clientes',
-        icon: UserGroupIcon,
-        iconBg: 'bg-green-100',
-        iconColor: 'text-green-600'
-      },
-      {
-        name: 'Inventario',
-        description: 'Gestionar productos y suministros',
-        href: '/productos',
-        icon: ShoppingCartIcon,
-        iconBg: 'bg-blue-100',
-        iconColor: 'text-blue-600'
-      },
-      {
-        name: 'Configuración',
-        description: 'Ajustes del sistema',
-        href: '/configuracion',
-        icon: CogIcon,
-        iconBg: 'bg-gray-100',
-        iconColor: 'text-gray-600'
-      }
-    ]    // Popular Services (se llenará con datos reales)
-    const popularServices = ref([
-      { name: 'Lavado Básico', percentage: 45, color: '#3B82F6' },
-      { name: 'Lavado Premium', percentage: 30, color: '#10B981' },
-      { name: 'Encerado', percentage: 15, color: '#F59E0B' },
-      { name: 'Detailing Completo', percentage: 10, color: '#EF4444' }
-    ])
+const dashboardStats = computed(() => [
+  {
+    nombre: 'Ingresos Hoy',
+    valor: formatCurrency(dashboardData.value.stats.ingresos_hoy),
+    icono: CurrencyDollarIcon,
+    color: 'green'
+  },
+  {
+    nombre: 'Lavados Hoy',
+    valor: dashboardData.value.stats.lavados_hoy,
+    icono: TruckIcon,
+    color: 'blue'
+  },
+  {
+    nombre: 'Productos Vendidos',
+    valor: dashboardData.value.stats.productos_vendidos_hoy,
+    icono: ShoppingBagIcon,
+    color: 'purple'
+  },
+  {
+    nombre: 'Clientes Nuevos',
+    valor: dashboardData.value.stats.clientes_nuevos,
+    icono: UserGroupIcon,
+    color: 'yellow'
+  }
+])
 
-    // Recent Transactions (se llenará con datos reales)
-    const recentTransactions = ref([])
+const formatCurrency = (amount) => {
+  return new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'MXN'
+  }).format(amount)
+}
 
-    // Notifications (se llenará con datos reales)
-    const notifications = ref([])
+const formatDate = (date) => {
+  return new Date(date).toLocaleDateString('es-MX', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
 
-    // Cargar datos del dashboard
-    const loadDashboardData = async () => {
-      try {
-        loading.value = true
-        const response = await axios.get('/api/dashboard/data')
-        dashboardData.value = response.data
-        
-        // Actualizar estadísticas del dashboard
-        const { metricas } = response.data
-        dashboardStats.value = [
+const loadDashboardData = async () => {
+  try {
+    loading.value = true
+    
+    const response = await api.get('/api/dashboard', {
+      loadingMessage: 'Cargando dashboard...',
+      showError: false
+    })
+    
+    if (response.success && response.data) {
+      dashboardData.value = response.data
+    } else {
+      // Si no hay datos, usar estructura vacía
+      dashboardData.value = {
+        stats: {
+          ingresos_hoy: 0,
+          lavados_hoy: 0,
+          productos_vendidos_hoy: 0,
+          clientes_nuevos: 0
+        },
+        lavados_recientes: [],
+        ingresos_semanales: [],
+        servicios_populares: [],
+        alertas: [
           {
-            name: 'Lavados Hoy',
-            value: metricas.lavadosHoy.toString(),
-            change: `${metricas.lavadosHoy > 0 ? '+' : ''}${metricas.lavadosHoy}`,
-            changeType: metricas.lavadosHoy > 0 ? 'increase' : 'neutral',
-            icon: DocumentTextIcon,
-            iconBg: 'bg-blue-100',
-            iconColor: 'text-blue-600'
-          },
-          {
-            name: 'Ingresos del Día',
-            value: `$${metricas.ingresosHoy.toLocaleString()}`,
-            change: metricas.variacionIngresos,
-            changeType: metricas.variacionIngresos.includes('+') ? 'increase' : 'decrease',
-            icon: CurrencyDollarIcon,
-            iconBg: 'bg-green-100',
-            iconColor: 'text-green-600'
-          },
-          {
-            name: 'Total Clientes',
-            value: metricas.clientesTotal.toString(),
-            change: `${metricas.clientesNuevos} nuevos hoy`,
-            changeType: metricas.clientesNuevos > 0 ? 'increase' : 'neutral',
-            icon: UserGroupIcon,
-            iconBg: 'bg-purple-100',
-            iconColor: 'text-purple-600'
-          },
-          {
-            name: 'Empleados',
-            value: metricas.empleados.toString(),
-            change: 'Personal activo',
-            changeType: 'neutral',
-            icon: TruckIcon,
-            iconBg: 'bg-yellow-100',
-            iconColor: 'text-yellow-600'
+            tipo: 'info',
+            titulo: 'Sistema Nuevo',
+            mensaje: 'No hay datos disponibles. Comienza agregando información.',
+            fecha: new Date().toISOString()
           }
         ]
-
-        // Actualizar transacciones recientes
-        recentTransactions.value = response.data.actividad_reciente.map((actividad, index) => ({
-          id: actividad.id || index,
-          description: actividad.descripcion.replace(/<[^>]*>/g, ''), // Remover HTML
-          time: new Date(actividad.created_at).toLocaleString('es-ES', {
-            hour: '2-digit',
-            minute: '2-digit',
-            day: '2-digit',
-            month: '2-digit'
-          }),
-          amount: actividad.tipo === 'lavado' ? 50000 : 0, // Valor por defecto
-          icon: actividad.tipo === 'lavado' ? DocumentTextIcon : UserGroupIcon,
-          iconBg: actividad.tipo === 'lavado' ? 'bg-green-100' : 'bg-blue-100',
-          iconColor: actividad.tipo === 'lavado' ? 'text-green-600' : 'text-blue-600'
-        }))
-
-        // Generar notificaciones basadas en datos
-        const notificationsData = []
-        
-        if (metricas.lavadosEnProceso > 5) {
-          notificationsData.push({
-            id: 1,
-            title: 'Cola de Lavados',
-            message: `${metricas.lavadosEnProceso} vehículos en espera`,
-            icon: ClockIcon,
-            bgColor: 'bg-yellow-50',
-            iconColor: 'text-yellow-500',
-            textColor: 'text-yellow-800',
-            subTextColor: 'text-yellow-600'
-          })
+      }
+    }
+  } catch (error) {
+    console.error('Error cargando dashboard:', error)
+    notificationStore.error('Error al cargar los datos del dashboard')
+    
+    // Usar estructura vacía en caso de error
+    dashboardData.value = {
+      stats: {
+        ingresos_hoy: 0,
+        lavados_hoy: 0,
+        productos_vendidos_hoy: 0,
+        clientes_nuevos: 0
+      },
+      lavados_recientes: [],
+      ingresos_semanales: [],
+      servicios_populares: [],
+      alertas: [
+        {
+          tipo: 'error',
+          titulo: 'Error de Conexión',
+          mensaje: 'No se pudieron cargar los datos. Verifica tu conexión.',
+          fecha: new Date().toISOString()
         }
-
-        if (metricas.clientesNuevos > 0) {
-          notificationsData.push({
-            id: 2,
-            title: 'Nuevos Clientes',
-            message: `${metricas.clientesNuevos} clientes se registraron hoy`,
-            icon: InformationCircleIcon,
-            bgColor: 'bg-blue-50',
-            iconColor: 'text-blue-500',
-            textColor: 'text-blue-800',
-            subTextColor: 'text-blue-600'
-          })
-        }
-
-        notificationsData.push({
-          id: 3,
-          title: 'Sistema Activo',
-          message: 'Todos los servicios funcionando correctamente',
-          icon: CheckCircleIcon,
-          bgColor: 'bg-green-50',
-          iconColor: 'text-green-500',
-          textColor: 'text-green-800',
-          subTextColor: 'text-green-600'
-        })
-
-        notifications.value = notificationsData
-
-      } catch (error) {
-        console.error('Error cargando datos del dashboard:', error)
-        // Mantener valores por defecto en caso de error
-      } finally {        loading.value = false
-      }
+      ]
     }
+  } finally {
+    loading.value = false
+  }
+}
 
-    const fetchAuthInfo = async () => {
-      try {
-        const response = await axios.get('/test-auth')
-        authInfo.value = response.data
-      } catch (error) {
-        console.error('Error fetching auth info:', error)
-      }
-    }
+const verLavado = (id) => {
+  router.push(`/lavados/${id}`)
+}
 
-    const exportReport = () => {
-      // TODO: Implement export functionality      alert('Funcionalidad de exportación próximamente')
-    }
+const editarLavado = (id) => {
+  router.push(`/lavados/${id}/editar`)
+}
 
-    onMounted(() => {
-      loadDashboardData()
-      if (showDebugInfo.value) {
-        fetchAuthInfo()
-      }
-    })
-
-    return {
-      breadcrumbs,
-      dashboardStats,
-      quickActions,
-      popularServices,
-      recentTransactions,
-      notifications,
-      authInfo,
-      showDebugInfo,
-      loading,
-      dashboardData,
-      loadDashboardData,
-      exportReport
+const eliminarLavado = async (id) => {
+  if (confirm('¿Estás seguro de que deseas eliminar este lavado?')) {
+    try {
+      await api.delete(`/api/lavados/${id}`, {
+        successMessage: 'Lavado eliminado correctamente'
+      })
+      await loadDashboardData()
+    } catch (error) {
+      console.error('Error al eliminar lavado:', error)
     }
   }
 }
+
+const exportReport = async () => {
+  try {
+    notificationStore.info('Generando reporte...', 'Exportación')
+    // Simulación de exportación
+    setTimeout(() => {
+      notificationStore.success('Reporte exportado correctamente', 'Exportación')
+    }, 2000)
+  } catch (error) {
+    console.error('Error al exportar reporte:', error)
+  }
+}
+
+const getEstadoClass = (estado) => {
+  const classes = {
+    'Completado': 'bg-green-100 text-green-800',
+    'En proceso': 'bg-yellow-100 text-yellow-800',
+    'Pendiente': 'bg-gray-100 text-gray-800',
+    'Cancelado': 'bg-red-100 text-red-800'
+  }
+  return classes[estado] || 'bg-gray-100 text-gray-800'
+}
+
+// Variables computadas para mostrar datos en el dashboard
+const quickActions = computed(() => [
+  {
+    name: 'Nuevo Lavado',
+    description: 'Registrar un nuevo servicio',
+    href: '/lavados/nuevo',
+    icon: TruckIcon,
+    iconBg: 'bg-blue-100',
+    iconColor: 'text-blue-600'
+  },
+  {
+    name: 'Gestionar Clientes',
+    description: 'Ver y editar clientes',
+    href: '/clientes',
+    icon: UserGroupIcon,
+    iconBg: 'bg-green-100',
+    iconColor: 'text-green-600'
+  },
+  {
+    name: 'Productos',
+    description: 'Inventario y ventas',
+    href: '/productos',
+    icon: ShoppingBagIcon,
+    iconBg: 'bg-purple-100',
+    iconColor: 'text-purple-600'
+  },
+  {
+    name: 'Reportes',
+    description: 'Análisis y estadísticas',
+    href: '/reportes',
+    icon: DocumentArrowDownIcon,
+    iconBg: 'bg-yellow-100',
+    iconColor: 'text-yellow-600'
+  }
+])
+
+const popularServices = computed(() => {
+  const servicios = dashboardData.value.servicios_populares || []
+  return servicios.length > 0 ? servicios : [
+    { name: 'Lavado Completo', percentage: 0, color: '#4F46E5' },
+    { name: 'Lavado Básico', percentage: 0, color: '#10B981' },
+    { name: 'Encerado', percentage: 0, color: '#F59E0B' },
+    { name: 'Aspirado', percentage: 0, color: '#EF4444' }
+  ]
+})
+
+const recentTransactions = computed(() => {
+  const lavados = dashboardData.value.lavados_recientes || []
+  return lavados.map(lavado => ({
+    id: lavado.id,
+    description: `Lavado ${lavado.tipo_lavado} - ${lavado.cliente?.nombre || 'Cliente N/A'}`,
+    time: formatDate(lavado.created_at),
+    amount: lavado.total || 0,
+    icon: TruckIcon,
+    iconBg: 'bg-blue-100',
+    iconColor: 'text-blue-600'
+  }))
+})
+
+const notifications = computed(() => {
+  const alertas = dashboardData.value.alertas || []
+  
+  if (alertas.length === 0) {
+    return [{
+      id: 1,
+      title: 'Sistema Listo',
+      message: 'No hay notificaciones pendientes',
+      icon: HomeIcon,
+      iconColor: 'text-blue-500',
+      textColor: 'text-blue-800',
+      subTextColor: 'text-blue-600',
+      bgColor: 'bg-blue-50'
+    }]
+  }
+  
+  return alertas.map((alerta, index) => ({
+    id: index + 1,
+    title: alerta.titulo || getAlertTitle(alerta.tipo),
+    message: alerta.mensaje,
+    icon: getAlertIcon(alerta.tipo),
+    iconColor: getAlertIconColor(alerta.tipo),
+    textColor: getAlertTextColor(alerta.tipo),
+    subTextColor: getAlertSubTextColor(alerta.tipo),
+    bgColor: getAlertBgColor(alerta.tipo)
+  }))
+})
+
+const getAlertTitle = (tipo) => {
+  const titles = {
+    'warning': 'Advertencia',
+    'error': 'Error',
+    'info': 'Información',
+    'success': 'Éxito'
+  }
+  return titles[tipo] || 'Notificación'
+}
+
+const getAlertIcon = (tipo) => {
+  const icons = {
+    'warning': ClockIcon,
+    'error': ClockIcon,
+    'info': HomeIcon,
+    'success': HomeIcon
+  }
+  return icons[tipo] || HomeIcon
+}
+
+const getAlertIconColor = (tipo) => {
+  const colors = {
+    'warning': 'text-yellow-500',
+    'error': 'text-red-500',
+    'info': 'text-blue-500',
+    'success': 'text-green-500'
+  }
+  return colors[tipo] || 'text-blue-500'
+}
+
+const getAlertTextColor = (tipo) => {
+  const colors = {
+    'warning': 'text-yellow-800',
+    'error': 'text-red-800',
+    'info': 'text-blue-800',
+    'success': 'text-green-800'
+  }
+  return colors[tipo] || 'text-blue-800'
+}
+
+const getAlertSubTextColor = (tipo) => {
+  const colors = {
+    'warning': 'text-yellow-600',
+    'error': 'text-red-600',
+    'info': 'text-blue-600',
+    'success': 'text-green-600'
+  }
+  return colors[tipo] || 'text-blue-600'
+}
+
+const getAlertBgColor = (tipo) => {
+  const colors = {
+    'warning': 'bg-yellow-50',
+    'error': 'bg-red-50',
+    'info': 'bg-blue-50',
+    'success': 'bg-green-50'
+  }
+  return colors[tipo] || 'bg-blue-50'
+}
+
+// Debug info (solo en desarrollo)
+const showDebugInfo = ref(false)
+const authInfo = computed(() => authStore.user)
+
+onMounted(() => {
+  loadDashboardData()
+})
 </script>

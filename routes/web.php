@@ -9,23 +9,11 @@ use App\Http\Controllers\AuthController;
 Route::post('/login', [AuthController::class, 'loginWeb']);
 Route::post('/logout', [AuthController::class, 'logoutWeb'])->name('logout');
 
-// Ruta para crear usuario por defecto (solo desarrollo)
-Route::get('/create-default-user', [AuthController::class, 'createDefaultUser']);
-
-// Ruta de test de autenticación
-Route::get('/test-auth', function () {
-    return response()->json([
-        'authenticated' => Auth::check(),
-        'user_id' => Auth::id(),
-        'session_id' => session()->getId(),
-        'session_user_id' => session('user_id'),
-        'session_logged_in' => session('logged_in'),
-        'session_data' => session()->all()
-    ]);
-});
-
 // API Routes (protected)
 Route::middleware(['auth'])->prefix('api')->group(function () {
+    // User data
+    Route::get('/user', [AuthController::class, 'user']);
+    
     // Dashboard API
     Route::get('/dashboard/data', [DashboardController::class, 'getData']);
     

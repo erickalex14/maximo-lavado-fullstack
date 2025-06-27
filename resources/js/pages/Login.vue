@@ -85,9 +85,9 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { useAuthStore } from '@/stores/auth'
 import MaterialCard from '../components/MaterialCard.vue'
 import MaterialInput from '../components/MaterialInput.vue'
 import MaterialButton from '../components/MaterialButton.vue'
@@ -105,7 +105,7 @@ export default {
   },
   setup() {
     const router = useRouter()
-    const loading = ref(false)
+    const authStore = useAuthStore()
     const error = ref('')
     
     const form = ref({
@@ -113,49 +113,29 @@ export default {
       password: 'password123'
     })
 
+    const loading = computed(() => authStore.loading)
+
     const login = async () => {
-      loading.value = true
       error.value = ''
       
       try {
         console.log('Attempting login with:', form.value.email)
         
-        // First, get CSRF cookie
-        await axios.get('/sanctum/csrf-cookie').catch(() => {
-          // If sanctum route doesn't exist, continue anyway
-        })
-        
-        const response = await axios.post('/login', {
+        const result = await authStore.login({
           email: form.value.email,
           password: form.value.password
-        }, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
         })
         
-        console.log('Login response:', response.data)
-        
-        if (response.data.success) {
+        if (result.success) {
           console.log('Login successful, redirecting to dashboard')
           await router.push('/dashboard')
         } else {
-          error.value = response.data.message || 'Error en el login'
+          error.value = result.message || 'Error en el login'
         }
         
       } catch (err) {
         console.error('Login error:', err)
-        
-        if (err.response?.data?.message) {
-          error.value = err.response.data.message
-        } else if (err.response?.data?.errors) {
-          error.value = Object.values(err.response.data.errors).flat().join(', ')
-        } else {
-          error.value = 'Error al conectar con el servidor'
-        }
-      } finally {
-        loading.value = false
+        error.value = 'Error inesperado al iniciar sesión'
       }
     }
 

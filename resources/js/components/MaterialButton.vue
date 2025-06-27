@@ -37,7 +37,7 @@ export default {
     variant: {
       type: String,
       default: 'filled', // filled, outlined, text
-      validator: (value) => ['filled', 'outlined', 'text'].includes(value)
+      validator: (value) => ['filled', 'outlined', 'text', 'danger', 'success', 'warning'].includes(value)
     },
     size: {
       type: String,
@@ -85,7 +85,13 @@ export default {
           return 'border-2 border-primary-500 text-primary-600 bg-transparent hover:bg-primary-50 focus:ring-primary-500'
         case 'text':
           return 'text-primary-600 bg-transparent hover:bg-primary-50 focus:ring-primary-500'
-        default: // filled
+        case 'danger':
+          return 'bg-red-500 text-white hover:bg-red-600 focus:ring-red-500 shadow-material-1 hover:shadow-material-2'
+        case 'success':
+          return 'bg-green-500 text-white hover:bg-green-600 focus:ring-green-500 shadow-material-1 hover:shadow-material-2'
+        case 'warning':
+          return 'bg-yellow-500 text-white hover:bg-yellow-600 focus:ring-yellow-500 shadow-material-1 hover:shadow-material-2'
+        default: // primary/filled
           return 'bg-primary-500 text-white hover:bg-primary-600 focus:ring-primary-500 shadow-material-1 hover:shadow-material-2'
       }
     })

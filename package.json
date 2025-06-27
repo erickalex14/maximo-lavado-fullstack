@@ -24,8 +24,10 @@
         "@heroicons/vue": "^2.2.0",
         "@material/web": "^2.3.0",
         "@vitejs/plugin-vue": "^5.2.1",
+        "chart.js": "^4.5.0",
         "pinia": "^3.0.3",
         "vue": "^3.4.21",
+        "vue-chartjs": "^5.3.2",
         "vue-router": "^4.3.0"
     }
 }

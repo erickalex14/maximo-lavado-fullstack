@@ -1,11 +1,14 @@
 import { defineStore } from 'pinia'
-import axios from 'axios'
+import { useNotificationStore } from './notification'
+import { useLoadingStore } from './loading'
+import { useApi } from '@/composables/useApi'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
     isAuthenticated: false,
-    loading: false
+    loading: false,
+    token: localStorage.getItem('auth_token') || null
   }),
 
   getters: {
@@ -14,86 +17,96 @@ export const useAuthStore = defineStore('auth', {
 
   actions: {
     async login(credentials) {
+      const loadingStore = useLoadingStore()
+      const notificationStore = useNotificationStore()
+      const api = useApi()
+      
       this.loading = true
-      try {
-        // Get CSRF cookie first
-        await axios.get('/sanctum/csrf-cookie').catch(() => {
-          // Continue if sanctum route doesn't exist
+      loadingStore.startLoading('Iniciando sesión...')
+      
+      try {        const response = await api.post('/login', credentials, {
+          showError: false
         })
 
-        const response = await axios.post('/login', credentials, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-        })
-
-        if (response.data.success) {
-          this.user = response.data.user
-          this.isAuthenticated = true
+        if (response.success) {
+          await this.fetchUser()
+          notificationStore.success('Sesión iniciada correctamente', 'Bienvenido')
           return { success: true }
         } else {
-          return { success: false, message: response.data.message }
+          notificationStore.error(response.message || 'Error al iniciar sesión')
+          return { success: false, message: response.message || 'Error al iniciar sesión' }
         }
       } catch (error) {
         console.error('Login error:', error)
-        let message = 'Error al conectar con el servidor'
-        
-        if (error.response?.data?.message) {
-          message = error.response.data.message
-        } else if (error.response?.data?.errors) {
-          message = Object.values(error.response.data.errors).flat().join(', ')
-        }
-        
+        const message = 'Error al conectar con el servidor'
+        notificationStore.error(message)
         return { success: false, message }
       } finally {
         this.loading = false
+        loadingStore.stopLoading()
+      }
+    },
+
+    async fetchUser() {
+      try {
+        const response = await fetch('/api/user', {
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': this.token ? `Bearer ${this.token}` : undefined
+          },
+          credentials: 'include'
+        })
+
+        if (response.ok) {
+          const userData = await response.json()
+          this.user = userData
+          this.isAuthenticated = true
+          return userData
+        } else if (response.status === 401) {
+          this.logout()
+        }
+      } catch (error) {
+        console.error('Error fetching user:', error)
+        this.logout()
       }
     },
 
     async logout() {
+      const loadingStore = useLoadingStore()
+      const notificationStore = useNotificationStore()
+      
+      loadingStore.startLoading('Cerrando sesión...')
+      
       try {
-        await axios.post('/logout')
+        await fetch('/logout', {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+          },
+          credentials: 'include'
+        })
       } catch (error) {
         console.error('Logout error:', error)
       } finally {
         this.user = null
         this.isAuthenticated = false
+        this.token = null
+        localStorage.removeItem('auth_token')
+        loadingStore.stopLoading()
+        notificationStore.info('Sesión cerrada correctamente')
       }
     },
 
     async checkAuth() {
-      try {
-        const response = await axios.get('/user', {
-          headers: {
-            'Accept': 'application/json'
-          }
-        })
-        
-        if (response.data.success && response.data.user) {
-          this.user = response.data.user
-          this.isAuthenticated = true
-          return true
-        }
-      } catch (error) {
-        console.error('Auth check error:', error)
+      if (this.token && !this.user) {
+        await this.fetchUser()
       }
-      
-      this.user = null
-      this.isAuthenticated = false
-      return false
     },
 
-    async fetchUser() {
-      try {
-        const response = await axios.get('/api/user')
-        this.user = response.data
-        this.isAuthenticated = true
-      } catch (error) {
-        console.error('Error fetching user:', error)
-        this.user = null
-        this.isAuthenticated = false
-      }
+    setToken(token) {
+      this.token = token
+      localStorage.setItem('auth_token', token)
     }
   }
 })

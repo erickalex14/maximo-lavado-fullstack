@@ -28,7 +28,7 @@ Route::middleware('auth:sanctum')->get('/user', [AuthController::class, 'user'])
 
 Route::middleware('auth:sanctum')->group(function () {
     // Dashboard
-    Route::get('/dashboard/data', [DashboardController::class, 'getData']);
+    Route::get('/dashboard', [DashboardController::class, 'apiData']);
     Route::get('/dashboard/charts', [DashboardController::class, 'getChartData']);
     
     // Ruta de prueba
