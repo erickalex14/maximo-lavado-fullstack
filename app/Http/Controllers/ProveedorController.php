@@ -2,142 +2,225 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Proveedor;
-use App\Models\PagoProveedor;
-use Illuminate\Http\Request;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Support\Facades\DB;
+use App\Services\ProveedorService;
+use App\Http\Requests\Proveedor\CreateProveedorRequest;
+use App\Http\Requests\Proveedor\UpdateProveedorRequest;
+use App\Http\Requests\Proveedor\RegistrarPagoRequest;
+use Illuminate\Http\JsonResponse;
 
 class ProveedorController extends Controller
 {
-    // Mostrar la vista de proveedores
-    public function indexView()
+    protected $proveedorService;
+
+    public function __construct(ProveedorService $proveedorService)
     {
-        return view('proveedores.index');
+        $this->proveedorService = $proveedorService;
     }
 
-    // Listar todos los proveedores
-    public function index()
-    {
-        $proveedores = Proveedor::all();
-        return response()->json($proveedores);
-    }
-
-    // Crear un nuevo proveedor
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'nombre' => 'required|string|max:255',
-            'telefono' => 'nullable|string|max:30',
-            'direccion' => 'nullable|string|max:255',
-            'email' => 'nullable|email|max:255',
-        ]);
-        $proveedor = Proveedor::create($validated);
-        return response()->json(['message' => 'Proveedor creado correctamente', 'proveedor' => $proveedor], 201);
-    }
-
-    // Mostrar un proveedor específico
-    public function show($id)
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(): JsonResponse
     {
         try {
-            $proveedor = Proveedor::findOrFail($id);
-            return response()->json($proveedor);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Proveedor no encontrado'], 404);
-        }
-    }
-
-    // Actualizar un proveedor
-    public function update(Request $request, $id)
-    {
-        try {
-            $proveedor = Proveedor::findOrFail($id);
-            $validated = $request->validate([
-                'nombre' => 'sometimes|required|string|max:255',
-                'telefono' => 'nullable|string|max:30',
-                'direccion' => 'nullable|string|max:255',
-                'email' => 'nullable|email|max:255',
-            ]);
-            $proveedor->update($validated);
-            return response()->json(['message' => 'Proveedor actualizado correctamente', 'proveedor' => $proveedor]);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Proveedor no encontrado'], 404);
-        }
-    }
-
-    // Eliminar un proveedor
-    public function destroy($id)
-    {
-        try {
-            $proveedor = Proveedor::findOrFail($id);
-            $proveedor->delete();
-            return response()->json(['message' => 'Proveedor eliminado correctamente']);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Proveedor no encontrado'], 404);
-        }
-    }
-
-    // Ver deuda actual del proveedor
-    public function verDeuda($id)
-    {
-        try {
-            $proveedor = Proveedor::findOrFail($id);
-            return response()->json([
-                'proveedor_id' => $proveedor->getKey(),
-                'deuda_pendiente' => $proveedor->deuda_pendiente
-            ]);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Proveedor no encontrado'], 404);
-        }
-    }
-
-    // Registrar un pago a proveedor
-    public function registrarPago(Request $request, $id)
-    {
-        $validated = $request->validate([
-            'monto' => 'required|numeric|min:0.01',
-            'descripcion' => 'nullable|string|max:255',
-        ]);
-        try {
-            $proveedor = Proveedor::findOrFail($id);
-            DB::beginTransaction();
-            $nuevoSaldo = $proveedor->deuda_pendiente - $validated['monto'];
-            if ($nuevoSaldo < 0) {
-                DB::rollBack();
-                return response()->json(['message' => 'El monto excede la deuda pendiente'], 400);
+            $proveedores = $this->proveedorService->getAllProveedores();
+            
+            if ($proveedores->isEmpty()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No hay proveedores registrados'
+                ], 404);
             }
-            $proveedor->deuda_pendiente = $nuevoSaldo;
-            $proveedor->save();
-            // Registrar el pago en la tabla pagos_proveedores
-            PagoProveedor::create([
-                'proveedor_id' => $proveedor->getKey(),
-                'monto' => $validated['monto'],
-                'fecha' => now(),
-                'descripcion' => $validated['descripcion'] ?? null,
-            ]);
-            DB::commit();
+
             return response()->json([
-                'message' => 'Pago registrado correctamente',
-                'deuda_pendiente' => $proveedor->deuda_pendiente
+                'status' => 'success',
+                'message' => 'Proveedores encontrados',
+                'data' => $proveedores
             ]);
-        } catch (ModelNotFoundException $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'Proveedor no encontrado'], 404);
         } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'Error al registrar el pago', 'error' => $e->getMessage()], 500);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener los proveedores: ' . $e->getMessage()
+            ], 500);
         }
     }
 
-    // Historial de pagos a proveedor
-    public function pagos($id)
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(CreateProveedorRequest $request): JsonResponse
     {
         try {
-            $proveedor = Proveedor::findOrFail($id);
-            $pagos = $proveedor->pagos()->orderByDesc('fecha')->get();
-            return response()->json($pagos);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Proveedor no encontrado'], 404);
+            $proveedor = $this->proveedorService->createProveedor($request->validated());
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Proveedor creado correctamente',
+                'data' => $proveedor
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al crear el proveedor: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show(int $id): JsonResponse
+    {
+        try {
+            $proveedor = $this->proveedorService->findProveedorById($id);
+            
+            if (!$proveedor) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Proveedor no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $proveedor
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener el proveedor: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(UpdateProveedorRequest $request, int $id): JsonResponse
+    {
+        try {
+            $proveedor = $this->proveedorService->updateProveedor($id, $request->validated());
+            
+            if (!$proveedor) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Proveedor no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Proveedor actualizado correctamente',
+                'data' => $proveedor
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al actualizar el proveedor: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        try {
+            $deleted = $this->proveedorService->deleteProveedor($id);
+            
+            if (!$deleted) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Proveedor no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Proveedor eliminado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al eliminar el proveedor: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get debt amount for a specific provider.
+     */
+    public function verDeuda(int $id): JsonResponse
+    {
+        try {
+            $deuda = $this->proveedorService->getDeudaProveedor($id);
+            
+            if ($deuda === null) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Proveedor no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'data' => ['deuda_pendiente' => $deuda]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener la deuda: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Register a payment for a provider.
+     */
+    public function registrarPago(RegistrarPagoRequest $request, int $id): JsonResponse
+    {
+        try {
+            $validated = $request->validated();
+            $success = $this->proveedorService->registrarPago($id, $validated['monto'], $validated['descripcion'] ?? null);
+            
+            if (!$success) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No se pudo registrar el pago. Verifique que el proveedor existe y que el monto no exceda la deuda pendiente.'
+                ], 400);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Pago registrado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al registrar el pago: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get payment history for a provider.
+     */
+    public function pagos(int $id): JsonResponse
+    {
+        try {
+            $pagos = $this->proveedorService->getPagosProveedor($id);
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Historial de pagos encontrado',
+                'data' => $pagos
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener el historial de pagos: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

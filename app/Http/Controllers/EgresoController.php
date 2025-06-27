@@ -2,109 +2,175 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Egreso;
+use App\Services\EgresoService;
+use App\Http\Requests\Egreso\CreateEgresoRequest;
+use App\Http\Requests\Egreso\UpdateEgresoRequest;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class EgresoController extends Controller
 {
-    public function index(Request $request)
-    {
-        $query = Egreso::query();
-        // Filtros por fecha y tipo
-        if ($request->has('fecha_inicio') && $request->has('fecha_fin')) {
-            $query->whereBetween('fecha', [$request->fecha_inicio, $request->fecha_fin]);
-        }
-        if ($request->has('tipo')) {
-            $query->where('tipo', $request->tipo);
-        }
-        $egresos = $query->get();
-        return response()->json($egresos);
-    }    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'monto' => 'required|numeric|min:0.01',
-            'fecha' => 'required|date',
-            'tipo' => 'required|in:pago_proveedor,gasto_general',
-            'referencia_id' => 'nullable|integer',
-            'descripcion' => 'nullable|string|max:255',
-        ]);
+    protected $egresoService;
 
-        // Validar que referencia_id corresponda al tipo seleccionado
-        if ($validated['referencia_id']) {
-            $this->validarReferencia($validated['tipo'], $validated['referencia_id']);
-        }
-
-        $egreso = Egreso::create($validated);
-        return response()->json(['message' => 'Egreso registrado correctamente', 'egreso' => $egreso], 201);
+    public function __construct(EgresoService $egresoService)
+    {
+        $this->egresoService = $egresoService;
     }
 
-    private function validarReferencia($tipo, $referenciaId)
-    {
-        switch ($tipo) {
-            case 'pago_proveedor':
-                if (!\App\Models\PagoProveedor::where('id_pago_proveedor', $referenciaId)->exists()) {
-                    throw new \Illuminate\Validation\ValidationException(
-                        validator([], []),
-                        ['referencia_id' => 'El pago a proveedor especificado no existe']
-                    );
-                }
-                break;
-            case 'gasto_general':
-                if (!\App\Models\GastoGeneral::where('gasto_general_id', $referenciaId)->exists()) {
-                    throw new \Illuminate\Validation\ValidationException(
-                        validator([], []),
-                        ['referencia_id' => 'El gasto general especificado no existe']
-                    );
-                }
-                break;
-        }
-    }
-
-    public function show($id)
+    /**
+     * Display a listing of egresos.
+     */
+    public function index(Request $request): JsonResponse
     {
         try {
-            $egreso = Egreso::findOrFail($id);
-            return response()->json($egreso);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Egreso no encontrado'], 404);
-        }
-    }
-
-    public function update(Request $request, $id)
-    {
-        try {
-            $egreso = Egreso::findOrFail($id);
-            $validated = $request->validate([
-                'monto' => 'sometimes|required|numeric|min:0.01',
-                'fecha' => 'sometimes|required|date',
-                'tipo' => 'sometimes|required|in:pago_proveedor,gasto_general',
-                'referencia_id' => 'nullable|integer',
-                'descripcion' => 'nullable|string|max:255',
-            ]);
-
-            // Validar que referencia_id corresponda al tipo si ambos están presentes
-            if (isset($validated['tipo']) && isset($validated['referencia_id'])) {
-                $this->validarReferencia($validated['tipo'], $validated['referencia_id']);
-            } elseif (isset($validated['referencia_id']) && !isset($validated['tipo'])) {
-                $this->validarReferencia($egreso->tipo, $validated['referencia_id']);
+            // Si hay filtros de fecha
+            if ($request->has('fecha_inicio') && $request->has('fecha_fin')) {
+                $egresos = $this->egresoService->getEgresosByFechaRange(
+                    $request->fecha_inicio,
+                    $request->fecha_fin
+                );
+            }
+            // Si hay filtro por tipo
+            elseif ($request->has('tipo')) {
+                $egresos = $this->egresoService->getEgresosByTipo($request->tipo);
+            }
+            // Sin filtros
+            else {
+                $egresos = $this->egresoService->getAllEgresos();
             }
 
-            $egreso->update($validated);
-            return response()->json(['message' => 'Egreso actualizado correctamente', 'egreso' => $egreso]);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Egreso no encontrado'], 404);
+            return response()->json([
+                'status' => 'success',
+                'data' => $egresos
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener los egresos: ' . $e->getMessage()
+            ], 500);
         }
     }
 
-    public function destroy($id)
+    /**
+     * Store a newly created egreso.
+     */
+    public function store(CreateEgresoRequest $request): JsonResponse
     {
         try {
-            $egreso = Egreso::findOrFail($id);
-            $egreso->delete();
-            return response()->json(['message' => 'Egreso eliminado correctamente']);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Egreso no encontrado'], 404);
+            $egreso = $this->egresoService->createEgreso($request->validated());
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Egreso registrado correctamente',
+                'data' => $egreso
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al crear el egreso: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Display the specified egreso.
+     */
+    public function show(int $id): JsonResponse
+    {
+        try {
+            $egreso = $this->egresoService->findEgresoById($id);
+            
+            if (!$egreso) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Egreso no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $egreso
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener el egreso: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update the specified egreso.
+     */
+    public function update(UpdateEgresoRequest $request, int $id): JsonResponse
+    {
+        try {
+            $egreso = $this->egresoService->updateEgreso($id, $request->validated());
+            
+            if (!$egreso) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Egreso no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Egreso actualizado correctamente',
+                'data' => $egreso
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al actualizar el egreso: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Remove the specified egreso.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        try {
+            $deleted = $this->egresoService->deleteEgreso($id);
+            
+            if (!$deleted) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Egreso no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Egreso eliminado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al eliminar el egreso: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get egresos metrics.
+     */
+    public function getMetricas(): JsonResponse
+    {
+        try {
+            $metricas = $this->egresoService->getMetricas();
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $metricas
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener métricas: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

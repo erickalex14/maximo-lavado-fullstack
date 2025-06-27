@@ -2,117 +2,175 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Ingreso;
+use App\Services\IngresoService;
+use App\Http\Requests\Ingreso\CreateIngresoRequest;
+use App\Http\Requests\Ingreso\UpdateIngresoRequest;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class IngresoController extends Controller
 {
-    public function index(Request $request)
-    {
-        $query = Ingreso::query();
-        // Filtros por fecha y tipo
-        if ($request->has('fecha_inicio') && $request->has('fecha_fin')) {
-            $query->whereBetween('fecha', [$request->fecha_inicio, $request->fecha_fin]);
-        }
-        if ($request->has('tipo')) {
-            $query->where('tipo', $request->tipo);
-        }
-        $ingresos = $query->get();
-        return response()->json($ingresos);
-    }    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'monto' => 'required|numeric|min:0.01',
-            'fecha' => 'required|date',
-            'tipo' => 'required|in:lavado,producto_automotriz,producto_despensa',
-            'referencia_id' => 'nullable|integer',
-            'descripcion' => 'nullable|string|max:255',
-        ]);
+    protected $ingresoService;
 
-        // Validar que referencia_id corresponda al tipo seleccionado
-        if ($validated['referencia_id']) {
-            $this->validarReferencia($validated['tipo'], $validated['referencia_id']);
-        }
-
-        $ingreso = Ingreso::create($validated);
-        return response()->json(['message' => 'Ingreso registrado correctamente', 'ingreso' => $ingreso], 201);
+    public function __construct(IngresoService $ingresoService)
+    {
+        $this->ingresoService = $ingresoService;
     }
 
-    private function validarReferencia($tipo, $referenciaId)
-    {
-        switch ($tipo) {
-            case 'lavado':
-                if (!\App\Models\Lavado::where('lavado_id', $referenciaId)->exists()) {
-                    throw new \Illuminate\Validation\ValidationException(
-                        validator([], []),
-                        ['referencia_id' => 'El lavado especificado no existe']
-                    );
-                }
-                break;
-            case 'producto_automotriz':
-                if (!\App\Models\VentaProductoAutomotriz::where('id', $referenciaId)->exists()) {
-                    throw new \Illuminate\Validation\ValidationException(
-                        validator([], []),
-                        ['referencia_id' => 'La venta de producto automotriz especificada no existe']
-                    );
-                }
-                break;
-            case 'producto_despensa':
-                if (!\App\Models\VentaProductoDespensa::where('id', $referenciaId)->exists()) {
-                    throw new \Illuminate\Validation\ValidationException(
-                        validator([], []),
-                        ['referencia_id' => 'La venta de producto despensa especificada no existe']
-                    );
-                }
-                break;
-        }
-    }
-
-    public function show($id)
+    /**
+     * Display a listing of ingresos.
+     */
+    public function index(Request $request): JsonResponse
     {
         try {
-            $ingreso = Ingreso::findOrFail($id);
-            return response()->json($ingreso);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Ingreso no encontrado'], 404);
-        }
-    }
-
-    public function update(Request $request, $id)
-    {
-        try {
-            $ingreso = Ingreso::findOrFail($id);
-            $validated = $request->validate([
-                'monto' => 'sometimes|required|numeric|min:0.01',
-                'fecha' => 'sometimes|required|date',
-                'tipo' => 'sometimes|required|in:lavado,producto_automotriz,producto_despensa',
-                'referencia_id' => 'nullable|integer',
-                'descripcion' => 'nullable|string|max:255',
-            ]);
-
-            // Validar que referencia_id corresponda al tipo si ambos están presentes
-            if (isset($validated['tipo']) && isset($validated['referencia_id'])) {
-                $this->validarReferencia($validated['tipo'], $validated['referencia_id']);
-            } elseif (isset($validated['referencia_id']) && !isset($validated['tipo'])) {
-                $this->validarReferencia($ingreso->tipo, $validated['referencia_id']);
+            // Si hay filtros de fecha
+            if ($request->has('fecha_inicio') && $request->has('fecha_fin')) {
+                $ingresos = $this->ingresoService->getIngresosByFechaRange(
+                    $request->fecha_inicio,
+                    $request->fecha_fin
+                );
+            }
+            // Si hay filtro por tipo
+            elseif ($request->has('tipo')) {
+                $ingresos = $this->ingresoService->getIngresosByTipo($request->tipo);
+            }
+            // Sin filtros
+            else {
+                $ingresos = $this->ingresoService->getAllIngresos();
             }
 
-            $ingreso->update($validated);
-            return response()->json(['message' => 'Ingreso actualizado correctamente', 'ingreso' => $ingreso]);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Ingreso no encontrado'], 404);
+            return response()->json([
+                'status' => 'success',
+                'data' => $ingresos
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener los ingresos: ' . $e->getMessage()
+            ], 500);
         }
     }
 
-    public function destroy($id)
+    /**
+     * Store a newly created ingreso.
+     */
+    public function store(CreateIngresoRequest $request): JsonResponse
     {
         try {
-            $ingreso = Ingreso::findOrFail($id);
-            $ingreso->delete();
-            return response()->json(['message' => 'Ingreso eliminado correctamente']);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Ingreso no encontrado'], 404);
+            $ingreso = $this->ingresoService->createIngreso($request->validated());
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Ingreso registrado correctamente',
+                'data' => $ingreso
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al crear el ingreso: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Display the specified ingreso.
+     */
+    public function show(int $id): JsonResponse
+    {
+        try {
+            $ingreso = $this->ingresoService->findIngresoById($id);
+            
+            if (!$ingreso) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Ingreso no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $ingreso
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener el ingreso: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update the specified ingreso.
+     */
+    public function update(UpdateIngresoRequest $request, int $id): JsonResponse
+    {
+        try {
+            $ingreso = $this->ingresoService->updateIngreso($id, $request->validated());
+            
+            if (!$ingreso) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Ingreso no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Ingreso actualizado correctamente',
+                'data' => $ingreso
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al actualizar el ingreso: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Remove the specified ingreso.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        try {
+            $deleted = $this->ingresoService->deleteIngreso($id);
+            
+            if (!$deleted) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Ingreso no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Ingreso eliminado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al eliminar el ingreso: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get ingresos metrics.
+     */
+    public function getMetricas(): JsonResponse
+    {
+        try {
+            $metricas = $this->ingresoService->getMetricas();
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $metricas
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener métricas: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

@@ -1,119 +1,218 @@
 <?php
-// Controlador para la gestión de vehículos
-// Incluye CRUD, validación de matrícula y buenas prácticas de manejo de errores
 
 namespace App\Http\Controllers;
 
-use App\Models\Vehiculo;
+use App\Http\Requests\Vehiculo\CreateVehiculoRequest;
+use App\Http\Requests\Vehiculo\UpdateVehiculoRequest;
+use App\Services\VehiculoService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Log;
 
 class VehiculoController extends Controller
 {
-    // Mostrar la vista de vehículos
-    public function indexView()
-    {
-        return view('vehiculos.index');
-    }
+    public function __construct(
+        protected VehiculoService $vehiculoService
+    ) {}
 
-    // Listar todos los vehículos
-    public function index()
+    /**
+     * Obtener lista paginada de vehículos
+     */
+    public function index(Request $request): JsonResponse
     {
-        $vehiculos = Vehiculo::with('cliente')->get();
-        if ($vehiculos->isEmpty()) {
+        try {
+            $perPage = $request->input('per_page', 15);
+            $filters = $request->only(['search', 'cliente_id', 'tipo']);
+
+            $vehiculos = $this->vehiculoService->getVehiculosPaginated($perPage, $filters);
+
             return response()->json([
-                'status' => 'error',
-                'message' => 'No hay vehículos registrados'
-            ], 404);
+                'success' => true,
+                'data' => $vehiculos,
+                'message' => 'Vehículos obtenidos exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener vehículos', ['error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener vehículos'
+            ], 500);
         }
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Vehículos encontrados',
-            'vehiculos' => $vehiculos
-        ]);
     }
 
-    // Crear un nuevo vehículo
-    public function store(Request $request)
+    /**
+     * Obtener todos los vehículos (para selects)
+     */
+    public function all(): JsonResponse
     {
-        $validated = $request->validate([
-            'cliente_id' => 'required|exists:clientes,cliente_id',
-            'tipo' => 'required|in:moto,camioneta,auto_pequeno,auto_mediano',
-            'matricula' => 'nullable|string|unique:vehiculos,matricula',
-            'descripcion' => 'nullable|string',
-        ]);
-        // Validar matrícula obligatoria excepto para motos
-        if ($validated['tipo'] !== 'moto' && empty($validated['matricula'])) {
+        try {
+            $vehiculos = $this->vehiculoService->getAllVehiculos();
+
             return response()->json([
-                'message' => 'La matrícula es obligatoria para vehículos que no son motos.'
+                'success' => true,
+                'data' => $vehiculos,
+                'message' => 'Vehículos obtenidos exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener todos los vehículos', ['error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener vehículos'
+            ], 500);
+        }
+    }
+
+    /**
+     * Crear nuevo vehículo
+     */
+    public function store(CreateVehiculoRequest $request): JsonResponse
+    {
+        try {
+            $vehiculo = $this->vehiculoService->createVehiculo($request->validated());
+
+            return response()->json([
+                'success' => true,
+                'data' => $vehiculo,
+                'message' => 'Vehículo creado exitosamente'
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error('Error al crear vehículo', ['error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
             ], 422);
         }
-        $vehiculo = Vehiculo::create($validated);
-        return response()->json([
-            'message' => 'Vehículo creado correctamente',
-            'vehiculo' => $vehiculo
-        ], 201);
     }
 
-    // Mostrar un vehículo específico
-    public function show($id)
+    /**
+     * Obtener vehículo específico
+     */
+    public function show(int $id): JsonResponse
     {
         try {
-            $vehiculo = Vehiculo::with('cliente')->findOrFail($id);
-            return response()->json([
-                'vehiculo' => $vehiculo
-            ]);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Vehículo no encontrado'], 404);
-        }
-    }
+            $vehiculo = $this->vehiculoService->getVehiculoById($id);
 
-    // Actualizar un vehículo
-    public function update(Request $request, $id)
-    {
-        try {
-            $vehiculo = Vehiculo::findOrFail($id);
-            $validated = $request->validate([
-                'cliente_id' => 'sometimes|exists:clientes,cliente_id',
-                'tipo' => 'sometimes|in:moto,camioneta,auto_pequeno,auto_mediano',
-                'matricula' => 'nullable|string|unique:vehiculos,matricula,' . $id . ',vehiculo_id',
-                'descripcion' => 'nullable|string',
-            ]);
-            // Validar matrícula obligatoria excepto para motos
-            if (isset($validated['tipo']) && $validated['tipo'] !== 'moto' && empty($validated['matricula']) && empty($vehiculo->matricula)) {
+            if (!$vehiculo) {
                 return response()->json([
-                    'message' => 'La matrícula es obligatoria para vehículos que no son motos.'
-                ], 422);
+                    'success' => false,
+                    'message' => 'Vehículo no encontrado'
+                ], 404);
             }
-            $vehiculo->update($validated);
+
             return response()->json([
-                'message' => 'Vehículo actualizado correctamente',
-                'vehiculo' => $vehiculo
+                'success' => true,
+                'data' => $vehiculo,
+                'message' => 'Vehículo obtenido exitosamente'
             ]);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Vehículo no encontrado'], 404);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener vehículo', ['id' => $id, 'error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener vehículo'
+            ], 500);
         }
     }
 
-    // Eliminar un vehículo
-    public function destroy($id)
+    /**
+     * Actualizar vehículo
+     */
+    public function update(UpdateVehiculoRequest $request, int $id): JsonResponse
     {
         try {
-            $vehiculo = Vehiculo::findOrFail($id);
-            $vehiculo->delete();
-            return response()->json(['message' => 'Vehículo eliminado correctamente']);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Vehículo no encontrado'], 404);
+            $vehiculo = $this->vehiculoService->updateVehiculo($id, $request->validated());
+
+            return response()->json([
+                'success' => true,
+                'data' => $vehiculo,
+                'message' => 'Vehículo actualizado exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al actualizar vehículo', ['id' => $id, 'error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
         }
     }
 
-    // Obtener vehículos por cliente
-    public function getByCliente($cliente_id)
+    /**
+     * Eliminar vehículo
+     */
+    public function destroy(int $id): JsonResponse
     {
-        $vehiculos = Vehiculo::where('cliente_id', $cliente_id)->get();
-        return response()->json([
-            'status' => 'success',
-            'vehiculos' => $vehiculos
-        ]);
+        try {
+            $this->vehiculoService->deleteVehiculo($id);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Vehículo eliminado exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al eliminar vehículo', ['id' => $id, 'error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
+        }
+    }
+
+    /**
+     * Obtener vehículos por cliente
+     */
+    public function byCliente(int $clienteId): JsonResponse
+    {
+        try {
+            $vehiculos = $this->vehiculoService->getVehiculosByCliente($clienteId);
+
+            return response()->json([
+                'success' => true,
+                'data' => $vehiculos,
+                'message' => 'Vehículos del cliente obtenidos exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener vehículos por cliente', ['cliente_id' => $clienteId, 'error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener vehículos del cliente'
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener estadísticas de vehículos
+     */
+    public function stats(): JsonResponse
+    {
+        try {
+            $stats = $this->vehiculoService->getEstadisticas();
+
+            return response()->json([
+                'success' => true,
+                'data' => $stats,
+                'message' => 'Estadísticas obtenidas exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener estadísticas de vehículos', ['error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener estadísticas'
+            ], 500);
+        }
     }
 }

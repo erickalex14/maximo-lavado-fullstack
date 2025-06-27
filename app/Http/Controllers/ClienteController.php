@@ -1,115 +1,252 @@
 <?php
-// Controlador para la gestión de clientes
-// Incluye CRUD, búsqueda por cédula y buenas prácticas de manejo de errores
 
 namespace App\Http\Controllers;
 
-use App\Models\Cliente;
+use App\Http\Requests\Cliente\CreateClienteRequest;
+use App\Http\Requests\Cliente\UpdateClienteRequest;
+use App\Services\ClienteService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Log;
 
 class ClienteController extends Controller
 {
-    // Mostrar la vista de clientes
-    public function indexView()
-    {
-        return view('clientes.index');
-    }
+    public function __construct(
+        protected ClienteService $clienteService
+    ) {}
 
-    // Listar todos los clientes
-    public function index()
-    {
-        $clientes = Cliente::all();
-        if ($clientes->isEmpty()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'No hay clientes registrados'
-            ], 404);
-        }
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Clientes encontrados',
-            'clientes' => $clientes
-        ]);
-    }
-
-    // Crear un nuevo cliente
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'nombre' => 'required|string',
-            'telefono' => 'nullable|string',
-            'email' => 'nullable|email',
-            'direccion' => 'nullable|string',
-            'cedula' => 'nullable|string|unique:clientes,cedula',
-        ]);
-        $cliente = Cliente::create($validated);
-        return response()->json([
-            'message' => 'Cliente creado correctamente',
-            'cliente' => $cliente
-        ], 201);
-    }
-
-    // Mostrar un cliente específico
-    public function show($id)
+    /**
+     * Obtener lista paginada de clientes
+     */
+    public function index(Request $request): JsonResponse
     {
         try {
-            $cliente = Cliente::findOrFail($id);
+            $perPage = $request->input('per_page', 15);
+            $filters = $request->only(['search', 'activo']);
+
+            $clientes = $this->clienteService->getClientesPaginated($perPage, $filters);
+
             return response()->json([
-                'cliente' => $cliente
+                'success' => true,
+                'data' => $clientes,
+                'message' => 'Clientes obtenidos exitosamente'
             ]);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Cliente no encontrado'], 404);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener clientes', ['error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener clientes',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 
-    // Actualizar un cliente
-    public function update(Request $request, $id)
+    /**
+     * Obtener todos los clientes (para selects)
+     */
+    public function all(): JsonResponse
     {
         try {
-            $cliente = Cliente::findOrFail($id);
-            $validated = $request->validate([
-                'nombre' => 'sometimes|string',
-                'telefono' => 'sometimes|string',
-                'email' => 'sometimes|email',
-                'direccion' => 'sometimes|string',
-                'cedula' => 'sometimes|string|unique:clientes,cedula,' . $id . ',cliente_id',
-            ]);
-            $cliente->update($validated);
+            $clientes = $this->clienteService->getAllClientes();
+
             return response()->json([
-                'message' => 'Cliente actualizado correctamente',
-                'cliente' => $cliente
+                'success' => true,
+                'data' => $clientes,
+                'message' => 'Clientes obtenidos exitosamente'
             ]);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Cliente no encontrado'], 404);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener todos los clientes', ['error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener clientes'
+            ], 500);
         }
     }
 
-    // Eliminar un cliente
-    public function destroy($id)
+    /**
+     * Crear nuevo cliente
+     */
+    public function store(CreateClienteRequest $request): JsonResponse
     {
         try {
-            $cliente = Cliente::findOrFail($id);
-            $cliente->delete();
-            return response()->json(['message' => 'Cliente eliminado correctamente']);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Cliente no encontrado'], 404);
+            $cliente = $this->clienteService->createCliente($request->validated());
+
+            return response()->json([
+                'success' => true,
+                'data' => $cliente,
+                'message' => 'Cliente creado exitosamente'
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error('Error al crear cliente', ['error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
         }
     }
 
-    // Buscar cliente por cédula
-    public function buscarPorCedula($cedula)
+    /**
+     * Obtener cliente específico
+     */
+    public function show(int $id): JsonResponse
     {
-        $cliente = Cliente::where('cedula', $cedula)->first();
-        if (!$cliente) {
+        try {
+            $cliente = $this->clienteService->getClienteById($id);
+
+            if (!$cliente) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cliente no encontrado'
+                ], 404);
+            }
+
             return response()->json([
-                'status' => 'error',
-                'message' => 'Cliente no encontrado con esa cédula'
-            ], 404);
+                'success' => true,
+                'data' => $cliente,
+                'message' => 'Cliente obtenido exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener cliente', ['id' => $id, 'error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener cliente'
+            ], 500);
         }
-        return response()->json([
-            'status' => 'success',
-            'cliente' => $cliente
-        ]);
+    }
+
+    /**
+     * Actualizar cliente
+     */
+    public function update(UpdateClienteRequest $request, int $id): JsonResponse
+    {
+        try {
+            $cliente = $this->clienteService->updateCliente($id, $request->validated());
+
+            return response()->json([
+                'success' => true,
+                'data' => $cliente,
+                'message' => 'Cliente actualizado exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al actualizar cliente', ['id' => $id, 'error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
+        }
+    }
+
+    /**
+     * Eliminar cliente
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        try {
+            $this->clienteService->deleteCliente($id);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Cliente eliminado exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al eliminar cliente', ['id' => $id, 'error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
+        }
+    }
+
+    /**
+     * Buscar clientes
+     */
+    public function search(Request $request): JsonResponse
+    {
+        try {
+            $term = $request->input('term', '');
+            
+            if (empty($term)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Término de búsqueda requerido'
+                ], 400);
+            }
+
+            $clientes = $this->clienteService->searchClientes($term);
+
+            return response()->json([
+                'success' => true,
+                'data' => $clientes,
+                'message' => 'Búsqueda completada'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error en búsqueda de clientes', ['error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error en la búsqueda'
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener estadísticas de clientes
+     */
+    public function stats(): JsonResponse
+    {
+        try {
+            $stats = $this->clienteService->getEstadisticas();
+
+            return response()->json([
+                'success' => true,
+                'data' => $stats,
+                'message' => 'Estadísticas obtenidas exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener estadísticas de clientes', ['error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener estadísticas'
+            ], 500);
+        }
+    }
+
+    /**
+     * Activar/Desactivar cliente
+     */
+    public function toggleActivo(int $id): JsonResponse
+    {
+        try {
+            $cliente = $this->clienteService->toggleActivo($id);
+
+            return response()->json([
+                'success' => true,
+                'data' => $cliente,
+                'message' => 'Estado del cliente actualizado exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al cambiar estado del cliente', ['id' => $id, 'error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
+        }
     }
 }

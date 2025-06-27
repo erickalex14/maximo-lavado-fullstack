@@ -7,18 +7,18 @@ use App\Http\Controllers\EmpleadoController;
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\VehiculoController;
 use App\Http\Controllers\LavadoController;
-use App\Http\Controllers\ProductoAutomotrizController;
-use App\Http\Controllers\ProductoDespensaController;
 use App\Http\Controllers\ProveedorController;
 use App\Http\Controllers\IngresoController;
 use App\Http\Controllers\EgresoController;
 use App\Http\Controllers\GastoGeneralController;
+use App\Http\Controllers\FacturaController;
+use App\Http\Controllers\PagoProveedorController;
 use App\Http\Controllers\BalanceController;
 use App\Http\Controllers\ReporteController;
-use App\Http\Controllers\FacturaController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VentaController;
 use App\Http\Controllers\TestController;
 
 // Rutas de autenticación Sanctum
@@ -37,12 +37,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // CRUD de empleados
     Route::get('/empleados', [EmpleadoController::class, 'index']);
     Route::post('/empleados', [EmpleadoController::class, 'store']);
-    Route::get('/empleados/{id}', [EmpleadoController::class, 'show']);
-    Route::put('/empleados/{id}', [EmpleadoController::class, 'update']);
-    Route::delete('/empleados/{id}', [EmpleadoController::class, 'destroy']);    // Filtros de lavados por empleado
-    Route::get('/empleados/{empleado_id}/lavados/dia/{fecha}', [EmpleadoController::class, 'lavadosPorDia']);
-    Route::get('/empleados/{empleado_id}/lavados/semana/{fecha}', [EmpleadoController::class, 'lavadosPorSemana']);
-    Route::get('/empleados/{empleado_id}/lavados/mes/{anio}/{mes}', [EmpleadoController::class, 'lavadosPorMes']);
+    Route::get('/empleados/{empleado}', [EmpleadoController::class, 'show']);
+    Route::put('/empleados/{empleado}', [EmpleadoController::class, 'update']);
+    Route::delete('/empleados/{empleado}', [EmpleadoController::class, 'destroy']);
+    
+    // Filtros de lavados por empleado
+    Route::get('/empleados/{empleado}/lavados/dia/{fecha}', [EmpleadoController::class, 'lavadosPorDia']);
+    Route::get('/empleados/{empleado}/lavados/semana/{fecha}', [EmpleadoController::class, 'lavadosPorSemana']);
+    Route::get('/empleados/{empleado}/lavados/mes/{anio}/{mes}', [EmpleadoController::class, 'lavadosPorMes']);
 
     // CRUD de usuarios
     Route::get('/usuarios', [UserController::class, 'index']);
@@ -53,15 +55,20 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // CRUD de clientes
     Route::get('/clientes', [ClienteController::class, 'index']);
+    Route::get('/clientes/all', [ClienteController::class, 'all']); // Para selects
+    Route::get('/clientes/search', [ClienteController::class, 'search']); // Búsqueda
+    Route::get('/clientes/stats', [ClienteController::class, 'stats']); // Estadísticas
     Route::post('/clientes', [ClienteController::class, 'store']);
     Route::get('/clientes/{id}', [ClienteController::class, 'show']);
     Route::put('/clientes/{id}', [ClienteController::class, 'update']);
+    Route::patch('/clientes/{id}/toggle-activo', [ClienteController::class, 'toggleActivo']);
     Route::delete('/clientes/{id}', [ClienteController::class, 'destroy']);
-    // Buscar cliente por cédula
-    Route::get('/clientes/buscar/cedula/{cedula}', [ClienteController::class, 'buscarPorCedula']);
 
     // CRUD de vehículos
     Route::get('/vehiculos', [VehiculoController::class, 'index']);
+    Route::get('/vehiculos/all', [VehiculoController::class, 'all']); // Para selects
+    Route::get('/vehiculos/stats', [VehiculoController::class, 'stats']); // Estadísticas
+    Route::get('/vehiculos/cliente/{clienteId}', [VehiculoController::class, 'byCliente']); // Por cliente
     Route::post('/vehiculos', [VehiculoController::class, 'store']);
     Route::get('/vehiculos/{id}', [VehiculoController::class, 'show']);
     Route::put('/vehiculos/{id}', [VehiculoController::class, 'update']);
@@ -74,23 +81,25 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/lavados/{id}', [LavadoController::class, 'update']);
     Route::delete('/lavados/{id}', [LavadoController::class, 'destroy']);
 
-    // CRUD de productos automotrices
-    Route::get('/productos-automotrices', [ProductoAutomotrizController::class, 'index']);
-    Route::post('/productos-automotrices', [ProductoAutomotrizController::class, 'store']);
-    Route::get('/productos-automotrices/{id}', [ProductoAutomotrizController::class, 'show']);
-    Route::put('/productos-automotrices/{id}', [ProductoAutomotrizController::class, 'update']);
-    Route::delete('/productos-automotrices/{id}', [ProductoAutomotrizController::class, 'destroy']);
-    // Actualizar stock
-    Route::put('/productos-automotrices/{id}/stock', [ProductoAutomotrizController::class, 'actualizarStock']);
-
-    // CRUD de productos de despensa
-    Route::get('/productos-despensa', [ProductoDespensaController::class, 'index']);
-    Route::post('/productos-despensa', [ProductoDespensaController::class, 'store']);
-    Route::get('/productos-despensa/{id}', [ProductoDespensaController::class, 'show']);
-    Route::put('/productos-despensa/{id}', [ProductoDespensaController::class, 'update']);
-    Route::delete('/productos-despensa/{id}', [ProductoDespensaController::class, 'destroy']);
-    // Actualizar stock
-    Route::put('/productos-despensa/{id}/stock', [ProductoDespensaController::class, 'actualizarStock']);
+    // CRUD unificado de productos
+    Route::get('/productos', [ProductoController::class, 'index']); // Todos los productos
+    Route::get('/productos/metricas', [ProductoController::class, 'getMetricas']); // Métricas
+    
+    // Productos automotrices
+    Route::get('/productos/automotrices', [ProductoController::class, 'getProductosAutomotrices']);
+    Route::post('/productos/automotrices', [ProductoController::class, 'storeAutomotriz']);
+    Route::get('/productos/automotrices/{id}', [ProductoController::class, 'showAutomotriz']);
+    Route::put('/productos/automotrices/{id}', [ProductoController::class, 'updateAutomotriz']);
+    Route::delete('/productos/automotrices/{id}', [ProductoController::class, 'destroyAutomotriz']);
+    Route::put('/productos/automotrices/{id}/stock', [ProductoController::class, 'updateStockAutomotriz']);
+    
+    // Productos de despensa
+    Route::get('/productos/despensa', [ProductoController::class, 'getProductosDespensa']);
+    Route::post('/productos/despensa', [ProductoController::class, 'storeDespensa']);
+    Route::get('/productos/despensa/{id}', [ProductoController::class, 'showDespensa']);
+    Route::put('/productos/despensa/{id}', [ProductoController::class, 'updateDespensa']);
+    Route::delete('/productos/despensa/{id}', [ProductoController::class, 'destroyDespensa']);
+    Route::put('/productos/despensa/{id}/stock', [ProductoController::class, 'updateStockDespensa']);
 
     // CRUD de proveedores
     Route::get('/proveedores', [ProveedorController::class, 'index']);
@@ -110,6 +119,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/ingresos/{id}', [IngresoController::class, 'show']);
     Route::put('/ingresos/{id}', [IngresoController::class, 'update']);
     Route::delete('/ingresos/{id}', [IngresoController::class, 'destroy']);
+    Route::get('/ingresos/metricas', [IngresoController::class, 'getMetricas']);
 
     // CRUD de egresos
     Route::get('/egresos', [EgresoController::class, 'index']);
@@ -117,6 +127,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/egresos/{id}', [EgresoController::class, 'show']);
     Route::put('/egresos/{id}', [EgresoController::class, 'update']);
     Route::delete('/egresos/{id}', [EgresoController::class, 'destroy']);
+    Route::get('/egresos/metricas', [EgresoController::class, 'getMetricas']);
 
     // CRUD de gastos generales
     Route::get('/gastos-generales', [GastoGeneralController::class, 'index']);
@@ -124,14 +135,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/gastos-generales/{id}', [GastoGeneralController::class, 'show']);
     Route::put('/gastos-generales/{id}', [GastoGeneralController::class, 'update']);
     Route::delete('/gastos-generales/{id}', [GastoGeneralController::class, 'destroy']);
-
-    // Balance y reportes
-    Route::get('/balance', [BalanceController::class, 'resumen']);
-    Route::get('/reportes/ingresos', [ReporteController::class, 'ingresosPDF']);
-    Route::get('/reportes/egresos', [ReporteController::class, 'egresosPDF']);
-    Route::get('/reportes/inventario', [ReporteController::class, 'inventarioPDF']);
-    Route::get('/reportes/pagos', [ReporteController::class, 'pagosPDF']);
-    Route::get('/reportes/deudas', [ReporteController::class, 'deudasPDF']);
+    Route::get('/gastos-generales/metricas', [GastoGeneralController::class, 'getMetricas']);
 
     // Facturación
     Route::get('/facturas', [FacturaController::class, 'index']);
@@ -139,18 +143,23 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/facturas/{id}', [FacturaController::class, 'show']);
     Route::put('/facturas/{id}', [FacturaController::class, 'update']);
     Route::delete('/facturas/{id}', [FacturaController::class, 'destroy']);
-    // Detalles de factura
-    Route::get('/facturas/{id}/detalles', [FacturaController::class, 'detalles']);
-    // Generar PDF de factura
-    Route::get('/facturas/{id}/pdf', [FacturaController::class, 'generarPDF']);    // Ventas de productos automotrices
-    Route::post('/ventas-productos-automotrices', [\App\Http\Controllers\VentaProductoAutomotrizController::class, 'store']);    // Ventas de productos de despensa    Route::post('/ventas-productos-despensa', [\App\Http\Controllers\VentaProductoDespensaController::class, 'store']);
+    Route::get('/facturas/numero/{numeroFactura}', [FacturaController::class, 'findByNumero']);
+    Route::get('/facturas/metricas', [FacturaController::class, 'getMetricas']);
 
-    // Rutas de productos
-    Route::get('/productos', [ProductoController::class, 'index']);
-    Route::post('/productos', [ProductoController::class, 'store']);
-    Route::get('/productos/{id}', [ProductoController::class, 'show']);
-    Route::put('/productos/{id}', [ProductoController::class, 'update']);
-    Route::delete('/productos/{id}', [ProductoController::class, 'destroy']);
+    // Pagos a Proveedores
+    Route::get('/pagos-proveedores', [PagoProveedorController::class, 'index']);
+    Route::post('/pagos-proveedores', [PagoProveedorController::class, 'store']);
+    Route::get('/pagos-proveedores/{id}', [PagoProveedorController::class, 'show']);
+    Route::put('/pagos-proveedores/{id}', [PagoProveedorController::class, 'update']);
+    Route::delete('/pagos-proveedores/{id}', [PagoProveedorController::class, 'destroy']);
+    Route::get('/pagos-proveedores/metricas', [PagoProveedorController::class, 'getMetricas']);
+
+    // Ventas
+    Route::get('/ventas', [VentaController::class, 'index']);
+    Route::post('/ventas', [VentaController::class, 'store']);
+    Route::get('/ventas/metricas', [VentaController::class, 'getMetricas']);
+    Route::get('/ventas/productos-disponibles', [VentaController::class, 'getProductosDisponibles']);
+    Route::get('/ventas/clientes', [VentaController::class, 'getClientes']);
 
     // CRUD de usuarios
     Route::get('/usuarios', [UserController::class, 'index']);

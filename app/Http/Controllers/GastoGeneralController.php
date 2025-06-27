@@ -2,73 +2,171 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\GastoGeneral;
+use App\Services\GastoGeneralService;
+use App\Http\Requests\GastoGeneral\CreateGastoGeneralRequest;
+use App\Http\Requests\GastoGeneral\UpdateGastoGeneralRequest;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class GastoGeneralController extends Controller
 {
-    public function index(Request $request)
+    protected $gastoGeneralService;
+
+    public function __construct(GastoGeneralService $gastoGeneralService)
     {
-        $query = GastoGeneral::query();
-        // Filtros por fecha y tipo
-        if ($request->has('fecha_inicio') && $request->has('fecha_fin')) {
-            $query->whereBetween('fecha', [$request->fecha_inicio, $request->fecha_fin]);
-        }
-        if ($request->has('tipo')) {
-            $query->where('tipo', $request->tipo);
-        }
-        $gastos = $query->get();
-        return response()->json($gastos);
+        $this->gastoGeneralService = $gastoGeneralService;
     }
 
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'monto' => 'required|numeric|min:0.01',
-            'fecha' => 'required|date',
-            'tipo' => 'required|string|max:100',
-            'descripcion' => 'nullable|string|max:255',
-        ]);
-        $gasto = GastoGeneral::create($validated);
-        return response()->json(['message' => 'Gasto general registrado correctamente', 'gasto' => $gasto], 201);
-    }
-
-    public function show($id)
+    /**
+     * Display a listing of gastos generales.
+     */
+    public function index(Request $request): JsonResponse
     {
         try {
-            $gasto = GastoGeneral::findOrFail($id);
-            return response()->json($gasto);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Gasto general no encontrado'], 404);
-        }
-    }
+            // Si hay filtros de fecha
+            if ($request->has('fecha_inicio') && $request->has('fecha_fin')) {
+                $gastos = $this->gastoGeneralService->getGastosGeneralesByFechaRange(
+                    $request->fecha_inicio,
+                    $request->fecha_fin
+                );
+            }
+            // Sin filtros
+            else {
+                $gastos = $this->gastoGeneralService->getAllGastosGenerales();
+            }
 
-    public function update(Request $request, $id)
-    {
-        try {
-            $gasto = GastoGeneral::findOrFail($id);
-            $validated = $request->validate([
-                'monto' => 'sometimes|required|numeric|min:0.01',
-                'fecha' => 'sometimes|required|date',
-                'tipo' => 'sometimes|required|string|max:100',
-                'descripcion' => 'nullable|string|max:255',
+            return response()->json([
+                'status' => 'success',
+                'data' => $gastos
             ]);
-            $gasto->update($validated);
-            return response()->json(['message' => 'Gasto general actualizado correctamente', 'gasto' => $gasto]);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Gasto general no encontrado'], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener los gastos generales: ' . $e->getMessage()
+            ], 500);
         }
     }
 
-    public function destroy($id)
+    /**
+     * Store a newly created gasto general.
+     */
+    public function store(CreateGastoGeneralRequest $request): JsonResponse
     {
         try {
-            $gasto = GastoGeneral::findOrFail($id);
-            $gasto->delete();
-            return response()->json(['message' => 'Gasto general eliminado correctamente']);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Gasto general no encontrado'], 404);
+            $gastoGeneral = $this->gastoGeneralService->createGastoGeneral($request->validated());
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Gasto general registrado correctamente',
+                'data' => $gastoGeneral
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al crear el gasto general: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Display the specified gasto general.
+     */
+    public function show(int $id): JsonResponse
+    {
+        try {
+            $gastoGeneral = $this->gastoGeneralService->findGastoGeneralById($id);
+            
+            if (!$gastoGeneral) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Gasto general no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $gastoGeneral
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener el gasto general: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update the specified gasto general.
+     */
+    public function update(UpdateGastoGeneralRequest $request, int $id): JsonResponse
+    {
+        try {
+            $gastoGeneral = $this->gastoGeneralService->updateGastoGeneral($id, $request->validated());
+            
+            if (!$gastoGeneral) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Gasto general no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Gasto general actualizado correctamente',
+                'data' => $gastoGeneral
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al actualizar el gasto general: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Remove the specified gasto general.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        try {
+            $deleted = $this->gastoGeneralService->deleteGastoGeneral($id);
+            
+            if (!$deleted) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Gasto general no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Gasto general eliminado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al eliminar el gasto general: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get gastos generales metrics.
+     */
+    public function getMetricas(): JsonResponse
+    {
+        try {
+            $metricas = $this->gastoGeneralService->getMetricas();
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $metricas
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener métricas: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

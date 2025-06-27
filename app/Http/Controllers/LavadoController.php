@@ -1,156 +1,149 @@
 <?php
-// Controlador para la gestión de lavados
-// Incluye CRUD, lógica de precios, pulverizado y buenas prácticas de manejo de errores
 
 namespace App\Http\Controllers;
 
-use App\Models\Lavado;
-use App\Models\Vehiculo;
-use App\Models\Empleado;
-use Illuminate\Http\Request;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Support\Carbon;
+use App\Services\LavadoService;
+use App\Http\Requests\Lavado\CreateLavadoRequest;
+use App\Http\Requests\Lavado\UpdateLavadoRequest;
+use Illuminate\Http\JsonResponse;
 
 class LavadoController extends Controller
 {
-    // Mostrar la vista de lavados
-    public function indexView()
+    protected $lavadoService;
+
+    public function __construct(LavadoService $lavadoService)
     {
-        return view('lavados.index');
+        $this->lavadoService = $lavadoService;
     }
 
-    // Listar todos los lavados
-    public function index()
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(): JsonResponse
     {
-        $lavados = Lavado::with(['vehiculo', 'empleado'])->get();
-        if ($lavados->isEmpty()) {
+        try {
+            $lavados = $this->lavadoService->getAllLavados();
+            
+            if ($lavados->isEmpty()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No hay lavados registrados'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Lavados encontrados',
+                'data' => $lavados
+            ]);
+        } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'No hay lavados registrados'
-            ], 404);
+                'message' => 'Error al obtener los lavados: ' . $e->getMessage()
+            ], 500);
         }
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Lavados encontrados',
-            'lavados' => $lavados
-        ]);
     }
 
-    // Crear un nuevo lavado
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'vehiculo_id' => 'required|exists:vehiculos,vehiculo_id',
-            'empleado_id' => 'required|exists:empleados,empleado_id',
-            'fecha' => 'required|date',
-            'tipo_lavado' => 'required|in:completo,solo_fuera,solo_por_dentro',
-            'precio' => 'nullable|numeric',
-            'pulverizado' => 'boolean',
-        ]);
-
-        // Lógica de precio predeterminado según tipo de vehículo y tipo de lavado
-        $vehiculo = Vehiculo::find($validated['vehiculo_id']);
-        $precio = $validated['precio'] ?? $this->calcularPrecio($vehiculo->tipo, $validated['tipo_lavado']);
-        if (!empty($validated['pulverizado'])) {
-            $precio += 2;
-        }
-        $lavado = Lavado::create([
-            'vehiculo_id' => $validated['vehiculo_id'],
-            'empleado_id' => $validated['empleado_id'],
-            'fecha' => $validated['fecha'],
-            'tipo_lavado' => $validated['tipo_lavado'],
-            'precio' => $precio,
-            'pulverizado' => $validated['pulverizado'] ?? false,
-        ]);
-        return response()->json([
-            'message' => 'Lavado registrado correctamente',
-            'lavado' => $lavado
-        ], 201);
-    }
-
-    // Mostrar un lavado específico
-    public function show($id)
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(CreateLavadoRequest $request): JsonResponse
     {
         try {
-            $lavado = Lavado::with(['vehiculo', 'empleado'])->findOrFail($id);
+            $lavado = $this->lavadoService->createLavado($request->validated());
+            
             return response()->json([
-                'lavado' => $lavado
-            ]);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Lavado no encontrado'], 404);
+                'status' => 'success',
+                'message' => 'Lavado creado correctamente',
+                'data' => $lavado
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al crear el lavado: ' . $e->getMessage()
+            ], 500);
         }
     }
 
-    // Actualizar un lavado
-    public function update(Request $request, $id)
+    /**
+     * Display the specified resource.
+     */
+    public function show(int $id): JsonResponse
     {
         try {
-            $lavado = Lavado::findOrFail($id);
-            $validated = $request->validate([
-                'vehiculo_id' => 'sometimes|exists:vehiculos,vehiculo_id',
-                'empleado_id' => 'sometimes|exists:empleados,empleado_id',
-                'fecha' => 'sometimes|date',
-                'tipo_lavado' => 'sometimes|in:completo,solo_fuera,solo_por_dentro',
-                'precio' => 'nullable|numeric',
-                'pulverizado' => 'boolean',
-            ]);
-            // Si no se envía precio, recalcular
-            if (!isset($validated['precio'])) {
-                $vehiculo = Vehiculo::find($validated['vehiculo_id'] ?? $lavado->vehiculo_id);
-                $tipo_lavado = $validated['tipo_lavado'] ?? $lavado->tipo_lavado;
-                $precio = $this->calcularPrecio($vehiculo->tipo, $tipo_lavado);
-                if (isset($validated['pulverizado']) ? $validated['pulverizado'] : $lavado->pulverizado) {
-                    $precio += 2;
-                }
-                $validated['precio'] = $precio;
+            $lavado = $this->lavadoService->findLavadoById($id);
+            
+            if (!$lavado) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Lavado no encontrado'
+                ], 404);
             }
-            $lavado->update($validated);
+
             return response()->json([
-                'message' => 'Lavado actualizado correctamente',
-                'lavado' => $lavado
+                'status' => 'success',
+                'data' => $lavado
             ]);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Lavado no encontrado'], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener el lavado: ' . $e->getMessage()
+            ], 500);
         }
     }
 
-    // Eliminar un lavado
-    public function destroy($id)
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(UpdateLavadoRequest $request, int $id): JsonResponse
     {
         try {
-            $lavado = Lavado::findOrFail($id);
-            $lavado->delete();
-            return response()->json(['message' => 'Lavado eliminado correctamente']);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Lavado no encontrado'], 404);
+            $lavado = $this->lavadoService->updateLavado($id, $request->validated());
+            
+            if (!$lavado) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Lavado no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Lavado actualizado correctamente',
+                'data' => $lavado
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al actualizar el lavado: ' . $e->getMessage()
+            ], 500);
         }
     }
 
-    // Lógica de precios predeterminados
-    private function calcularPrecio($tipoVehiculo, $tipoLavado)
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(int $id): JsonResponse
     {
-        $precios = [
-            'moto' => [
-                'completo' => 3,
-                'solo_fuera' => 3,
-                'solo_por_dentro' => 3,
-            ],
-            'auto_pequeno' => [
-                'completo' => 8,
-                'solo_fuera' => 4.5,
-                'solo_por_dentro' => 4,
-            ],
-            'auto_mediano' => [
-                'completo' => 10,
-                'solo_fuera' => 5,
-                'solo_por_dentro' => 5,
-            ],
-            'camioneta' => [
-                'completo' => 10,
-                'solo_fuera' => 8,
-                'solo_por_dentro' => 7,
-            ],
-        ];
-        return $precios[$tipoVehiculo][$tipoLavado] ?? 0;
+        try {
+            $deleted = $this->lavadoService->deleteLavado($id);
+            
+            if (!$deleted) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Lavado no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Lavado eliminado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al eliminar el lavado: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
