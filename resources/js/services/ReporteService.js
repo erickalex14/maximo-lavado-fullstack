@@ -1,99 +1,217 @@
-import apiClient from './api';
+import api from './api';
 
-export class ReporteService {
+/**
+ * Servicio para gestión de reportes
+ * Consume la API real del backend sin datos de ejemplo
+ * Endpoints disponibles según routes/api.php:
+ * - GET /reportes - Lista de reportes disponibles
+ * - GET /reportes/ventas - Reporte de ventas
+ * - GET /reportes/lavados - Reporte de lavados
+ * - GET /reportes/ingresos - Reporte de ingresos
+ * - GET /reportes/egresos - Reporte de egresos
+ * - GET /reportes/facturas - Reporte de facturas
+ * - GET /reportes/empleados - Reporte de empleados
+ * - GET /reportes/productos - Reporte de productos
+ * - GET /reportes/clientes - Reporte de clientes
+ * - GET /reportes/financiero - Reporte financiero
+ * - GET /reportes/balance - Reporte de balance
+ * - GET /reportes/completo - Reporte completo
+ */
+class ReporteServiceClass {
   /**
-   * Obtener reporte de ventas
+   * Obtener lista de reportes disponibles
+   * @returns {Promise} Respuesta de la API
    */
-  static async getReporteVentas(params = {}) {
-    const response = await apiClient.get('/reportes/ventas', { params });
+  async getReportesDisponibles() {
+    const response = await api.get('/reportes');
     return response.data;
   }
 
   /**
-   * Obtener reporte financiero
+   * Generar reporte de ventas
+   * @param {string} fechaInicio - Fecha inicio (YYYY-MM-DD)
+   * @param {string} fechaFin - Fecha fin (YYYY-MM-DD)
+   * @param {string} formato - Formato del reporte (json, pdf, excel)
+   * @returns {Promise} Respuesta de la API
    */
-  static async getReporteFinanciero(params = {}) {
-    const response = await apiClient.get('/reportes/financiero', { params });
-    return response.data;
-  }
-
-  /**
-   * Obtener reporte de clientes
-   */
-  static async getReporteClientes(params = {}) {
-    const response = await apiClient.get('/reportes/clientes', { params });
-    return response.data;
-  }
-
-  /**
-   * Obtener reporte de empleados
-   */
-  static async getReporteEmpleados(params = {}) {
-    const response = await apiClient.get('/reportes/empleados', { params });
-    return response.data;
-  }
-
-  /**
-   * Obtener reporte de productos
-   */
-  static async getReporteProductos(params = {}) {
-    const response = await apiClient.get('/reportes/productos', { params });
-    return response.data;
-  }
-
-  /**
-   * Obtener reporte de servicios (lavados)
-   */
-  static async getReporteServicios(params = {}) {
-    const response = await apiClient.get('/reportes/servicios', { params });
-    return response.data;
-  }
-
-  /**
-   * Obtener reporte de inventario
-   */
-  static async getReporteInventario(params = {}) {
-    const response = await apiClient.get('/reportes/inventario', { params });
-    return response.data;
-  }
-
-  /**
-   * Exportar reporte en PDF
-   */
-  static async exportarPDF(tipo, params = {}) {
-    const response = await apiClient.get(`/reportes/${tipo}/pdf`, {
-      params,
-      responseType: 'blob'
+  async reporteVentas(fechaInicio, fechaFin, formato = 'json') {
+    const response = await api.get('/reportes/ventas', {
+      params: {
+        fecha_inicio: fechaInicio,
+        fecha_fin: fechaFin,
+        formato
+      }
     });
     return response.data;
   }
 
   /**
-   * Exportar reporte en Excel
+   * Generar reporte de lavados
+   * @param {string} fechaInicio - Fecha inicio (YYYY-MM-DD)
+   * @param {string} fechaFin - Fecha fin (YYYY-MM-DD)
+   * @param {string} formato - Formato del reporte (json, pdf, excel)
+   * @returns {Promise} Respuesta de la API
    */
-  static async exportarExcel(tipo, params = {}) {
-    const response = await apiClient.get(`/reportes/${tipo}/excel`, {
-      params,
-      responseType: 'blob'
+  async reporteLavados(fechaInicio, fechaFin, formato = 'json') {
+    const response = await api.get('/reportes/lavados', {
+      params: {
+        fecha_inicio: fechaInicio,
+        fecha_fin: fechaFin,
+        formato
+      }
     });
     return response.data;
   }
 
   /**
-   * Obtener datos para gráficos del dashboard
+   * Generar reporte de ingresos
+   * @param {string} fechaInicio - Fecha inicio (YYYY-MM-DD)
+   * @param {string} fechaFin - Fecha fin (YYYY-MM-DD)
+   * @param {string} formato - Formato del reporte (json, pdf, excel)
+   * @returns {Promise} Respuesta de la API
    */
-  static async getDatosGraficos(params = {}) {
-    const response = await apiClient.get('/reportes/graficos', { params });
+  async reporteIngresos(fechaInicio, fechaFin, formato = 'json') {
+    const response = await api.get('/reportes/ingresos', {
+      params: {
+        fecha_inicio: fechaInicio,
+        fecha_fin: fechaFin,
+        formato
+      }
+    });
     return response.data;
   }
 
   /**
-   * Obtener métricas principales
+   * Generar reporte de egresos
+   * @param {string} fechaInicio - Fecha inicio (YYYY-MM-DD)
+   * @param {string} fechaFin - Fecha fin (YYYY-MM-DD)
+   * @param {string} formato - Formato del reporte (json, pdf, excel)
+   * @returns {Promise} Respuesta de la API
    */
-  static async getMetricasPrincipales(params = {}) {
-    const response = await apiClient.get('/reportes/metricas', { params });
+  async reporteEgresos(fechaInicio, fechaFin, formato = 'json') {
+    const response = await api.get('/reportes/egresos', {
+      params: {
+        fecha_inicio: fechaInicio,
+        fecha_fin: fechaFin,
+        formato
+      }
+    });
+    return response.data;
+  }
+
+  /**
+   * Generar reporte de facturas
+   * @param {string} fechaInicio - Fecha inicio (YYYY-MM-DD)
+   * @param {string} fechaFin - Fecha fin (YYYY-MM-DD)
+   * @param {string} formato - Formato del reporte (json, pdf, excel)
+   * @returns {Promise} Respuesta de la API
+   */
+  async reporteFacturas(fechaInicio, fechaFin, formato = 'json') {
+    const response = await api.get('/reportes/facturas', {
+      params: {
+        fecha_inicio: fechaInicio,
+        fecha_fin: fechaFin,
+        formato
+      }
+    });
+    return response.data;
+  }
+
+  /**
+   * Generar reporte de empleados
+   * @param {string} fechaInicio - Fecha inicio (YYYY-MM-DD)
+   * @param {string} fechaFin - Fecha fin (YYYY-MM-DD)
+   * @param {string} formato - Formato del reporte (json, pdf, excel)
+   * @returns {Promise} Respuesta de la API
+   */
+  async reporteEmpleados(fechaInicio, fechaFin, formato = 'json') {
+    const response = await api.get('/reportes/empleados', {
+      params: {
+        fecha_inicio: fechaInicio,
+        fecha_fin: fechaFin,
+        formato
+      }
+    });
+    return response.data;
+  }
+
+  /**
+   * Generar reporte de productos
+   * @param {string} formato - Formato del reporte (json, pdf, excel)
+   * @returns {Promise} Respuesta de la API
+   */
+  async reporteProductos(formato = 'json') {
+    const response = await api.get('/reportes/productos', {
+      params: { formato }
+    });
+    return response.data;
+  }
+
+  /**
+   * Generar reporte de clientes
+   * @param {string} formato - Formato del reporte (json, pdf, excel)
+   * @returns {Promise} Respuesta de la API
+   */
+  async reporteClientes(formato = 'json') {
+    const response = await api.get('/reportes/clientes', {
+      params: { formato }
+    });
+    return response.data;
+  }
+
+  /**
+   * Generar reporte financiero
+   * @param {string} fechaInicio - Fecha inicio (YYYY-MM-DD)
+   * @param {string} fechaFin - Fecha fin (YYYY-MM-DD)
+   * @param {string} formato - Formato del reporte (json, pdf, excel)
+   * @returns {Promise} Respuesta de la API
+   */
+  async reporteFinanciero(fechaInicio, fechaFin, formato = 'json') {
+    const response = await api.get('/reportes/financiero', {
+      params: {
+        fecha_inicio: fechaInicio,
+        fecha_fin: fechaFin,
+        formato
+      }
+    });
+    return response.data;
+  }
+
+  /**
+   * Generar reporte de balance
+   * @param {string} fechaInicio - Fecha inicio (YYYY-MM-DD)
+   * @param {string} fechaFin - Fecha fin (YYYY-MM-DD)
+   * @param {string} formato - Formato del reporte (json, pdf, excel)
+   * @returns {Promise} Respuesta de la API
+   */
+  async reporteBalance(fechaInicio, fechaFin, formato = 'json') {
+    const response = await api.get('/reportes/balance', {
+      params: {
+        fecha_inicio: fechaInicio,
+        fecha_fin: fechaFin,
+        formato
+      }
+    });
+    return response.data;
+  }
+
+  /**
+   * Generar reporte completo del negocio
+   * @param {string} fechaInicio - Fecha inicio (YYYY-MM-DD)
+   * @param {string} fechaFin - Fecha fin (YYYY-MM-DD)
+   * @returns {Promise} Respuesta de la API
+   */
+  async reporteCompleto(fechaInicio, fechaFin) {
+    const response = await api.get('/reportes/completo', {
+      params: {
+        fecha_inicio: fechaInicio,
+        fecha_fin: fechaFin
+      }
+    });
     return response.data;
   }
 }
 
-export default ReporteService;
+// Crear instancia única del servicio
+export const reporteService = new ReporteServiceClass();
+export default reporteService;

@@ -4,7 +4,7 @@ namespace App\Http\Requests\Proveedor;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class RegistrarPagoRequest extends FormRequest
+class UpdatePagoRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -16,14 +16,13 @@ class RegistrarPagoRequest extends FormRequest
 
     /**
      * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
-            'monto' => 'required|numeric|min:0.01|max:999999.99',
+            'monto' => 'sometimes|numeric|min:0.01',
             'descripcion' => 'nullable|string|max:500',
+            'fecha' => 'sometimes|date',
         ];
     }
 
@@ -33,13 +32,10 @@ class RegistrarPagoRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'monto.required' => 'El monto es obligatorio.',
-            'monto.numeric' => 'El monto debe ser un número.',
+            'monto.numeric' => 'El monto debe ser un número válido.',
             'monto.min' => 'El monto debe ser mayor a 0.',
-            'monto.max' => 'El monto no puede exceder 999999.99.',
-            
-            'descripcion.string' => 'La descripción debe ser una cadena de texto.',
             'descripcion.max' => 'La descripción no puede exceder 500 caracteres.',
+            'fecha.date' => 'La fecha debe tener un formato válido.',
         ];
     }
 }

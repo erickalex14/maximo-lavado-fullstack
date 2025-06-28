@@ -1,45 +1,121 @@
-import apiClient from './api';
+import BaseService from './BaseService';
 
-export class LavadoService {
+/**
+ * Servicio para gestión de lavados
+ * Extiende BaseService para operaciones CRUD básicas
+ */
+class LavadoServiceClass extends BaseService {
+  constructor() {
+    super('/lavados');
+  }
+
   /**
-   * Obtener todos los lavados con paginación
+   * Obtener lavados por vehículo
+   * @param {number} vehiculoId - ID del vehículo
+   */
+  async getByVehiculo(vehiculoId) {
+    return this.customAction('vehiculo', vehiculoId, null, 'GET');
+  }
+
+  /**
+   * Obtener lavados por cliente
+   * @param {number} clienteId - ID del cliente
+   */
+  async getByCliente(clienteId) {
+    return this.customAction('cliente', clienteId, null, 'GET');
+  }
+
+  /**
+   * Obtener lavados por empleado
+   * @param {number} empleadoId - ID del empleado
+   */
+  async getByEmpleado(empleadoId) {
+    return this.customAction('empleado', empleadoId, null, 'GET');
+  }
+
+  /**
+   * Iniciar nuevo lavado
+   * @param {object} data - Datos del lavado
+   */
+  async iniciar(data) {
+    return this.customAction('iniciar', null, data);
+  }
+
+  /**
+   * Finalizar lavado
+   * @param {number} id - ID del lavado
+   * @param {object} data - Datos de finalización
+   */
+  async finalizar(id, data) {
+    return this.customAction('finalizar', id, data);
+  }
+
+  /**
+   * Cancelar lavado
+   * @param {number} id - ID del lavado
+   * @param {string} motivo - Motivo de cancelación
+   */
+  async cancelar(id, motivo) {
+    return this.customAction('cancelar', id, { motivo });
+  }
+
+  /**
+   * Obtener lavados del día
+   */
+  async getDelDia() {
+    return this.customAction('del-dia', null, null, 'GET');
+  }
+
+  /**
+   * Obtener lavados pendientes
+   */
+  async getPendientes() {
+    return this.customAction('pendientes', null, null, 'GET');
+  }
+
+  // =======================================
+  // MÉTODOS DE COMPATIBILIDAD (deprecated)
+  // =======================================
+  
+  /**
+   * @deprecated Usar getAll(params) en su lugar
    */
   static async getLavados(params = {}) {
-    const response = await apiClient.get('/lavados', { params });
-    return response.data;
+    return lavadoService.getAll(params);
   }
 
   /**
-   * Obtener lavado por ID
+   * @deprecated Usar getById(id) en su lugar
    */
   static async getLavado(id) {
-    const response = await apiClient.get(`/lavados/${id}`);
-    return response.data;
+    return lavadoService.getById(id);
   }
 
   /**
-   * Crear nuevo lavado
+   * @deprecated Usar create(data) en su lugar
    */
   static async createLavado(data) {
-    const response = await apiClient.post('/lavados', data);
-    return response.data;
+    return lavadoService.create(data);
   }
 
   /**
-   * Actualizar lavado
+   * @deprecated Usar update(id, data) en su lugar
    */
   static async updateLavado(id, data) {
-    const response = await apiClient.put(`/lavados/${id}`, data);
-    return response.data;
+    return lavadoService.update(id, data);
   }
 
   /**
-   * Eliminar lavado
+   * @deprecated Usar delete(id) en su lugar
    */
   static async deleteLavado(id) {
-    const response = await apiClient.delete(`/lavados/${id}`);
-    return response.data;
+    return lavadoService.delete(id);
   }
 }
 
-export default LavadoService;
+// Exportar instancia singleton
+export const lavadoService = new LavadoServiceClass();
+
+// Para compatibilidad con imports existentes
+export const LavadoService = LavadoServiceClass;
+export default lavadoService;

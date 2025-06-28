@@ -12,7 +12,6 @@ use App\Http\Controllers\IngresoController;
 use App\Http\Controllers\EgresoController;
 use App\Http\Controllers\GastoGeneralController;
 use App\Http\Controllers\FacturaController;
-use App\Http\Controllers\PagoProveedorController;
 use App\Http\Controllers\BalanceController;
 use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\DashboardController;
@@ -116,11 +115,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/proveedores/{id}', [ProveedorController::class, 'show']);
     Route::put('/proveedores/{id}', [ProveedorController::class, 'update']);
     Route::delete('/proveedores/{id}', [ProveedorController::class, 'destroy']);
-    // Gestión de deudas y pagos a proveedores
+    
+    // Gestión de deudas y pagos a proveedores específicos
     Route::get('/proveedores/{id}/deuda', [ProveedorController::class, 'verDeuda']);
-    Route::post('/proveedores/{id}/pago', [ProveedorController::class, 'registrarPago']);
-    // Historial de pagos a proveedor
     Route::get('/proveedores/{id}/pagos', [ProveedorController::class, 'pagos']);
+    
+    // Gestión consolidada de pagos (todos los proveedores)
+    Route::get('/proveedores/pagos', [ProveedorController::class, 'getAllPagos']);
+    Route::post('/proveedores/pagos', [ProveedorController::class, 'createPago']);
+    Route::get('/proveedores/pagos/metricas', [ProveedorController::class, 'getMetricasPagos']);
+    Route::get('/proveedores/pagos/{pagoId}', [ProveedorController::class, 'getPago']);
+    Route::put('/proveedores/pagos/{pagoId}', [ProveedorController::class, 'updatePago']);
+    Route::delete('/proveedores/pagos/{pagoId}', [ProveedorController::class, 'deletePago']);
 
     // CRUD de ingresos
     Route::get('/ingresos', [IngresoController::class, 'index']);
@@ -154,14 +160,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/facturas/{id}', [FacturaController::class, 'destroy']);
     Route::get('/facturas/numero/{numeroFactura}', [FacturaController::class, 'findByNumero']);
     Route::get('/facturas/metricas', [FacturaController::class, 'getMetricas']);
-
-    // Pagos a Proveedores
-    Route::get('/pagos-proveedores', [PagoProveedorController::class, 'index']);
-    Route::post('/pagos-proveedores', [PagoProveedorController::class, 'store']);
-    Route::get('/pagos-proveedores/{id}', [PagoProveedorController::class, 'show']);
-    Route::put('/pagos-proveedores/{id}', [PagoProveedorController::class, 'update']);
-    Route::delete('/pagos-proveedores/{id}', [PagoProveedorController::class, 'destroy']);
-    Route::get('/pagos-proveedores/metricas', [PagoProveedorController::class, 'getMetricas']);
 
     // Ventas
     Route::get('/ventas', [VentaController::class, 'index']);

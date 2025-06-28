@@ -1,95 +1,90 @@
-import apiClient from './api';
+import api from './api';
 
-export class FacturaService {
+/**
+ * Servicio para gestión de facturas
+ * Consume la API real del backend sin datos de ejemplo
+ * Endpoints disponibles según routes/api.php:
+ * - GET /facturas - Obtener facturas con paginación
+ * - POST /facturas - Crear nueva factura
+ * - GET /facturas/{id} - Obtener factura por ID
+ * - PUT /facturas/{id} - Actualizar factura
+ * - DELETE /facturas/{id} - Eliminar factura
+ * - GET /facturas/numero/{numeroFactura} - Buscar por número
+ * - GET /facturas/metricas - Obtener métricas de facturas
+ */
+class FacturaServiceClass {
   /**
-   * Obtener todas las facturas
+   * Obtener todas las facturas con paginación
+   * @param {object} params - Parámetros de consulta (página, filtros, etc.)
+   * @returns {Promise} Respuesta de la API
    */
-  static async getAll(params = {}) {
-    const response = await apiClient.get('/facturas', { params });
+  async getAll(params = {}) {
+    const response = await api.get('/facturas', { params });
     return response.data;
   }
 
   /**
    * Obtener una factura por ID
+   * @param {number} id - ID de la factura
+   * @returns {Promise} Respuesta de la API
    */
-  static async getById(id) {
-    const response = await apiClient.get(`/facturas/${id}`);
+  async getById(id) {
+    const response = await api.get(`/facturas/${id}`);
     return response.data;
   }
 
   /**
    * Crear una nueva factura
+   * @param {object} data - Datos de la factura a crear
+   * @returns {Promise} Respuesta de la API
    */
-  static async create(data) {
-    const response = await apiClient.post('/facturas', data);
+  async create(data) {
+    const response = await api.post('/facturas', data);
     return response.data;
   }
 
   /**
    * Actualizar una factura
+   * @param {number} id - ID de la factura
+   * @param {object} data - Datos actualizados de la factura
+   * @returns {Promise} Respuesta de la API
    */
-  static async update(id, data) {
-    const response = await apiClient.put(`/facturas/${id}`, data);
+  async update(id, data) {
+    const response = await api.put(`/facturas/${id}`, data);
     return response.data;
   }
 
   /**
    * Eliminar una factura
+   * @param {number} id - ID de la factura
+   * @returns {Promise} Respuesta de la API
    */
-  static async delete(id) {
-    const response = await apiClient.delete(`/facturas/${id}`);
+  async delete(id) {
+    const response = await api.delete(`/facturas/${id}`);
     return response.data;
   }
 
   /**
-   * Generar factura desde un lavado
+   * Buscar factura por número
+   * @param {string} numeroFactura - Número de la factura
+   * @returns {Promise} Respuesta de la API
    */
-  static async generarDesdeLavado(lavadoId, data = {}) {
-    const response = await apiClient.post(`/facturas/generar-desde-lavado/${lavadoId}`, data);
+  async findByNumero(numeroFactura) {
+    const response = await api.get(`/facturas/numero/${numeroFactura}`);
     return response.data;
   }
 
   /**
-   * Marcar factura como pagada
+   * Obtener métricas de facturas
+   * @param {object} params - Parámetros de consulta (fechas, filtros, etc.)
+   * @returns {Promise} Respuesta de la API
    */
-  static async marcarComoPagada(id, data = {}) {
-    const response = await apiClient.patch(`/facturas/${id}/pagar`, data);
-    return response.data;
-  }
-
-  /**
-   * Obtener PDF de la factura
-   */
-  static async getPDF(id) {
-    const response = await apiClient.get(`/facturas/${id}/pdf`, {
-      responseType: 'blob'
-    });
-    return response.data;
-  }
-
-  /**
-   * Enviar factura por email
-   */
-  static async enviarPorEmail(id, data = {}) {
-    const response = await apiClient.post(`/facturas/${id}/enviar-email`, data);
-    return response.data;
-  }
-
-  /**
-   * Obtener detalles de una factura
-   */
-  static async getDetalles(id) {
-    const response = await apiClient.get(`/facturas/${id}/detalles`);
-    return response.data;
-  }
-
-  /**
-   * Obtener resumen de facturación
-   */
-  static async getResumen(params = {}) {
-    const response = await apiClient.get('/facturas/resumen', { params });
+  async getMetricas(params = {}) {
+    const response = await api.get('/facturas/metricas', { params });
     return response.data;
   }
 }
 
-export default FacturaService;
+// Crear instancia única del servicio
+export const facturaService = new FacturaServiceClass();
+export default facturaService;

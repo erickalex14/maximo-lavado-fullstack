@@ -1,69 +1,79 @@
-import apiClient from './api';
+import api from './api';
 
-export class EgresoService {
+/**
+ * Servicio para gestión de egresos
+ * Consume la API real del backend sin datos de ejemplo
+ * Endpoints disponibles según routes/api.php:
+ * - GET /egresos - Obtener egresos con paginación
+ * - POST /egresos - Crear nuevo egreso
+ * - GET /egresos/{id} - Obtener egreso por ID
+ * - PUT /egresos/{id} - Actualizar egreso
+ * - DELETE /egresos/{id} - Eliminar egreso
+ * - GET /egresos/metricas - Obtener métricas de egresos
+ */
+class EgresoServiceClass {
   /**
-   * Obtener todos los egresos
+   * Obtener todos los egresos con paginación
+   * @param {object} params - Parámetros de consulta (página, filtros, etc.)
+   * @returns {Promise} Respuesta de la API
    */
-  static async getAll(params = {}) {
-    const response = await apiClient.get('/egresos', { params });
+  async getAll(params = {}) {
+    const response = await api.get('/egresos', { params });
     return response.data;
   }
 
   /**
    * Obtener un egreso por ID
+   * @param {number} id - ID del egreso
+   * @returns {Promise} Respuesta de la API
    */
-  static async getById(id) {
-    const response = await apiClient.get(`/egresos/${id}`);
+  async getById(id) {
+    const response = await api.get(`/egresos/${id}`);
     return response.data;
   }
 
   /**
    * Crear un nuevo egreso
+   * @param {object} data - Datos del egreso a crear
+   * @returns {Promise} Respuesta de la API
    */
-  static async create(data) {
-    const response = await apiClient.post('/egresos', data);
+  async create(data) {
+    const response = await api.post('/egresos', data);
     return response.data;
   }
 
   /**
    * Actualizar un egreso
+   * @param {number} id - ID del egreso
+   * @param {object} data - Datos actualizados del egreso
+   * @returns {Promise} Respuesta de la API
    */
-  static async update(id, data) {
-    const response = await apiClient.put(`/egresos/${id}`, data);
+  async update(id, data) {
+    const response = await api.put(`/egresos/${id}`, data);
     return response.data;
   }
 
   /**
    * Eliminar un egreso
+   * @param {number} id - ID del egreso
+   * @returns {Promise} Respuesta de la API
    */
-  static async delete(id) {
-    const response = await apiClient.delete(`/egresos/${id}`);
+  async delete(id) {
+    const response = await api.delete(`/egresos/${id}`);
     return response.data;
   }
 
   /**
-   * Obtener resumen de egresos por período
+   * Obtener métricas de egresos
+   * @param {object} params - Parámetros de consulta (fechas, filtros, etc.)
+   * @returns {Promise} Respuesta de la API
    */
-  static async getResumenPorPeriodo(params = {}) {
-    const response = await apiClient.get('/egresos/resumen', { params });
-    return response.data;
-  }
-
-  /**
-   * Obtener egresos por categoría
-   */
-  static async getPorCategoria(params = {}) {
-    const response = await apiClient.get('/egresos/por-categoria', { params });
-    return response.data;
-  }
-
-  /**
-   * Obtener categorías de egresos
-   */
-  static async getCategorias() {
-    const response = await apiClient.get('/egresos/categorias');
+  async getMetricas(params = {}) {
+    const response = await api.get('/egresos/metricas', { params });
     return response.data;
   }
 }
 
-export default EgresoService;
+// Crear instancia única del servicio
+export const egresoService = new EgresoServiceClass();
+export default egresoService;

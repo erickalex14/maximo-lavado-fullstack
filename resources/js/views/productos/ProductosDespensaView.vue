@@ -177,7 +177,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import ProductoDespensaService from '@/services/ProductoDespensaService';
+import ProductoService from '@/services/ProductoService';
 import { useNotificationStore } from '@/stores/notification';
 
 const notificationStore = useNotificationStore();
@@ -240,7 +240,7 @@ const filteredProductos = computed(() => {
 const loadProductos = async () => {
   try {
     isLoading.value = true;
-    const response = await ProductoDespensaService.getAll();
+    const response = await ProductoService.getAll('despensa');
     productos.value = response.data || [];
   } catch (error) {
     console.error('Error cargando productos:', error);

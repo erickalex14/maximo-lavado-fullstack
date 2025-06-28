@@ -1,67 +1,122 @@
-import apiClient from './api';
+import api from './api';
 
-export class BalanceService {
+/**
+ * Servicio para gestión de balance y análisis financiero
+ * Consume la API real del backend sin datos de ejemplo
+ * Endpoints disponibles según routes/api.php:
+ * - GET /balance/general - Obtener balance general
+ * - GET /balance/categorias - Balance por categoría
+ * - GET /balance/mensual - Balance por mes
+ * - GET /balance/trimestral - Balance por trimestre
+ * - GET /balance/anual - Balance anual
+ * - GET /balance/flujo-caja - Flujo de caja
+ * - GET /balance/indicadores - Indicadores financieros
+ * - GET /balance/comparativo - Comparativo mensual
+ * - GET /balance/proyeccion - Proyección financiera
+ * - GET /balance/resumen - Resumen completo
+ */
+class BalanceServiceClass {
   /**
    * Obtener balance general
+   * @param {object} params - Parámetros de consulta (fechas, filtros, etc.)
+   * @returns {Promise} Respuesta de la API
    */
-  static async getBalanceGeneral(params = {}) {
-    const response = await apiClient.get('/balance/general', { params });
+  async getBalanceGeneral(params = {}) {
+    const response = await api.get('/balance/general', { params });
     return response.data;
   }
 
   /**
-   * Obtener estado de resultados
+   * Obtener balance por categoría
+   * @param {object} params - Parámetros de consulta
+   * @returns {Promise} Respuesta de la API
    */
-  static async getEstadoResultados(params = {}) {
-    const response = await apiClient.get('/balance/estado-resultados', { params });
+  async getBalancePorCategoria(params = {}) {
+    const response = await api.get('/balance/categorias', { params });
+    return response.data;
+  }
+
+  /**
+   * Obtener balance por mes
+   * @param {object} params - Parámetros de consulta
+   * @returns {Promise} Respuesta de la API
+   */
+  async getBalancePorMes(params = {}) {
+    const response = await api.get('/balance/mensual', { params });
+    return response.data;
+  }
+
+  /**
+   * Obtener balance por trimestre
+   * @param {object} params - Parámetros de consulta
+   * @returns {Promise} Respuesta de la API
+   */
+  async getBalancePorTrimestre(params = {}) {
+    const response = await api.get('/balance/trimestral', { params });
+    return response.data;
+  }
+
+  /**
+   * Obtener balance anual
+   * @param {object} params - Parámetros de consulta
+   * @returns {Promise} Respuesta de la API
+   */
+  async getBalanceAnual(params = {}) {
+    const response = await api.get('/balance/anual', { params });
     return response.data;
   }
 
   /**
    * Obtener flujo de caja
+   * @param {object} params - Parámetros de consulta
+   * @returns {Promise} Respuesta de la API
    */
-  static async getFlujoCaja(params = {}) {
-    const response = await apiClient.get('/balance/flujo-caja', { params });
+  async getFlujoCaja(params = {}) {
+    const response = await api.get('/balance/flujo-caja', { params });
     return response.data;
   }
 
   /**
    * Obtener indicadores financieros
+   * @param {object} params - Parámetros de consulta
+   * @returns {Promise} Respuesta de la API
    */
-  static async getIndicadoresFinancieros(params = {}) {
-    const response = await apiClient.get('/balance/indicadores', { params });
+  async getIndicadoresFinancieros(params = {}) {
+    const response = await api.get('/balance/indicadores', { params });
     return response.data;
   }
 
   /**
-   * Obtener resumen financiero
+   * Obtener comparativo mensual
+   * @param {object} params - Parámetros de consulta
+   * @returns {Promise} Respuesta de la API
    */
-  static async getResumenFinanciero(params = {}) {
-    const response = await apiClient.get('/balance/resumen', { params });
+  async getComparativoMensual(params = {}) {
+    const response = await api.get('/balance/comparativo', { params });
     return response.data;
   }
 
   /**
-   * Exportar balance en PDF
+   * Obtener proyección financiera
+   * @param {object} params - Parámetros de consulta
+   * @returns {Promise} Respuesta de la API
    */
-  static async exportarPDF(params = {}) {
-    const response = await apiClient.get('/balance/exportar/pdf', { 
-      params,
-      responseType: 'blob'
-    });
+  async getProyeccion(params = {}) {
+    const response = await api.get('/balance/proyeccion', { params });
     return response.data;
   }
 
   /**
-   * Exportar balance en Excel
+   * Obtener resumen completo
+   * @param {object} params - Parámetros de consulta
+   * @returns {Promise} Respuesta de la API
    */
-  static async exportarExcel(params = {}) {
-    const response = await apiClient.get('/balance/exportar/excel', { 
-      params,
-      responseType: 'blob'
-    });
+  async getResumenCompleto(params = {}) {
+    const response = await api.get('/balance/resumen', { params });
     return response.data;
   }
 }
 
-export default BalanceService;
+// Crear instancia única del servicio
+export const balanceService = new BalanceServiceClass();
+export default balanceService;

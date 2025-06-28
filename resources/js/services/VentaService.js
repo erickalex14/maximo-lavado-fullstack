@@ -1,93 +1,67 @@
-import apiClient from './api';
+import api from './api';
 
-export class VentaService {
+/**
+ * Servicio para gestión de ventas
+ * Consume la API real del backend sin datos de ejemplo
+ * Endpoints disponibles según routes/api.php:
+ * - GET /ventas - Obtener ventas con paginación
+ * - POST /ventas - Crear nueva venta
+ * - GET /ventas/metricas - Obtener métricas de ventas
+ * - GET /ventas/productos-disponibles - Obtener productos disponibles para venta
+ * - GET /ventas/clientes - Obtener clientes para selección
+ */
+class VentaServiceClass {
   /**
-   * Obtener todas las ventas
+   * Obtener todas las ventas con paginación
+   * @param {object} params - Parámetros de consulta (página, filtros, etc.)
+   * @returns {Promise} Respuesta de la API
    */
-  static async getAll(params = {}) {
-    const response = await apiClient.get('/ventas', { params });
-    return response.data;
-  }
-
-  /**
-   * Obtener una venta por ID
-   */
-  static async getById(id) {
-    const response = await apiClient.get(`/ventas/${id}`);
+  async getAll(params = {}) {
+    const response = await api.get('/ventas', { params });
     return response.data;
   }
 
   /**
    * Crear una nueva venta
+   * @param {object} data - Datos de la venta a crear
+   * @returns {Promise} Respuesta de la API
    */
-  static async create(data) {
-    const response = await apiClient.post('/ventas', data);
+  async create(data) {
+    const response = await api.post('/ventas', data);
     return response.data;
   }
 
   /**
-   * Actualizar una venta
+   * Obtener métricas de ventas
+   * @param {object} params - Parámetros de consulta (fechas, filtros, etc.)
+   * @returns {Promise} Respuesta de la API
    */
-  static async update(id, data) {
-    const response = await apiClient.put(`/ventas/${id}`, data);
+  async getMetricas(params = {}) {
+    const response = await api.get('/ventas/metricas', { params });
     return response.data;
   }
 
   /**
-   * Eliminar una venta
+   * Obtener productos disponibles para venta
+   * @param {object} params - Parámetros de consulta
+   * @returns {Promise} Respuesta de la API
    */
-  static async delete(id) {
-    const response = await apiClient.delete(`/ventas/${id}`);
+  async getProductosDisponibles(params = {}) {
+    const response = await api.get('/ventas/productos-disponibles', { params });
     return response.data;
   }
 
   /**
-   * Obtener ventas de productos automotrices
+   * Obtener clientes disponibles para selección
+   * @param {object} params - Parámetros de consulta
+   * @returns {Promise} Respuesta de la API
    */
-  static async getVentasProductosAutomotrices(params = {}) {
-    const response = await apiClient.get('/ventas/productos-automotrices', { params });
-    return response.data;
-  }
-
-  /**
-   * Obtener ventas de productos de despensa
-   */
-  static async getVentasProductosDespensa(params = {}) {
-    const response = await apiClient.get('/ventas/productos-despensa', { params });
-    return response.data;
-  }
-
-  /**
-   * Crear venta de producto automotriz
-   */
-  static async crearVentaProductoAutomotriz(data) {
-    const response = await apiClient.post('/ventas/productos-automotrices', data);
-    return response.data;
-  }
-
-  /**
-   * Crear venta de producto de despensa
-   */
-  static async crearVentaProductoDespensa(data) {
-    const response = await apiClient.post('/ventas/productos-despensa', data);
-    return response.data;
-  }
-
-  /**
-   * Obtener resumen de ventas por período
-   */
-  static async getResumenPorPeriodo(params = {}) {
-    const response = await apiClient.get('/ventas/resumen', { params });
-    return response.data;
-  }
-
-  /**
-   * Obtener top productos vendidos
-   */
-  static async getTopProductos(params = {}) {
-    const response = await apiClient.get('/ventas/top-productos', { params });
+  async getClientes(params = {}) {
+    const response = await api.get('/ventas/clientes', { params });
     return response.data;
   }
 }
 
-export default VentaService;
+// Crear instancia única del servicio
+export const ventaService = new VentaServiceClass();
+export default ventaService;

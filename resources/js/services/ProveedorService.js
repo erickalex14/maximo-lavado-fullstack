@@ -1,61 +1,184 @@
-import apiClient from './api';
+import api from './api';
 
-export class ProveedorService {
+/**
+ * Servicio consolidado para gestión de proveedores y sus pagos
+ * Consume la API real del backend sin datos de ejemplo
+ * 
+ * PROPUESTA DE CONSOLIDACIÓN:
+ * En lugar de tener PagoProveedorController separado, todo debería manejarse desde ProveedorController
+ * 
+ * Endpoints consolidados propuestos:
+ * - GET /proveedores - Obtener proveedores con paginación
+ * - POST /proveedores - Crear nuevo proveedor
+ * - GET /proveedores/{id} - Obtener proveedor por ID
+ * - PUT /proveedores/{id} - Actualizar proveedor
+ * - DELETE /proveedores/{id} - Eliminar proveedor
+ * - GET /proveedores/{id}/deuda - Ver deuda del proveedor
+ * - POST /proveedores/{id}/pago - Registrar pago a proveedor
+ * - GET /proveedores/{id}/pagos - Historial de pagos de un proveedor
+ * - GET /proveedores/pagos - Todos los pagos de todos los proveedores (con filtros)
+ * - GET /proveedores/pagos/metricas - Métricas de pagos
+ * - GET /proveedores/pagos/{pagoId} - Detalle de un pago específico
+ * - PUT /proveedores/pagos/{pagoId} - Actualizar un pago específico
+ * - DELETE /proveedores/pagos/{pagoId} - Eliminar un pago específico
+ */
+class ProveedorServiceClass {
   /**
-   * Obtener todos los proveedores
+   * Obtener todos los proveedores con paginación
+   * @param {object} params - Parámetros de consulta (página, filtros, etc.)
+   * @returns {Promise} Respuesta de la API
    */
-  static async getAll(params = {}) {
-    const response = await apiClient.get('/proveedores', { params });
+  async getAll(params = {}) {
+    const response = await api.get('/proveedores', { params });
     return response.data;
   }
 
   /**
    * Obtener un proveedor por ID
+   * @param {number} id - ID del proveedor
+   * @returns {Promise} Respuesta de la API
    */
-  static async getById(id) {
-    const response = await apiClient.get(`/proveedores/${id}`);
+  async getById(id) {
+    const response = await api.get(`/proveedores/${id}`);
     return response.data;
   }
 
   /**
    * Crear un nuevo proveedor
+   * @param {object} data - Datos del proveedor a crear
+   * @returns {Promise} Respuesta de la API
    */
-  static async create(data) {
-    const response = await apiClient.post('/proveedores', data);
+  async create(data) {
+    const response = await api.post('/proveedores', data);
     return response.data;
   }
 
   /**
    * Actualizar un proveedor
+   * @param {number} id - ID del proveedor
+   * @param {object} data - Datos actualizados del proveedor
+   * @returns {Promise} Respuesta de la API
    */
-  static async update(id, data) {
-    const response = await apiClient.put(`/proveedores/${id}`, data);
+  async update(id, data) {
+    const response = await api.put(`/proveedores/${id}`, data);
     return response.data;
   }
 
   /**
    * Eliminar un proveedor
+   * @param {number} id - ID del proveedor
+   * @returns {Promise} Respuesta de la API
    */
-  static async delete(id) {
-    const response = await apiClient.delete(`/proveedores/${id}`);
+  async delete(id) {
+    const response = await api.delete(`/proveedores/${id}`);
     return response.data;
   }
 
   /**
-   * Obtener historial de compras del proveedor
+   * Ver deuda de un proveedor
+   * @param {number} id - ID del proveedor
+   * @returns {Promise} Respuesta de la API
    */
-  static async getHistorialCompras(id, params = {}) {
-    const response = await apiClient.get(`/proveedores/${id}/compras`, { params });
+  async verDeuda(id) {
+    const response = await api.get(`/proveedores/${id}/deuda`);
     return response.data;
   }
 
   /**
-   * Obtener productos del proveedor
+   * Registrar pago a un proveedor
+   * @param {number} id - ID del proveedor
+   * @param {object} data - Datos del pago
+   * @returns {Promise} Respuesta de la API
    */
-  static async getProductos(id, params = {}) {
-    const response = await apiClient.get(`/proveedores/${id}/productos`, { params });
+  async registrarPago(id, data) {
+    const response = await api.post(`/proveedores/${id}/pago`, data);
+    return response.data;
+  }
+
+  /**
+   * Obtener historial de pagos de un proveedor específico
+   * @param {number} id - ID del proveedor
+   * @param {object} params - Parámetros de consulta
+   * @returns {Promise} Respuesta de la API
+   */
+  async getPagosProveedor(id, params = {}) {
+    const response = await api.get(`/proveedores/${id}/pagos`, { params });
+    return response.data;
+  }
+
+  // ==========================================================
+  // MÉTODOS PARA GESTIÓN CONSOLIDADA DE PAGOS
+  // (Nuevas rutas consolidadas en ProveedorController)
+  // ==========================================================
+
+  /**
+   * Obtener todos los pagos de todos los proveedores
+   * Ruta consolidada: GET /proveedores/pagos
+   * @param {object} params - Parámetros de consulta (fechas, proveedor_id, etc.)
+   * @returns {Promise} Respuesta de la API
+   */
+  async getTodosPagos(params = {}) {
+    const response = await api.get('/proveedores/pagos', { params });
+    return response.data;
+  }
+
+  /**
+   * Obtener un pago específico por ID
+   * Ruta consolidada: GET /proveedores/pagos/{id}
+   * @param {number} id - ID del pago
+   * @returns {Promise} Respuesta de la API
+   */
+  async getPagoById(id) {
+    const response = await api.get(`/proveedores/pagos/${id}`);
+    return response.data;
+  }
+
+  /**
+   * Crear un pago con transacción completa (pago + actualizar deuda + registrar egreso)
+   * Ruta consolidada: POST /proveedores/pagos
+   * @param {object} data - Datos del pago (debe incluir proveedor_id)
+   * @returns {Promise} Respuesta de la API
+   */
+  async crearPago(data) {
+    const response = await api.post('/proveedores/pagos', data);
+    return response.data;
+  }
+
+  /**
+   * Actualizar un pago específico
+   * Ruta consolidada: PUT /proveedores/pagos/{id}
+   * @param {number} id - ID del pago
+   * @param {object} data - Datos actualizados del pago
+   * @returns {Promise} Respuesta de la API
+   */
+  async actualizarPago(id, data) {
+    const response = await api.put(`/proveedores/pagos/${id}`, data);
+    return response.data;
+  }
+
+  /**
+   * Eliminar un pago específico
+   * Ruta consolidada: DELETE /proveedores/pagos/{id}
+   * @param {number} id - ID del pago
+   * @returns {Promise} Respuesta de la API
+   */
+  async eliminarPago(id) {
+    const response = await api.delete(`/proveedores/pagos/${id}`);
+    return response.data;
+  }
+
+  /**
+   * Obtener métricas de pagos a proveedores
+   * Ruta consolidada: GET /proveedores/pagos/metricas
+   * @param {object} params - Parámetros de consulta (fechas, filtros, etc.)
+   * @returns {Promise} Respuesta de la API
+   */
+  async getMetricasPagos(params = {}) {
+    const response = await api.get('/proveedores/pagos/metricas', { params });
     return response.data;
   }
 }
 
-export default ProveedorService;
+// Crear instancia única del servicio
+export const proveedorService = new ProveedorServiceClass();
+export default proveedorService;

@@ -26,4 +26,21 @@ interface ProveedorRepositoryInterface
     public function updateDeuda(int $id, float $nuevaDeuda): ?Proveedor;
     
     public function registrarPago(int $id, float $monto, string $descripcion = null): array;
+    
+    // Métodos consolidados para gestión de pagos
+    public function getAllPagos(): Collection;
+    
+    public function getPagoById(int $pagoId): ?object;
+    
+    public function createPago(array $data): array;
+    
+    public function updatePago(int $pagoId, array $data): ?object;
+    
+    public function deletePago(int $pagoId): bool;
+    
+    public function getPagosByProveedorId(int $proveedorId): Collection;
+    
+    public function getPagosByFechaRange(string $fechaInicio, string $fechaFin): Collection;
+    
+    public function getMetricasPagos(array $params = []): array;
 }
