@@ -1,33 +1,23 @@
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
-import router from '@/router'
-import axios from 'axios'
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+import router from './router';
+import App from './App.vue';
 
-// Import main app component
-import App from './App.vue'
+// Importar estilos globales
+import '../css/app.css';
 
-// Configure axios
-axios.defaults.withCredentials = true
-axios.defaults.baseURL = window.location.origin
-axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest'
+// Importar Material Web Components
+import '@material/web/all.js';
 
-// Configure CSRF token
-const token = document.head.querySelector('meta[name="csrf-token"]')
-if (token) {
-    axios.defaults.headers.common['X-CSRF-TOKEN'] = token.content
-}
+// Crear la aplicación Vue
+const app = createApp(App);
 
-// Create Pinia store
-const pinia = createPinia()
+// Configurar Pinia para el manejo de estado
+const pinia = createPinia();
+app.use(pinia);
 
-// Create Vue app
-const app = createApp(App)
+// Configurar el router
+app.use(router);
 
-// Use plugins
-app.use(pinia)
-app.use(router)
-
-// Mount app
-app.mount('#app')
-
-console.log('Vue app initialized successfully')
+// Montar la aplicación
+app.mount('#app');

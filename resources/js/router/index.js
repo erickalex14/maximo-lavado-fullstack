@@ -1,68 +1,140 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { createRouter, createWebHistory } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
 
-// Import components
-import Login from '@/pages/Login.vue'
-import Dashboard from '@/pages/Dashboard.vue'
-import Clientes from '@/pages/Clientes.vue'
-import Lavados from '@/pages/Lavados.vue'
-import Productos from '@/pages/Productos.vue'
-import Vehiculos from '@/pages/Vehiculos.vue'
-import Reportes from '@/pages/Reportes.vue'
+// Importar layouts
+import AuthLayout from '@/layouts/AuthLayout.vue';
+import DashboardLayout from '@/layouts/DashboardLayout.vue';
 
-// Configure routes
+// Importar rutas modulares
+import authRoutes from './modules/auth.routes';
+import dashboardRoutes from './modules/dashboard.routes';
+import empleadosRoutes from './modules/empleados.routes';
+import clientesRoutes from './modules/clientes.routes';
+import vehiculosRoutes from './modules/vehiculos.routes';
+import lavadosRoutes from './modules/lavados.routes';
+import productosRoutes from './modules/productos.routes';
+import proveedoresRoutes from './modules/proveedores.routes';
+import ingresosRoutes from './modules/ingresos.routes';
+import egresosRoutes from './modules/egresos.routes';
+import balanceRoutes from './modules/balance.routes';
+import reportesRoutes from './modules/reportes.routes';
+import facturacionRoutes from './modules/facturacion.routes';
+
 const routes = [
-  { path: '/', redirect: '/dashboard' },
-  { path: '/login', name: 'login', component: Login },
-  { path: '/dashboard', name: 'dashboard', component: Dashboard, meta: { requiresAuth: true } },
-  { path: '/clientes', name: 'clientes', component: Clientes, meta: { requiresAuth: true } },
-  { path: '/vehiculos', name: 'vehiculos', component: Vehiculos, meta: { requiresAuth: true } },
-  { path: '/lavados', name: 'lavados', component: Lavados, meta: { requiresAuth: true } },
-  { path: '/lavados/nuevo', name: 'lavados-nuevo', component: Lavados, meta: { requiresAuth: true } },
-  { path: '/productos', name: 'productos', component: Productos, meta: { requiresAuth: true } },
-  { path: '/reportes', name: 'reportes', component: Reportes, meta: { requiresAuth: true } },
-]
+  {
+    path: '/',
+    redirect: (to) => {
+      // Esta lógica se manejará en el beforeEach guard
+      return '/dashboard';
+    }
+  },
+  // Rutas de autenticación
+  {
+    path: '/auth',
+    component: AuthLayout,
+    children: authRoutes
+  },
+  // Rutas del dashboard (requieren autenticación)
+  {
+    path: '/dashboard',
+    component: DashboardLayout,
+    meta: { requiresAuth: true },
+    children: [
+      ...dashboardRoutes,
+      ...empleadosRoutes,
+      ...clientesRoutes,
+      ...vehiculosRoutes,
+      ...lavadosRoutes,
+      ...productosRoutes,
+      ...proveedoresRoutes,
+      ...ingresosRoutes,
+      ...egresosRoutes,
+      ...balanceRoutes,
+      ...reportesRoutes,
+      ...facturacionRoutes
+    ]
+  },
+  // Ruta 404
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('@/views/error/NotFound.vue')
+  }
+];
 
 const router = createRouter({
   history: createWebHistory(),
-  routes,
-})
+  routes
+});
 
-// Navigation guard
+// Guard de autenticación
 router.beforeEach(async (to, from, next) => {
-  console.log('Navigating to:', to.path)
+  const authStore = useAuthStore();
   
-  // Check if route requires authentication
-  if (to.matched.some(record => record.meta.requiresAuth)) {
-    const authStore = useAuthStore()
+  // Si está yendo a la ruta raíz, decidir a dónde redirigir basado en autenticación
+  if (to.path === '/') {
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      return next('/auth/login');
+    }
     
     try {
-      // Check if user is already authenticated
-      if (!authStore.isAuthenticated) {
-        await authStore.fetchUser()
-      }
-      
-      if (authStore.isAuthenticated) {
-        next()
+      const isValid = await authStore.checkAuth();
+      if (isValid) {
+        return next('/dashboard');
       } else {
-        console.log('User not authenticated, redirecting to login')
-        next('/login')
+        return next('/auth/login');
       }
     } catch (error) {
-      console.error('Auth check failed:', error)
-      next('/login')
+      console.error('Error verificando token:', error);
+      return next('/auth/login');
     }
-  } else {
-    // If going to login and already authenticated, redirect to dashboard
-    if (to.path === '/login') {
-      const authStore = useAuthStore()
-      if (authStore.isAuthenticated) {
-        next('/dashboard')
-        return
+  }
+  
+  // Si está intentando acceder al login y ya está autenticado, redirigir al dashboard
+  if (to.name === 'Login') {
+    // Solo verificar autenticación si hay token
+    const token = localStorage.getItem('auth_token');
+    if (token && authStore.isAuthenticated) {
+      return next('/dashboard');
+    }
+    // Si hay token pero no está verificado en el store, verificar
+    if (token && !authStore.isAuthenticated) {
+      try {
+        const isValid = await authStore.checkAuth();
+        if (isValid) {
+          return next('/dashboard');
+        }
+      } catch (error) {
+        console.error('Error verificando autenticación en login:', error);
       }
     }
-    next()
+    // Si no hay token o no es válido, permitir acceso al login
+    return next();
   }
-})
+  
+  // Verificar si la ruta requiere autenticación
+  if (to.matched.some(record => record.meta.requiresAuth)) {
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      return next('/auth/login');
+    }
+    
+    // Si hay token pero no está autenticado en el store, verificar
+    if (!authStore.isAuthenticated) {
+      try {
+        const isValid = await authStore.checkAuth();
+        if (!isValid) {
+          return next('/auth/login');
+        }
+      } catch (error) {
+        console.error('Error verificando autenticación:', error);
+        return next('/auth/login');
+      }
+    }
+  }
+  
+  next();
+});
 
-export default router
+export default router;
