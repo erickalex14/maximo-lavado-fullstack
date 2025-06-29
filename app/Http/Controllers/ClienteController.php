@@ -152,7 +152,14 @@ class ClienteController extends Controller
     public function destroy(int $id): JsonResponse
     {
         try {
-            $this->clienteService->deleteCliente($id);
+            $result = $this->clienteService->deleteCliente($id);
+
+            if (!$result) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cliente no encontrado'
+                ], 404);
+            }
 
             return response()->json([
                 'success' => true,
@@ -164,8 +171,64 @@ class ClienteController extends Controller
             
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
-            ], 422);
+                'message' => 'Error al eliminar cliente: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Restaurar cliente eliminado lógicamente
+     * PUT /clientes/{id}/restore
+     */
+    public function restore(int $id): JsonResponse
+    {
+        try {
+            $result = $this->clienteService->restoreCliente($id);
+
+            if (!$result) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cliente no encontrado en papelera'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Cliente restaurado exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al restaurar cliente', ['id' => $id, 'error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al restaurar cliente: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener clientes eliminados lógicamente
+     * GET /clientes/trashed
+     */
+    public function trashed(): JsonResponse
+    {
+        try {
+            $clientes = $this->clienteService->getTrashedClientes();
+
+            return response()->json([
+                'success' => true,
+                'data' => $clientes,
+                'message' => 'Clientes eliminados obtenidos exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener clientes eliminados', ['error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener clientes eliminados'
+            ], 500);
         }
     }
 

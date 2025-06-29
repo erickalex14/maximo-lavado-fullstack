@@ -5,12 +5,10 @@ namespace App\Services;
 use App\Contracts\VentaRepositoryInterface;
 use App\Models\ProductoAutomotriz;
 use App\Models\ProductoDespensa;
-use App\Models\Cliente;
 use App\Models\VentaProductoAutomotriz;
 use App\Models\VentaProductoDespensa;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class VentaService
 {
@@ -43,123 +41,41 @@ class VentaService
 
     public function getProductosDisponibles(): array
     {
-        $automotrices = ProductoAutomotriz::where('stock', '>', 0)
-            ->get()
-            ->map(function($producto) {
-                return [
-                    'id' => $producto->producto_automotriz_id,
-                    'nombre' => $producto->nombre,
-                    'precio_venta' => $producto->precio_venta,
-                    'stock' => $producto->stock,
-                    'tipo' => 'automotriz'
-                ];
-            });
-
-        $despensa = ProductoDespensa::where('stock', '>', 0)
-            ->get()
-            ->map(function($producto) {
-                return [
-                    'id' => $producto->producto_despensa_id,
-                    'nombre' => $producto->nombre,
-                    'precio_venta' => $producto->precio_venta,
-                    'stock' => $producto->stock,
-                    'tipo' => 'despensa'
-                ];
-            });
-
-        return [
-            'automotrices' => $automotrices,
-            'despensa' => $despensa
-        ];
+        return $this->ventaRepository->getProductosDisponibles();
     }
 
     public function getClientes(): Collection
     {
-        return Cliente::select('cliente_id as id', 'nombre', 'telefono')
-            ->orderBy('nombre')
-            ->get();
+        return $this->ventaRepository->getClientes();
     }
 
     public function procesarVenta(array $data): array
     {
-        return DB::transaction(function () use ($data) {
-            $ventasCreadas = [];
-            $montoTotal = 0;
+        // Validaciones de negocio
+        $this->validateVentaData($data);
+        
+        return $this->ventaRepository->procesarVentaCompleta($data);
+    }
 
-            foreach ($data['items'] as $item) {
-                if ($item['tipo'] === 'automotriz') {
-                    $resultado = $this->procesarVentaAutomotriz($item, $data['cliente_id'] ?? null);
-                } else {
-                    $resultado = $this->procesarVentaDespensa($item, $data['cliente_id'] ?? null);
-                }
+    // =======================================================
+    // VALIDACIONES DE NEGOCIO
+    // =======================================================
 
-                $ventasCreadas[] = $resultado['venta'];
-                $montoTotal += $resultado['total'];
+    private function validateVentaData(array $data): void
+    {
+        if (empty($data['items'])) {
+            throw new \Exception('Debe incluir al menos un producto en la venta');
+        }
+
+        foreach ($data['items'] as $item) {
+            if ($item['cantidad'] <= 0) {
+                throw new \Exception('La cantidad debe ser mayor a 0');
             }
-
-            return [
-                'ventas' => $ventasCreadas,
-                'monto_total' => $montoTotal
-            ];
-        });
-    }
-
-    private function procesarVentaAutomotriz(array $item, ?int $clienteId): array
-    {
-        $producto = ProductoAutomotriz::findOrFail($item['producto_id']);
-        
-        if ($producto->stock < $item['cantidad']) {
-            throw new \Exception("Stock insuficiente para {$producto->nombre}. Disponible: {$producto->stock}");
+            
+            if (!in_array($item['tipo'], ['automotriz', 'despensa'])) {
+                throw new \Exception('Tipo de producto no válido');
+            }
         }
-
-        $precioUnitario = $producto->precio_venta;
-        $total = $precioUnitario * $item['cantidad'];
-
-        $venta = $this->ventaRepository->createVentaAutomotriz([
-            'producto_id' => $item['producto_id'],
-            'cliente_id' => $clienteId,
-            'cantidad' => $item['cantidad'],
-            'precio_unitario' => $precioUnitario,
-            'total' => $total,
-            'fecha' => now()
-        ]);
-
-        // Actualizar stock
-        $producto->decrement('stock', $item['cantidad']);
-
-        return [
-            'venta' => $venta,
-            'total' => $total
-        ];
-    }
-
-    private function procesarVentaDespensa(array $item, ?int $clienteId): array
-    {
-        $producto = ProductoDespensa::findOrFail($item['producto_id']);
-        
-        if ($producto->stock < $item['cantidad']) {
-            throw new \Exception("Stock insuficiente para {$producto->nombre}. Disponible: {$producto->stock}");
-        }
-
-        $precioUnitario = $producto->precio_venta;
-        $total = $precioUnitario * $item['cantidad'];
-
-        $venta = $this->ventaRepository->createVentaDespensa([
-            'producto_id' => $item['producto_id'],
-            'cliente_id' => $clienteId,
-            'cantidad' => $item['cantidad'],
-            'precio_unitario' => $precioUnitario,
-            'total' => $total,
-            'fecha' => now()
-        ]);
-
-        // Actualizar stock
-        $producto->decrement('stock', $item['cantidad']);
-
-        return [
-            'venta' => $venta,
-            'total' => $total
-        ];
     }
 
     public function findVentaById(int $id, string $tipo): ?object
@@ -187,5 +103,311 @@ class VentaService
         } else {
             return $this->ventaRepository->deleteVentaDespensa($id);
         }
+    }
+
+    // =======================================================
+    // MÉTODOS CONSOLIDADOS PARA GESTIÓN ESPECÍFICA POR TIPO
+    // =======================================================
+
+    /**
+     * Obtener todas las ventas de productos automotrices
+     */
+    public function getAllVentasAutomotrices(): Collection
+    {
+        return $this->ventaRepository->getAllVentasAutomotrices();
+    }
+
+    /**
+     * Obtener ventas automotrices por rango de fechas
+     */
+    public function getVentasAutomotricesByFechaRange(string $fechaInicio, string $fechaFin): Collection
+    {
+        return $this->ventaRepository->getVentasAutomotricesByFechaRange($fechaInicio, $fechaFin);
+    }
+
+    /**
+     * Crear una venta de producto automotriz con transacción
+     */
+    public function createVentaAutomotriz(array $data): object
+    {
+        return DB::transaction(function () use ($data) {
+            $producto = ProductoAutomotriz::findOrFail($data['producto_id']);
+            
+            if ($producto->stock < $data['cantidad']) {
+                throw new \Exception("Stock insuficiente para {$producto->nombre}. Disponible: {$producto->stock}");
+            }
+
+            // Calcular total si no se proporciona
+            $total = $data['precio_unitario'] * $data['cantidad'];
+
+            $ventaData = [
+                'producto_id' => $data['producto_id'],
+                'cliente_id' => $data['cliente_id'] ?? null,
+                'cantidad' => $data['cantidad'],
+                'precio_unitario' => $data['precio_unitario'],
+                'total' => $total,
+                'fecha' => $data['fecha'] ?? now()
+            ];
+
+            $venta = $this->ventaRepository->createVentaAutomotriz($ventaData);
+
+            // Actualizar stock
+            $producto->decrement('stock', $data['cantidad']);
+
+            return $venta;
+        });
+    }
+
+    /**
+     * Obtener venta automotriz por ID
+     */
+    public function getVentaAutomotrizById(int $id): ?object
+    {
+        return $this->ventaRepository->findVentaAutomotrizById($id);
+    }
+
+    /**
+     * Actualizar venta automotriz
+     */
+    public function updateVentaAutomotriz(int $id, array $data): ?object
+    {
+        return DB::transaction(function () use ($id, $data) {
+            $venta = $this->ventaRepository->findVentaAutomotrizById($id);
+            if (!$venta) {
+                return null;
+            }
+
+            // Si cambia la cantidad, ajustar stock
+            if (isset($data['cantidad']) && $data['cantidad'] != $venta->cantidad) {
+                $producto = ProductoAutomotriz::findOrFail($venta->producto_id);
+                $diferencia = $data['cantidad'] - $venta->cantidad;
+                
+                if ($diferencia > 0 && $producto->stock < $diferencia) {
+                    throw new \Exception("Stock insuficiente. Disponible: {$producto->stock}");
+                }
+                
+                $producto->decrement('stock', $diferencia);
+            }
+
+            // Recalcular total si es necesario
+            if (isset($data['cantidad']) || isset($data['precio_unitario'])) {
+                $cantidad = $data['cantidad'] ?? $venta->cantidad;
+                $precioUnitario = $data['precio_unitario'] ?? $venta->precio_unitario;
+                $data['total'] = $cantidad * $precioUnitario;
+            }
+
+            return $this->ventaRepository->updateVentaAutomotriz($id, $data);
+        });
+    }
+
+    /**
+     * Eliminar una venta de producto automotriz
+     */
+    public function deleteVentaAutomotriz(int $id): bool
+    {
+        return DB::transaction(function () use ($id) {
+            $venta = $this->ventaRepository->findVentaAutomotrizById($id);
+            if (!$venta) {
+                return false;
+            }
+
+            // Restaurar stock
+            $producto = ProductoAutomotriz::findOrFail($venta->producto_id);
+            $producto->increment('stock', $venta->cantidad);
+
+            return $this->ventaRepository->deleteVentaAutomotriz($id);
+        });
+    }
+
+    /**
+     * Restaurar venta automotriz eliminada lógicamente
+     */
+    public function restoreVentaAutomotriz(int $id): bool
+    {
+        return DB::transaction(function () use ($id) {
+            $venta = VentaProductoAutomotriz::onlyTrashed()->findOrFail($id);
+            
+            // Verificar stock antes de restaurar
+            $producto = ProductoAutomotriz::findOrFail($venta->producto_id);
+            if ($producto->stock < $venta->cantidad) {
+                throw new \Exception("Stock insuficiente para restaurar la venta. Disponible: {$producto->stock}, Requerido: {$venta->cantidad}");
+            }
+
+            $result = $this->ventaRepository->restoreVentaAutomotriz($id);
+            
+            if ($result) {
+                // Decrementar stock nuevamente
+                $producto->decrement('stock', $venta->cantidad);
+            }
+            
+            return $result;
+        });
+    }
+
+    /**
+     * Obtener ventas automotrices eliminadas lógicamente
+     */
+    public function getTrashedVentasAutomotrices(): Collection
+    {
+        return $this->ventaRepository->getTrashedVentasAutomotrices();
+    }
+
+    /**
+     * Obtener todas las ventas de productos de despensa
+     */
+    public function getAllVentasDespensa(): Collection
+    {
+        return $this->ventaRepository->getAllVentasDespensa();
+    }
+
+    /**
+     * Obtener ventas de despensa por rango de fechas
+     */
+    public function getVentasDespensaByFechaRange(string $fechaInicio, string $fechaFin): Collection
+    {
+        return $this->ventaRepository->getVentasDespensaByFechaRange($fechaInicio, $fechaFin);
+    }
+
+    /**
+     * Crear una venta de producto de despensa con transacción
+     */
+    public function createVentaDespensa(array $data): object
+    {
+        return DB::transaction(function () use ($data) {
+            $producto = ProductoDespensa::findOrFail($data['producto_id']);
+            
+            if ($producto->stock < $data['cantidad']) {
+                throw new \Exception("Stock insuficiente para {$producto->nombre}. Disponible: {$producto->stock}");
+            }
+
+            // Calcular total
+            $total = $data['precio_unitario'] * $data['cantidad'];
+
+            $ventaData = [
+                'producto_id' => $data['producto_id'],
+                'cliente_id' => $data['cliente_id'] ?? null,
+                'cantidad' => $data['cantidad'],
+                'precio_unitario' => $data['precio_unitario'],
+                'total' => $total,
+                'fecha' => $data['fecha'] ?? now()
+            ];
+
+            $venta = $this->ventaRepository->createVentaDespensa($ventaData);
+
+            // Actualizar stock
+            $producto->decrement('stock', $data['cantidad']);
+
+            return $venta;
+        });
+    }
+
+    /**
+     * Obtener venta de despensa por ID
+     */
+    public function getVentaDespensaById(int $id): ?object
+    {
+        return $this->ventaRepository->findVentaDespensaById($id);
+    }
+
+    /**
+     * Actualizar venta de despensa
+     */
+    public function updateVentaDespensa(int $id, array $data): ?object
+    {
+        return DB::transaction(function () use ($id, $data) {
+            $venta = $this->ventaRepository->findVentaDespensaById($id);
+            if (!$venta) {
+                return null;
+            }
+
+            // Si cambia la cantidad, ajustar stock
+            if (isset($data['cantidad']) && $data['cantidad'] != $venta->cantidad) {
+                $producto = ProductoDespensa::findOrFail($venta->producto_id);
+                $diferencia = $data['cantidad'] - $venta->cantidad;
+                
+                if ($diferencia > 0 && $producto->stock < $diferencia) {
+                    throw new \Exception("Stock insuficiente. Disponible: {$producto->stock}");
+                }
+                
+                $producto->decrement('stock', $diferencia);
+            }
+
+            // Recalcular total si es necesario
+            if (isset($data['cantidad']) || isset($data['precio_unitario'])) {
+                $cantidad = $data['cantidad'] ?? $venta->cantidad;
+                $precioUnitario = $data['precio_unitario'] ?? $venta->precio_unitario;
+                $data['total'] = $cantidad * $precioUnitario;
+            }
+
+            return $this->ventaRepository->updateVentaDespensa($id, $data);
+        });
+    }
+
+    /**
+     * Eliminar venta de despensa y restaurar stock
+     */
+    public function deleteVentaDespensa(int $id): bool
+    {
+        return DB::transaction(function () use ($id) {
+            $venta = $this->ventaRepository->findVentaDespensaById($id);
+            if (!$venta) {
+                return false;
+            }
+
+            // Restaurar stock
+            $producto = ProductoDespensa::findOrFail($venta->producto_id);
+            $producto->increment('stock', $venta->cantidad);
+
+            return $this->ventaRepository->deleteVentaDespensa($id);
+        });
+    }
+
+    /**
+     * Restaurar venta de despensa eliminada lógicamente
+     */
+    public function restoreVentaDespensa(int $id): bool
+    {
+        return DB::transaction(function () use ($id) {
+            $venta = VentaProductoDespensa::onlyTrashed()->findOrFail($id);
+            
+            // Verificar stock antes de restaurar
+            $producto = ProductoDespensa::findOrFail($venta->producto_id);
+            if ($producto->stock < $venta->cantidad) {
+                throw new \Exception("Stock insuficiente para restaurar la venta. Disponible: {$producto->stock}, Requerido: {$venta->cantidad}");
+            }
+
+            $result = $this->ventaRepository->restoreVentaDespensa($id);
+            
+            if ($result) {
+                // Decrementar stock nuevamente
+                $producto->decrement('stock', $venta->cantidad);
+            }
+            
+            return $result;
+        });
+    }
+
+    /**
+     * Obtener ventas de despensa eliminadas lógicamente
+     */
+    public function getTrashedVentasDespensa(): Collection
+    {
+        return $this->ventaRepository->getTrashedVentasDespensa();
+    }
+
+    /**
+     * Obtener métricas específicas de ventas automotrices
+     */
+    public function getMetricasAutomotrices(array $params = []): array
+    {
+        return $this->ventaRepository->getMetricasAutomotrices($params);
+    }
+
+    /**
+     * Obtener métricas específicas de ventas de despensa
+     */
+    public function getMetricasDespensa(array $params = []): array
+    {
+        return $this->ventaRepository->getMetricasDespensa($params);
     }
 }

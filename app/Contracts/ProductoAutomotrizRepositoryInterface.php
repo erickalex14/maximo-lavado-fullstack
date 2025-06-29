@@ -17,6 +17,16 @@ interface ProductoAutomotrizRepositoryInterface
     
     public function delete(int $id): bool;
     
+    /**
+     * Restaurar producto automotriz eliminado lógicamente
+     */
+    public function restore(int $id): bool;
+    
+    /**
+     * Obtener productos automotrices eliminados lógicamente
+     */
+    public function getTrashed(): Collection;
+    
     public function getActiveProducts(): Collection;
     
     public function getInactiveProducts(): Collection;

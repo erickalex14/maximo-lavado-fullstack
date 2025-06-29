@@ -77,26 +77,8 @@ class ProductoService
      */
     public function getMetricas(): array
     {
-        $totalAutomotrices = $this->productoAutomotrizRepository->getAll()->count();
-        $totalDespensa = $this->productoDespensaRepository->getAll()->count();
-        
-        $stockBajoAutomotrices = $this->productoAutomotrizRepository->getAll()->where('stock', '<=', 10)->count();
-        $stockBajoDespensa = $this->productoDespensaRepository->getAll()->where('stock', '<=', 10)->count();
-        
-        $valorInventarioAutomotrices = $this->productoAutomotrizRepository->getAll()->sum(function($producto) {
-            return $producto->precio_venta * $producto->stock;
-        });
-        
-        $valorInventarioDespensa = $this->productoDespensaRepository->getAll()->sum(function($producto) {
-            return $producto->precio_venta * $producto->stock;
-        });
-
-        return [
-            'totalAutomotrices' => $totalAutomotrices,
-            'totalDespensa' => $totalDespensa,
-            'stockBajo' => $stockBajoAutomotrices + $stockBajoDespensa,
-            'valorInventario' => $valorInventarioAutomotrices + $valorInventarioDespensa
-        ];
+        return $this->productoAutomotrizRepository->getMetricas() + 
+               $this->productoDespensaRepository->getMetricas();
     }
 
     /**
@@ -161,6 +143,38 @@ class ProductoService
     public function deleteProductoDespensa(int $id): bool
     {
         return $this->productoDespensaRepository->delete($id);
+    }
+
+    /**
+     * Restore automotriz product
+     */
+    public function restoreProductoAutomotriz(int $id): bool
+    {
+        return $this->productoAutomotrizRepository->restore($id);
+    }
+
+    /**
+     * Restore despensa product
+     */
+    public function restoreProductoDespensa(int $id): bool
+    {
+        return $this->productoDespensaRepository->restore($id);
+    }
+
+    /**
+     * Get trashed automotriz products
+     */
+    public function getTrashedProductosAutomotrices(): Collection
+    {
+        return $this->productoAutomotrizRepository->getTrashed();
+    }
+
+    /**
+     * Get trashed despensa products
+     */
+    public function getTrashedProductosDespensa(): Collection
+    {
+        return $this->productoDespensaRepository->getTrashed();
     }
 
     /**

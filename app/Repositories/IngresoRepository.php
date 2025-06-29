@@ -50,6 +50,22 @@ class IngresoRepository implements IngresoRepositoryInterface
         return $ingreso->delete();
     }
     
+    public function restore(int $id): bool
+    {
+        $ingreso = Ingreso::onlyTrashed()->find($id);
+        if ($ingreso) {
+            return $ingreso->restore();
+        }
+        return false;
+    }
+    
+    public function getTrashed(): Collection
+    {
+        return Ingreso::onlyTrashed()
+            ->orderBy('deleted_at', 'desc')
+            ->get();
+    }
+    
     public function getByTipo(string $tipo): Collection
     {
         return Ingreso::where('tipo', $tipo)

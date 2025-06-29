@@ -17,6 +17,16 @@ interface ProductoDespensaRepositoryInterface
     
     public function delete(int $id): bool;
     
+    /**
+     * Restaurar producto de despensa eliminado lógicamente
+     */
+    public function restore(int $id): bool;
+    
+    /**
+     * Obtener productos de despensa eliminados lógicamente
+     */
+    public function getTrashed(): Collection;
+    
     public function getActiveProducts(): Collection;
     
     public function getInactiveProducts(): Collection;

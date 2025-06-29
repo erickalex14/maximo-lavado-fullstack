@@ -67,6 +67,16 @@ class UserService
         return $this->userRepository->delete($id);
     }
 
+    public function restoreUser(int $id): bool
+    {
+        return $this->userRepository->restore($id);
+    }
+
+    public function getTrashedUsers(): Collection
+    {
+        return $this->userRepository->getTrashed();
+    }
+
     public function getActiveUsers(): Collection
     {
         return $this->userRepository->getActiveUsers();

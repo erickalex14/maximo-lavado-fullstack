@@ -14,6 +14,17 @@ interface VehiculoRepositoryInterface
     public function create(array $data): Vehiculo;
     public function update(int $id, array $data): Vehiculo;
     public function delete(int $id): bool;
+    
+    /**
+     * Restaurar vehículo eliminado lógicamente
+     */
+    public function restore(int $id): bool;
+    
+    /**
+     * Obtener vehículos eliminados lógicamente
+     */
+    public function getTrashed(): Collection;
+    
     public function getByCliente(int $clienteId): Collection;
     public function existsByPlaca(string $placa, ?int $excludeId = null): bool;
     public function getStats(): array;

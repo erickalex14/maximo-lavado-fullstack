@@ -40,6 +40,16 @@ class EgresoService
         return $this->egresoRepository->delete($id);
     }
 
+    public function restoreEgreso(int $id): bool
+    {
+        return $this->egresoRepository->restore($id);
+    }
+
+    public function getTrashedEgresos(): Collection
+    {
+        return $this->egresoRepository->getTrashed();
+    }
+
     public function getEgresosByTipo(string $tipo): Collection
     {
         return $this->egresoRepository->getByTipo($tipo);

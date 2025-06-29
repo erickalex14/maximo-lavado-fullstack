@@ -155,6 +155,54 @@ class IngresoController extends Controller
     }
 
     /**
+     * Restore a soft deleted ingreso.
+     */
+    public function restore(int $id): JsonResponse
+    {
+        try {
+            $restored = $this->ingresoService->restoreIngreso($id);
+            
+            if (!$restored) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Ingreso no encontrado en la papelera'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Ingreso restaurado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al restaurar el ingreso: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all soft deleted ingresos.
+     */
+    public function trashed(): JsonResponse
+    {
+        try {
+            $ingresos = $this->ingresoService->getTrashedIngresos();
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Ingresos eliminados obtenidos correctamente',
+                'data' => $ingresos
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener ingresos eliminados: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Get ingresos metrics.
      */
     public function getMetricas(): JsonResponse

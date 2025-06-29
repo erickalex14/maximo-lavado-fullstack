@@ -24,19 +24,29 @@ interface ClienteRepositoryInterface
     public function findById(int $id): ?Cliente;
 
     /**
-     * Crear nuevo cliente
+     * Crear nuevo cliente (con transacción interna)
      */
     public function create(array $data): Cliente;
 
     /**
-     * Actualizar cliente
+     * Actualizar cliente (con transacción interna)
      */
     public function update(int $id, array $data): Cliente;
 
     /**
-     * Eliminar cliente
+     * Eliminar cliente (con transacción interna)
      */
     public function delete(int $id): bool;
+
+    /**
+     * Restaurar cliente eliminado lógicamente
+     */
+    public function restore(int $id): bool;
+
+    /**
+     * Obtener clientes eliminados lógicamente
+     */
+    public function getTrashed(): Collection;
 
     /**
      * Buscar clientes por término de búsqueda

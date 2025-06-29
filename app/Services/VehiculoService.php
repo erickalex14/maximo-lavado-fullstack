@@ -6,7 +6,6 @@ use App\Contracts\VehiculoRepositoryInterface;
 use App\Models\Vehiculo;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class VehiculoService
@@ -32,101 +31,81 @@ class VehiculoService
 
     public function createVehiculo(array $data): Vehiculo
     {
-        try {
-            DB::beginTransaction();
+        // Validaciones de negocio
+        $this->validateBusinessRules($data);
 
-            // Validaciones de negocio
-            $this->validateBusinessRules($data);
+        $vehiculo = $this->vehiculoRepository->create($data);
 
-            $vehiculo = $this->vehiculoRepository->create($data);
+        Log::info('Vehículo creado exitosamente', [
+            'vehiculo_id' => $vehiculo->vehiculo_id,
+            'cliente_id' => $vehiculo->cliente_id,
+            'matricula' => $vehiculo->matricula
+        ]);
 
-            DB::commit();
-
-            Log::info('Vehículo creado exitosamente', [
-                'vehiculo_id' => $vehiculo->vehiculo_id,
-                'cliente_id' => $vehiculo->cliente_id,
-                'matricula' => $vehiculo->matricula
-            ]);
-
-            return $vehiculo;
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error al crear vehículo', [
-                'data' => $data,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
-        }
+        return $vehiculo;
     }
 
     public function updateVehiculo(int $id, array $data): Vehiculo
     {
-        try {
-            DB::beginTransaction();
-
-            $vehiculo = $this->vehiculoRepository->findById($id);
-            if (!$vehiculo) {
-                throw new \Exception('Vehículo no encontrado');
-            }
-
-            // Validaciones de negocio
-            $this->validateBusinessRules($data, $id);
-
-            $vehiculoActualizado = $this->vehiculoRepository->update($id, $data);
-
-            DB::commit();
-
-            Log::info('Vehículo actualizado exitosamente', [
-                'vehiculo_id' => $id,
-                'cambios' => array_diff_assoc($data, $vehiculo->toArray())
-            ]);
-
-            return $vehiculoActualizado;
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error al actualizar vehículo', [
-                'vehiculo_id' => $id,
-                'data' => $data,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
+        $vehiculo = $this->vehiculoRepository->findById($id);
+        if (!$vehiculo) {
+            throw new \Exception('Vehículo no encontrado');
         }
+
+        // Validaciones de negocio
+        $this->validateBusinessRules($data, $id);
+
+        $vehiculoActualizado = $this->vehiculoRepository->update($id, $data);
+
+        Log::info('Vehículo actualizado exitosamente', [
+            'vehiculo_id' => $id
+        ]);
+
+        return $vehiculoActualizado;
     }
 
     public function deleteVehiculo(int $id): bool
     {
-        try {
-            DB::beginTransaction();
-
-            $vehiculo = $this->vehiculoRepository->findById($id);
-            if (!$vehiculo) {
-                throw new \Exception('Vehículo no encontrado');
-            }
-
-            // Verificar si se puede eliminar
-            $this->validateDeletion($vehiculo);
-
-            $result = $this->vehiculoRepository->delete($id);
-
-            DB::commit();
-
-            Log::info('Vehículo eliminado exitosamente', [
-                'vehiculo_id' => $id,
-                'matricula' => $vehiculo->matricula
-            ]);
-
-            return $result;
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error al eliminar vehículo', [
-                'vehiculo_id' => $id,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
+        $vehiculo = $this->vehiculoRepository->findById($id);
+        if (!$vehiculo) {
+            throw new \Exception('Vehículo no encontrado');
         }
+
+        // Verificar si se puede eliminar
+        $this->validateDeletion($vehiculo);
+
+        $result = $this->vehiculoRepository->delete($id);
+
+        Log::info('Vehículo eliminado exitosamente', [
+            'vehiculo_id' => $id,
+            'matricula' => $vehiculo->matricula
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * Restaurar vehículo eliminado lógicamente
+     */
+    public function restoreVehiculo(int $id): bool
+    {
+        $result = $this->vehiculoRepository->restore($id);
+
+        if ($result) {
+            Log::info('Vehículo restaurado exitosamente', [
+                'vehiculo_id' => $id
+            ]);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Obtener vehículos eliminados lógicamente
+     */
+    public function getTrashedVehiculos(): Collection
+    {
+        return $this->vehiculoRepository->getTrashed();
     }
 
     public function getVehiculosByCliente(int $clienteId): Collection

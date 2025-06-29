@@ -45,6 +45,22 @@ class EmpleadoService
         return $this->empleadoRepository->delete($id);
     }
 
+    /**
+     * Restaurar empleado eliminado lógicamente
+     */
+    public function restoreEmpleado(int $id): bool
+    {
+        return $this->empleadoRepository->restore($id);
+    }
+
+    /**
+     * Obtener empleados eliminados lógicamente
+     */
+    public function getTrashedEmpleados(): Collection
+    {
+        return $this->empleadoRepository->getTrashed();
+    }
+
     public function getLavadosPorDia(int $empleadoId, string $fecha): int
     {
         return $this->empleadoRepository->countLavadosByEmpleadoAndDate($empleadoId, $fecha);

@@ -51,6 +51,28 @@ class EmpleadoRepository implements EmpleadoRepositoryInterface
         return false;
     }
 
+    /**
+     * Restaurar empleado eliminado lógicamente
+     */
+    public function restore(int $id): bool
+    {
+        $empleado = Empleado::onlyTrashed()->find($id);
+        if ($empleado) {
+            return $empleado->restore();
+        }
+        return false;
+    }
+
+    /**
+     * Obtener empleados eliminados lógicamente
+     */
+    public function getTrashed(): Collection
+    {
+        return Empleado::onlyTrashed()
+            ->orderBy('deleted_at', 'desc')
+            ->get();
+    }
+
     public function getEmpleadosWithLavados(): Collection
     {
         return $this->model->with('lavados')->get();

@@ -40,6 +40,16 @@ class GastoGeneralService
         return $this->gastoGeneralRepository->delete($id);
     }
 
+    public function restoreGastoGeneral(int $id): bool
+    {
+        return $this->gastoGeneralRepository->restore($id);
+    }
+
+    public function getTrashedGastosGenerales(): Collection
+    {
+        return $this->gastoGeneralRepository->getTrashed();
+    }
+
     public function getGastosGeneralesByFechaRange(string $fechaInicio, string $fechaFin): Collection
     {
         return $this->gastoGeneralRepository->getByFechaRange($fechaInicio, $fechaFin);

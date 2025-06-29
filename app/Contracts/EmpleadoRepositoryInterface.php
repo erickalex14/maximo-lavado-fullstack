@@ -17,6 +17,16 @@ interface EmpleadoRepositoryInterface
     
     public function delete(int $id): bool;
     
+    /**
+     * Restaurar empleado eliminado lógicamente
+     */
+    public function restore(int $id): bool;
+    
+    /**
+     * Obtener empleados eliminados lógicamente
+     */
+    public function getTrashed(): Collection;
+    
     public function getEmpleadosWithLavados(): Collection;
     
     public function countLavadosByEmpleadoAndDate(int $empleadoId, string $fecha): int;

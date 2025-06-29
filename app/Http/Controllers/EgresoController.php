@@ -155,6 +155,54 @@ class EgresoController extends Controller
     }
 
     /**
+     * Restore a soft deleted egreso.
+     */
+    public function restore(int $id): JsonResponse
+    {
+        try {
+            $restored = $this->egresoService->restoreEgreso($id);
+            
+            if (!$restored) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Egreso no encontrado en la papelera'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Egreso restaurado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al restaurar el egreso: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all soft deleted egresos.
+     */
+    public function trashed(): JsonResponse
+    {
+        try {
+            $egresos = $this->egresoService->getTrashedEgresos();
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Egresos eliminados obtenidos correctamente',
+                'data' => $egresos
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener egresos eliminados: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Get egresos metrics.
      */
     public function getMetricas(): JsonResponse

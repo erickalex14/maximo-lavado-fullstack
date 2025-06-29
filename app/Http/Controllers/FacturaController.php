@@ -155,6 +155,54 @@ class FacturaController extends Controller
     }
 
     /**
+     * Restore a soft deleted factura.
+     */
+    public function restore(int $id): JsonResponse
+    {
+        try {
+            $restored = $this->facturaService->restoreFactura($id);
+            
+            if (!$restored) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Factura no encontrada en la papelera'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Factura restaurada correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al restaurar la factura: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all soft deleted facturas.
+     */
+    public function trashed(): JsonResponse
+    {
+        try {
+            $facturas = $this->facturaService->getTrashedFacturas();
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Facturas eliminadas obtenidas correctamente',
+                'data' => $facturas
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener facturas eliminadas: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Find factura by numero.
      */
     public function findByNumero(string $numeroFactura): JsonResponse

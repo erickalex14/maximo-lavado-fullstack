@@ -151,6 +151,54 @@ class GastoGeneralController extends Controller
     }
 
     /**
+     * Restore a soft deleted gasto general.
+     */
+    public function restore(int $id): JsonResponse
+    {
+        try {
+            $restored = $this->gastoGeneralService->restoreGastoGeneral($id);
+            
+            if (!$restored) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Gasto general no encontrado en la papelera'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Gasto general restaurado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al restaurar el gasto general: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all soft deleted gastos generales.
+     */
+    public function trashed(): JsonResponse
+    {
+        try {
+            $gastos = $this->gastoGeneralService->getTrashedGastosGenerales();
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Gastos generales eliminados obtenidos correctamente',
+                'data' => $gastos
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener gastos generales eliminados: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Get gastos generales metrics.
      */
     public function getMetricas(): JsonResponse

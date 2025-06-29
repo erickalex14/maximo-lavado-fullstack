@@ -48,20 +48,63 @@ class VehiculoRepository implements VehiculoRepositoryInterface
 
     public function create(array $data): Vehiculo
     {
-        return Vehiculo::create($data);
+        return \DB::transaction(function () use ($data) {
+            // Validar matrícula única (si se proporciona)
+            if (isset($data['matricula']) && !empty($data['matricula'])) {
+                if ($this->existsByMatricula($data['matricula'])) {
+                    throw new \Exception('Ya existe un vehículo con esta matrícula');
+                }
+            }
+
+            return Vehiculo::create($data);
+        });
     }
 
     public function update(int $id, array $data): Vehiculo
     {
-        $vehiculo = Vehiculo::findOrFail($id);
-        $vehiculo->update($data);
-        return $vehiculo->fresh(['cliente']);
+        return \DB::transaction(function () use ($id, $data) {
+            $vehiculo = Vehiculo::findOrFail($id);
+            
+            // Validar matrícula única si se está actualizando y es diferente
+            if (isset($data['matricula']) && !empty($data['matricula']) && $data['matricula'] !== $vehiculo->matricula) {
+                if ($this->existsByMatricula($data['matricula'], $id)) {
+                    throw new \Exception('Ya existe un vehículo con esta matrícula');
+                }
+            }
+            
+            $vehiculo->update($data);
+            return $vehiculo->fresh(['cliente']);
+        });
     }
 
     public function delete(int $id): bool
     {
-        $vehiculo = Vehiculo::findOrFail($id);
-        return $vehiculo->delete();
+        return \DB::transaction(function () use ($id) {
+            $vehiculo = Vehiculo::findOrFail($id);
+            return $vehiculo->delete();
+        });
+    }
+
+    /**
+     * Restaurar vehículo eliminado lógicamente
+     */
+    public function restore(int $id): bool
+    {
+        return \DB::transaction(function () use ($id) {
+            $vehiculo = Vehiculo::onlyTrashed()->findOrFail($id);
+            return $vehiculo->restore();
+        });
+    }
+
+    /**
+     * Obtener vehículos eliminados lógicamente
+     */
+    public function getTrashed(): Collection
+    {
+        return Vehiculo::onlyTrashed()
+            ->with(['cliente'])
+            ->orderBy('deleted_at', 'desc')
+            ->get();
     }
 
     public function getByCliente(int $clienteId): Collection

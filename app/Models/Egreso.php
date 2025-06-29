@@ -6,10 +6,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Egreso extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     // Nombre de la tabla asociada
     protected $table = 'egresos';

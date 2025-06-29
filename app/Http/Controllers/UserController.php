@@ -18,9 +18,8 @@ class UserController extends Controller
         $this->userService = $userService;
     }
 
-    /**
-     * Display a listing of users.
-     */
+    // Lista de usuarios
+
     public function index(): JsonResponse
     {
         try {
@@ -38,9 +37,8 @@ class UserController extends Controller
         }
     }
 
-    /**
-     * Store a newly created user.
-     */
+    // Guarda un nuevo usuario
+
     public function store(CreateUserRequest $request): JsonResponse
     {
         try {
@@ -64,9 +62,8 @@ class UserController extends Controller
         }
     }
 
-    /**
-     * Display the specified user.
-     */
+    // Obtiene un usuario específico por ID
+
     public function show(int $id): JsonResponse
     {
         try {
@@ -91,9 +88,8 @@ class UserController extends Controller
         }
     }
 
-    /**
-     * Update the specified user.
-     */
+    // Actualiza un usuario específico por ID
+    
     public function update(UpdateUserRequest $request, int $id): JsonResponse
     {
         try {
@@ -147,6 +143,54 @@ class UserController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Error al eliminar el usuario: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Restore a soft deleted user.
+     */
+    public function restore(int $id): JsonResponse
+    {
+        try {
+            $restored = $this->userService->restoreUser($id);
+            
+            if (!$restored) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Usuario no encontrado en la papelera'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Usuario restaurado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al restaurar el usuario: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all soft deleted users.
+     */
+    public function trashed(): JsonResponse
+    {
+        try {
+            $users = $this->userService->getTrashedUsers();
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Usuarios eliminados obtenidos correctamente',
+                'data' => $users
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener usuarios eliminados: ' . $e->getMessage()
             ], 500);
         }
     }

@@ -20,9 +20,8 @@ class ProveedorController extends Controller
         $this->proveedorService = $proveedorService;
     }
 
-    /**
-     * Display a listing of the resource.
-     */
+    // Muestra todos los proveedores
+
     public function index(): JsonResponse
     {
         try {
@@ -48,9 +47,8 @@ class ProveedorController extends Controller
         }
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
+    // Guarda un nuevo proveedor
+
     public function store(CreateProveedorRequest $request): JsonResponse
     {
         try {
@@ -69,9 +67,8 @@ class ProveedorController extends Controller
         }
     }
 
-    /**
-     * Display the specified resource.
-     */
+    // Muestra un proveedor específico por ID
+
     public function show(int $id): JsonResponse
     {
         try {
@@ -96,9 +93,8 @@ class ProveedorController extends Controller
         }
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
+    // Actualiza un proveedor específico por ID
+
     public function update(UpdateProveedorRequest $request, int $id): JsonResponse
     {
         try {
@@ -124,9 +120,8 @@ class ProveedorController extends Controller
         }
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
+    // Elimina un proveedor específico por ID
+
     public function destroy(int $id): JsonResponse
     {
         try {
@@ -151,9 +146,54 @@ class ProveedorController extends Controller
         }
     }
 
-    /**
-     * Get debt amount for a specific provider.
-     */
+    // Restaura un proveedor eliminado lógicamente
+
+    public function restore(int $id): JsonResponse
+    {
+        try {
+            $restored = $this->proveedorService->restoreProveedor($id);
+            
+            if (!$restored) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Proveedor no encontrado en la papelera'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Proveedor restaurado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al restaurar el proveedor: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // Obtiene todos los proveedores eliminados lógicamente
+
+    public function trashed(): JsonResponse
+    {
+        try {
+            $proveedores = $this->proveedorService->getTrashedProveedores();
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Proveedores eliminados obtenidos correctamente',
+                'data' => $proveedores
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener los proveedores eliminados: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // Ver deuda pendiente de un proveedor
+
     public function verDeuda(int $id): JsonResponse
     {
         try {
@@ -180,9 +220,8 @@ class ProveedorController extends Controller
 
 
 
-    /**
-     * Get payment history for a provider.
-     */
+    // Ver historial de pagos de un proveedor
+
     public function pagos(int $id): JsonResponse
     {
         try {
@@ -205,10 +244,8 @@ class ProveedorController extends Controller
     // MÉTODOS CONSOLIDADOS PARA GESTIÓN COMPLETA DE PAGOS
     // =======================================================
 
-    /**
-     * Obtener todos los pagos de todos los proveedores
-     * Ruta propuesta: GET /proveedores/pagos
-     */
+    // Obtener todos los pagos de proveedores
+
     public function getAllPagos(Request $request): JsonResponse
     {
         try {
@@ -236,10 +273,8 @@ class ProveedorController extends Controller
         }
     }
 
-    /**
-     * Crear un pago con transacción completa
-     * Ruta propuesta: POST /proveedores/pagos
-     */
+    //Crear un pago con transacción completa
+
     public function createPago(CreatePagoRequest $request): JsonResponse
     {
         try {
@@ -265,10 +300,8 @@ class ProveedorController extends Controller
         }
     }
 
-    /**
-     * Obtener un pago específico por ID
-     * Ruta propuesta: GET /proveedores/pagos/{pagoId}
-     */
+    // Obtener un pago específico por ID
+
     public function getPago(int $pagoId): JsonResponse
     {
         try {
@@ -293,10 +326,8 @@ class ProveedorController extends Controller
         }
     }
 
-    /**
-     * Actualizar un pago específico
-     * Ruta propuesta: PUT /proveedores/pagos/{pagoId}
-     */
+    // Actualizar un pago específico
+
     public function updatePago(UpdatePagoRequest $request, int $pagoId): JsonResponse
     {
         try {
@@ -322,10 +353,8 @@ class ProveedorController extends Controller
         }
     }
 
-    /**
-     * Eliminar un pago específico
-     * Ruta propuesta: DELETE /proveedores/pagos/{pagoId}
-     */
+    // Eliminar un pago específico
+
     public function deletePago(int $pagoId): JsonResponse
     {
         try {
@@ -350,10 +379,8 @@ class ProveedorController extends Controller
         }
     }
 
-    /**
-     * Obtener métricas de pagos a proveedores
-     * Ruta propuesta: GET /proveedores/pagos/metricas
-     */
+    // Obtener métricas de pagos
+    
     public function getMetricasPagos(Request $request): JsonResponse
     {
         try {

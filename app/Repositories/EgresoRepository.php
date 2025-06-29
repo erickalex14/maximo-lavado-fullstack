@@ -47,6 +47,22 @@ class EgresoRepository implements EgresoRepositoryInterface
         return $egreso->delete();
     }
     
+    public function restore(int $id): bool
+    {
+        $egreso = Egreso::onlyTrashed()->find($id);
+        if ($egreso) {
+            return $egreso->restore();
+        }
+        return false;
+    }
+    
+    public function getTrashed(): Collection
+    {
+        return Egreso::onlyTrashed()
+            ->orderBy('deleted_at', 'desc')
+            ->get();
+    }
+    
     public function getByTipo(string $tipo): Collection
     {
         return Egreso::where('tipo', $tipo)

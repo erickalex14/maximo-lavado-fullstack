@@ -2,25 +2,24 @@ import api from './api';
 
 /**
  * Servicio consolidado para gestión de proveedores y sus pagos
- * Consume la API real del backend sin datos de ejemplo
+ * Consume la API real del backend consolidada en ProveedorController
  * 
- * PROPUESTA DE CONSOLIDACIÓN:
- * En lugar de tener PagoProveedorController separado, todo debería manejarse desde ProveedorController
+ * Toda la gestión de proveedores y pagos está centralizada en ProveedorController
  * 
- * Endpoints consolidados propuestos:
+ * Endpoints consolidados activos:
  * - GET /proveedores - Obtener proveedores con paginación
  * - POST /proveedores - Crear nuevo proveedor
  * - GET /proveedores/{id} - Obtener proveedor por ID
  * - PUT /proveedores/{id} - Actualizar proveedor
  * - DELETE /proveedores/{id} - Eliminar proveedor
  * - GET /proveedores/{id}/deuda - Ver deuda del proveedor
- * - POST /proveedores/{id}/pago - Registrar pago a proveedor
  * - GET /proveedores/{id}/pagos - Historial de pagos de un proveedor
  * - GET /proveedores/pagos - Todos los pagos de todos los proveedores (con filtros)
  * - GET /proveedores/pagos/metricas - Métricas de pagos
  * - GET /proveedores/pagos/{pagoId} - Detalle de un pago específico
  * - PUT /proveedores/pagos/{pagoId} - Actualizar un pago específico
  * - DELETE /proveedores/pagos/{pagoId} - Eliminar un pago específico
+ * - POST /proveedores/pagos - Crear pago con transacción completa
  */
 class ProveedorServiceClass {
   /**
@@ -81,17 +80,6 @@ class ProveedorServiceClass {
    */
   async verDeuda(id) {
     const response = await api.get(`/proveedores/${id}/deuda`);
-    return response.data;
-  }
-
-  /**
-   * Registrar pago a un proveedor
-   * @param {number} id - ID del proveedor
-   * @param {object} data - Datos del pago
-   * @returns {Promise} Respuesta de la API
-   */
-  async registrarPago(id, data) {
-    const response = await api.post(`/proveedores/${id}/pago`, data);
     return response.data;
   }
 

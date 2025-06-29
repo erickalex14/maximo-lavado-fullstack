@@ -39,20 +39,43 @@ class ClienteRepository implements ClienteRepositoryInterface
 
     public function create(array $data): Cliente
     {
-        return Cliente::create($data);
+        return \DB::transaction(function () use ($data) {
+            return Cliente::create($data);
+        });
     }
 
     public function update(int $id, array $data): Cliente
     {
-        $cliente = Cliente::findOrFail($id);
-        $cliente->update($data);
-        return $cliente->fresh();
+        return \DB::transaction(function () use ($id, $data) {
+            $cliente = Cliente::findOrFail($id);
+            $cliente->update($data);
+            return $cliente->fresh();
+        });
     }
 
     public function delete(int $id): bool
     {
         $cliente = Cliente::findOrFail($id);
         return $cliente->delete();
+    }
+
+    /**
+     * Restaurar cliente eliminado lógicamente
+     */
+    public function restore(int $id): bool
+    {
+        $cliente = Cliente::onlyTrashed()->findOrFail($id);
+        return $cliente->restore();
+    }
+
+    /**
+     * Obtener clientes eliminados lógicamente
+     */
+    public function getTrashed(): Collection
+    {
+        return Cliente::onlyTrashed()
+            ->orderBy('deleted_at', 'desc')
+            ->get();
     }
 
     public function search(string $term): Collection

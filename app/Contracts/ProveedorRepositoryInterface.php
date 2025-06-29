@@ -17,6 +17,16 @@ interface ProveedorRepositoryInterface
     
     public function delete(int $id): bool;
     
+    /**
+     * Restaurar proveedor eliminado lógicamente
+     */
+    public function restore(int $id): bool;
+    
+    /**
+     * Obtener proveedores eliminados lógicamente
+     */
+    public function getTrashed(): Collection;
+    
     public function getProveedoresWithPagos(): Collection;
     
     public function findByEmail(string $email): ?Proveedor;

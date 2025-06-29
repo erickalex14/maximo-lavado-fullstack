@@ -61,6 +61,28 @@ class ProductoDespensaRepository implements ProductoDespensaRepositoryInterface
         return false;
     }
 
+    /**
+     * Restaurar producto de despensa eliminado lógicamente
+     */
+    public function restore(int $id): bool
+    {
+        $producto = ProductoDespensa::onlyTrashed()->find($id);
+        if ($producto) {
+            return $producto->restore();
+        }
+        return false;
+    }
+
+    /**
+     * Obtener productos de despensa eliminados lógicamente
+     */
+    public function getTrashed(): Collection
+    {
+        return ProductoDespensa::onlyTrashed()
+            ->orderBy('deleted_at', 'desc')
+            ->get();
+    }
+
     public function getActiveProducts(): Collection
     {
         return $this->model->where('activo', true)->get();

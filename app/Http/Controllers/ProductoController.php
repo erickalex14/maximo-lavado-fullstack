@@ -19,9 +19,8 @@ class ProductoController extends Controller
         $this->productoService = $productoService;
     }
 
-    /**
-     * Display a listing of all products (both automotriz and despensa).
-     */
+    // Muestra todos los productos
+
     public function index(): JsonResponse
     {
         try {
@@ -47,9 +46,8 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Get only automotriz products.
-     */
+    // Muestra los productos automotrices
+
     public function getProductosAutomotrices(): JsonResponse
     {
         try {
@@ -78,9 +76,8 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Get only despensa products.
-     */
+    // Muestra los productos de despensa
+
     public function getProductosDespensa(): JsonResponse
     {
         try {
@@ -108,9 +105,8 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Get product metrics.
-     */
+    // Obtiene las métricas de productos
+
     public function getMetricas(): JsonResponse
     {
         try {
@@ -128,9 +124,8 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Store a new automotriz product.
-     */
+    // Guarda un nuevo producto automotriz
+
     public function storeAutomotriz(CreateProductoAutomotrizRequest $request): JsonResponse
     {
         try {
@@ -149,9 +144,8 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Store a new despensa product.
-     */
+    // Guarda un nuevo producto de despensa
+
     public function storeDespensa(CreateProductoDespensaRequest $request): JsonResponse
     {
         try {
@@ -170,9 +164,8 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Display the specified automotriz product.
-     */
+    // Muestra un producto automotriz específico
+
     public function showAutomotriz(int $id): JsonResponse
     {
         try {
@@ -197,9 +190,8 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Display the specified despensa product.
-     */
+    // Muestra un producto de despensa específico
+
     public function showDespensa(int $id): JsonResponse
     {
         try {
@@ -224,9 +216,8 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Update the specified automotriz product.
-     */
+    // Actualiza un producto automotriz específico
+
     public function updateAutomotriz(UpdateProductoAutomotrizRequest $request, int $id): JsonResponse
     {
         try {
@@ -252,9 +243,7 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Update the specified despensa product.
-     */
+    // Actualiza un producto de despensa específico
     public function updateDespensa(UpdateProductoDespensaRequest $request, int $id): JsonResponse
     {
         try {
@@ -280,9 +269,8 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Remove the specified automotriz product.
-     */
+    // Elimina un producto automotriz específico
+
     public function destroyAutomotriz(int $id): JsonResponse
     {
         try {
@@ -307,9 +295,54 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Remove the specified despensa product.
-     */
+    // Restaura un producto automotriz eliminado lógicamente
+
+    public function restoreAutomotriz(int $id): JsonResponse
+    {
+        try {
+            $restored = $this->productoService->restoreProductoAutomotriz($id);
+            
+            if (!$restored) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Producto automotriz no encontrado en la papelera'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Producto automotriz restaurado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al restaurar producto automotriz: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // Obtiene todos los productos automotrices eliminados lógicamente
+
+    public function trashedAutomotriz(): JsonResponse
+    {
+        try {
+            $productos = $this->productoService->getTrashedProductosAutomotrices();
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Productos automotrices eliminados obtenidos correctamente',
+                'data' => $productos
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener productos automotrices eliminados: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // Elimina un producto de despensa específico
+
     public function destroyDespensa(int $id): JsonResponse
     {
         try {
@@ -334,9 +367,54 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Update stock for automotriz product.
-     */
+    // Restaura un producto de despensa eliminado lógicamente
+
+    public function restoreDespensa(int $id): JsonResponse
+    {
+        try {
+            $restored = $this->productoService->restoreProductoDespensa($id);
+            
+            if (!$restored) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Producto de despensa no encontrado en la papelera'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Producto de despensa restaurado correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al restaurar producto de despensa: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // Obtiene todos los productos de despensa eliminados lógicamente
+
+    public function trashedDespensa(): JsonResponse
+    {
+        try {
+            $productos = $this->productoService->getTrashedProductosDespensa();
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Productos de despensa eliminados obtenidos correctamente',
+                'data' => $productos
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener productos de despensa eliminados: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // Actualiza el stock de un producto automotriz
+
     public function updateStockAutomotriz(Request $request, int $id): JsonResponse
     {
         try {
@@ -366,9 +444,8 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Update stock for despensa product.
-     */
+    // Actualiza el stock de un producto de despensa
+    
     public function updateStockDespensa(Request $request, int $id): JsonResponse
     {
         try {

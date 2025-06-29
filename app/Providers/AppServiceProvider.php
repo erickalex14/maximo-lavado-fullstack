@@ -67,16 +67,7 @@ class AppServiceProvider extends ServiceProvider
             \App\Repositories\FacturaRepository::class
         );
 
-        $this->app->bind(
-            \App\Contracts\VentaProductoAutomotrizRepositoryInterface::class,
-            \App\Repositories\VentaProductoAutomotrizRepository::class
-        );
-
-        $this->app->bind(
-            \App\Contracts\VentaProductoDespensaRepositoryInterface::class,
-            \App\Repositories\VentaProductoDespensaRepository::class
-        );
-
+        // Repositorio consolidado de ventas (reemplaza VentaProductoAutomotriz y VentaProductoDespensa)
         $this->app->bind(
             \App\Contracts\VentaRepositoryInterface::class,
             \App\Repositories\VentaRepository::class

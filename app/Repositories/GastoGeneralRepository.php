@@ -47,6 +47,22 @@ class GastoGeneralRepository implements GastoGeneralRepositoryInterface
         return $gastoGeneral->delete();
     }
     
+    public function restore(int $id): bool
+    {
+        $gastoGeneral = GastoGeneral::onlyTrashed()->find($id);
+        if ($gastoGeneral) {
+            return $gastoGeneral->restore();
+        }
+        return false;
+    }
+    
+    public function getTrashed(): Collection
+    {
+        return GastoGeneral::onlyTrashed()
+            ->orderBy('deleted_at', 'desc')
+            ->get();
+    }
+    
     public function getByFechaRange(string $fechaInicio, string $fechaFin): Collection
     {
         return GastoGeneral::whereBetween('fecha', [$fechaInicio, $fechaFin])

@@ -50,6 +50,16 @@ class ProveedorService
         return $this->proveedorRepository->delete($id);
     }
 
+    public function restoreProveedor(int $id): bool
+    {
+        return $this->proveedorRepository->restore($id);
+    }
+
+    public function getTrashedProveedores(): Collection
+    {
+        return $this->proveedorRepository->getTrashed();
+    }
+
     public function getProveedoresConDeuda(): Collection
     {
         return $this->proveedorRepository->getProveedoresConDeuda();

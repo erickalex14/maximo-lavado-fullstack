@@ -151,7 +151,14 @@ class VehiculoController extends Controller
     public function destroy(int $id): JsonResponse
     {
         try {
-            $this->vehiculoService->deleteVehiculo($id);
+            $result = $this->vehiculoService->deleteVehiculo($id);
+
+            if (!$result) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vehículo no encontrado'
+                ], 404);
+            }
 
             return response()->json([
                 'success' => true,
@@ -163,8 +170,64 @@ class VehiculoController extends Controller
             
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
-            ], 422);
+                'message' => 'Error al eliminar vehículo: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Restaurar vehículo eliminado lógicamente
+     * PUT /vehiculos/{id}/restore
+     */
+    public function restore(int $id): JsonResponse
+    {
+        try {
+            $result = $this->vehiculoService->restoreVehiculo($id);
+
+            if (!$result) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vehículo no encontrado en papelera'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Vehículo restaurado exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al restaurar vehículo', ['id' => $id, 'error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al restaurar vehículo: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener vehículos eliminados lógicamente
+     * GET /vehiculos/trashed
+     */
+    public function trashed(): JsonResponse
+    {
+        try {
+            $vehiculos = $this->vehiculoService->getTrashedVehiculos();
+
+            return response()->json([
+                'success' => true,
+                'data' => $vehiculos,
+                'message' => 'Vehículos eliminados obtenidos exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener vehículos eliminados', ['error' => $e->getMessage()]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener vehículos eliminados'
+            ], 500);
         }
     }
 

@@ -17,6 +17,10 @@ interface FacturaRepositoryInterface
     
     public function delete(int $id): bool;
     
+    public function restore(int $id): bool;
+    
+    public function getTrashed(): Collection;
+    
     public function getByClienteId(int $clienteId): Collection;
     
     public function getByFechaRange(string $fechaInicio, string $fechaFin): Collection;

@@ -16,9 +16,8 @@ class EmpleadoController extends Controller
         $this->empleadoService = $empleadoService;
     }
 
-    /**
-     * Display a listing of the empleados.
-     */
+    //Obtiene una lista de empleados con sus lavados
+
     public function index(): JsonResponse
     {
         try {
@@ -44,9 +43,8 @@ class EmpleadoController extends Controller
         }
     }
 
-    /**
-     * Store a newly created empleado in storage.
-     */
+    // Guarda un nuevo empleado en la base de datos
+
     public function store(CreateEmpleadoRequest $request): JsonResponse
     {
         try {
@@ -65,9 +63,8 @@ class EmpleadoController extends Controller
         }
     }
 
-    /**
-     * Display the specified empleado.
-     */
+    // Obtiene un empleado específico por ID
+
     public function show(int $id): JsonResponse
     {
         try {
@@ -93,9 +90,8 @@ class EmpleadoController extends Controller
         }
     }
 
-    /**
-     * Update the specified empleado in storage.
-     */
+    // Actualiza un empleado existente por ID
+
     public function update(UpdateEmpleadoRequest $request, int $id): JsonResponse
     {
         try {
@@ -121,15 +117,14 @@ class EmpleadoController extends Controller
         }
     }
 
-    /**
-     * Remove the specified empleado from storage.
-     */
+    // Elimina un empleado por ID
+
     public function destroy(int $id): JsonResponse
     {
         try {
-            $deleted = $this->empleadoService->deleteEmpleado($id);
+            $result = $this->empleadoService->deleteEmpleado($id);
             
-            if (!$deleted) {
+            if (!$result) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Empleado no encontrado'
@@ -149,8 +144,57 @@ class EmpleadoController extends Controller
     }
 
     /**
-     * Get count of lavados by empleado and date.
+     * Restaurar empleado eliminado lógicamente
+     * PUT /empleados/{id}/restore
      */
+    public function restore(int $id): JsonResponse
+    {
+        try {
+            $result = $this->empleadoService->restoreEmpleado($id);
+            
+            if (!$result) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Empleado no encontrado en papelera'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Empleado restaurado correctamente'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al restaurar empleado: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener empleados eliminados lógicamente
+     * GET /empleados/trashed
+     */
+    public function trashed(): JsonResponse
+    {
+        try {
+            $empleados = $this->empleadoService->getTrashedEmpleados();
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Empleados eliminados obtenidos correctamente',
+                'data' => $empleados
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener empleados eliminados: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // Obtiene el conteo de lavados por empleado y día
+
     public function lavadosPorDia(int $empleadoId, string $fecha): JsonResponse
     {
         try {
@@ -168,9 +212,8 @@ class EmpleadoController extends Controller
         }
     }
 
-    /**
-     * Get count of lavados by empleado and week.
-     */
+    // Obtiene el conteo de lavados por empleado y semana
+
     public function lavadosPorSemana(int $empleadoId, string $fecha): JsonResponse
     {
         try {
@@ -188,9 +231,8 @@ class EmpleadoController extends Controller
         }
     }
 
-    /**
-     * Get count of lavados by empleado and month.
-     */
+    // Obtiene el conteo de lavados por empleado y mes
+
     public function lavadosPorMes(int $empleadoId, int $anio, int $mes): JsonResponse
     {
         try {

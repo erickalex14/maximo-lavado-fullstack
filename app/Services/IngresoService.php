@@ -40,6 +40,16 @@ class IngresoService
         return $this->ingresoRepository->delete($id);
     }
 
+    public function restoreIngreso(int $id): bool
+    {
+        return $this->ingresoRepository->restore($id);
+    }
+
+    public function getTrashedIngresos(): Collection
+    {
+        return $this->ingresoRepository->getTrashed();
+    }
+
     public function getIngresosByTipo(string $tipo): Collection
     {
         return $this->ingresoRepository->getByTipo($tipo);

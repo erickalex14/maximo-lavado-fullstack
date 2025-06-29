@@ -6,7 +6,6 @@ use App\Contracts\ClienteRepositoryInterface;
 use App\Models\Cliente;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ClienteService
@@ -44,31 +43,17 @@ class ClienteService
      */
     public function createCliente(array $data): Cliente
     {
-        try {
-            DB::beginTransaction();
+        // Validaciones de negocio adicionales
+        $this->validateBusinessRules($data);
 
-            // Validaciones de negocio adicionales
-            $this->validateBusinessRules($data);
+        $cliente = $this->clienteRepository->create($data);
 
-            $cliente = $this->clienteRepository->create($data);
+        Log::info('Cliente creado exitosamente', [
+            'cliente_id' => $cliente->id,
+            'nombre' => $cliente->nombre
+        ]);
 
-            DB::commit();
-
-            Log::info('Cliente creado exitosamente', [
-                'cliente_id' => $cliente->id,
-                'nombre' => $cliente->nombre
-            ]);
-
-            return $cliente;
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error al crear cliente', [
-                'data' => $data,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
-        }
+        return $cliente;
     }
 
     /**
@@ -76,38 +61,23 @@ class ClienteService
      */
     public function updateCliente(int $id, array $data): Cliente
     {
-        try {
-            DB::beginTransaction();
-
-            // Verificar que el cliente existe
-            $cliente = $this->clienteRepository->findById($id);
-            if (!$cliente) {
-                throw new \Exception('Cliente no encontrado');
-            }
-
-            // Validaciones de negocio adicionales
-            $this->validateBusinessRules($data, $id);
-
-            $clienteActualizado = $this->clienteRepository->update($id, $data);
-
-            DB::commit();
-
-            Log::info('Cliente actualizado exitosamente', [
-                'cliente_id' => $id,
-                'cambios' => array_diff_assoc($data, $cliente->toArray())
-            ]);
-
-            return $clienteActualizado;
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error al actualizar cliente', [
-                'cliente_id' => $id,
-                'data' => $data,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
+        // Verificar que el cliente existe
+        $cliente = $this->clienteRepository->findById($id);
+        if (!$cliente) {
+            throw new \Exception('Cliente no encontrado');
         }
+
+        // Validaciones de negocio adicionales
+        $this->validateBusinessRules($data, $id);
+
+        $clienteActualizado = $this->clienteRepository->update($id, $data);
+
+        Log::info('Cliente actualizado exitosamente', [
+            'cliente_id' => $id,
+            'cambios' => array_diff_assoc($data, $cliente->toArray())
+        ]);
+
+        return $clienteActualizado;
     }
 
     /**
@@ -115,36 +85,22 @@ class ClienteService
      */
     public function deleteCliente(int $id): bool
     {
-        try {
-            DB::beginTransaction();
-
-            $cliente = $this->clienteRepository->findById($id);
-            if (!$cliente) {
-                throw new \Exception('Cliente no encontrado');
-            }
-
-            // Verificar si el cliente tiene relaciones que impidan su eliminación
-            $this->validateDeletion($cliente);
-
-            $result = $this->clienteRepository->delete($id);
-
-            DB::commit();
-
-            Log::info('Cliente eliminado exitosamente', [
-                'cliente_id' => $id,
-                'nombre' => $cliente->nombre
-            ]);
-
-            return $result;
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error al eliminar cliente', [
-                'cliente_id' => $id,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
+        $cliente = $this->clienteRepository->findById($id);
+        if (!$cliente) {
+            throw new \Exception('Cliente no encontrado');
         }
+
+        // Verificar si el cliente tiene relaciones que impidan su eliminación
+        $this->validateDeletion($cliente);
+
+        $result = $this->clienteRepository->delete($id);
+
+        Log::info('Cliente eliminado exitosamente', [
+            'cliente_id' => $id,
+            'nombre' => $cliente->nombre
+        ]);
+
+        return $result;
     }
 
     /**

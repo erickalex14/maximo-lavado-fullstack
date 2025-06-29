@@ -3,159 +3,149 @@
 namespace App\Services;
 
 use App\Contracts\FacturaRepositoryInterface;
-use App\Contracts\FacturaDetalleRepositoryInterface;
 use App\Models\Factura;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class FacturaService
 {
-    protected $facturaRepository;
-    protected $facturaDetalleRepository;
-
     public function __construct(
-        FacturaRepositoryInterface $facturaRepository,
-        FacturaDetalleRepositoryInterface $facturaDetalleRepository
-    ) {
-        $this->facturaRepository = $facturaRepository;
-        $this->facturaDetalleRepository = $facturaDetalleRepository;
-    }
+        protected FacturaRepositoryInterface $facturaRepository
+    ) {}
 
+    /**
+     * Obtener todas las facturas
+     */
     public function getAllFacturas(): Collection
     {
         return $this->facturaRepository->getAll();
     }
 
-    public function findFacturaById(int $id): ?Factura
+    /**
+     * Obtener factura por ID
+     */
+    public function getFacturaById(int $id): ?Factura
     {
         return $this->facturaRepository->findById($id);
     }
 
+    /**
+     * Crear nueva factura
+     */
     public function createFactura(array $data): Factura
     {
-        return DB::transaction(function () use ($data) {
-            // Extraer detalles del array principal
-            $detalles = $data['detalles'] ?? [];
-            unset($data['detalles']);
-            
-            // Generar número de factura automáticamente si no se proporciona
-            if (!isset($data['numero_factura'])) {
-                $data['numero_factura'] = $this->generateNumeroFactura();
-            }
-            
-            // Crear la factura
-            $factura = $this->facturaRepository->create($data);
-            
-            // Crear los detalles de la factura
-            if (!empty($detalles)) {
-                foreach ($detalles as $detalle) {
-                    $detalle['factura_id'] = $factura->factura_id;
-                    $this->facturaDetalleRepository->create($detalle);
-                }
-            }
-            
-            return $factura->load('detalles');
-        });
-    }
+        // Validaciones de negocio
+        $this->validateFacturaData($data);
 
-    public function updateFactura(int $id, array $data): ?Factura
-    {
-        return DB::transaction(function () use ($id, $data) {
-            $factura = $this->facturaRepository->findById($id);
-            if (!$factura) {
-                return null;
-            }
-            
-            // Extraer detalles del array principal
-            $detalles = $data['detalles'] ?? null;
-            unset($data['detalles']);
-            
-            // Actualizar la factura
-            $facturaActualizada = $this->facturaRepository->update($id, $data);
-            
-            // Si se proporcionan detalles, actualizarlos
-            if ($detalles !== null) {
-                // Eliminar detalles existentes
-                $this->facturaDetalleRepository->deleteByFacturaId($id);
-                
-                // Crear nuevos detalles
-                foreach ($detalles as $detalle) {
-                    $detalle['factura_id'] = $id;
-                    unset($detalle['factura_detalle_id']); // Remover ID si existe para crear nuevo
-                    $this->facturaDetalleRepository->create($detalle);
-                }
-            }
-            
-            return $facturaActualizada ? $facturaActualizada->load('detalles') : null;
-        });
-    }
+        $factura = $this->facturaRepository->create($data);
 
-    public function deleteFactura(int $id): bool
-    {
-        return $this->facturaRepository->delete($id);
-    }
+        Log::info('Factura creada exitosamente', [
+            'factura_id' => $factura->factura_id,
+            'numero_factura' => $factura->numero_factura
+        ]);
 
-    public function getFacturasByClienteId(int $clienteId): Collection
-    {
-        return $this->facturaRepository->getByClienteId($clienteId);
-    }
-
-    public function getFacturasByFechaRange(string $fechaInicio, string $fechaFin): Collection
-    {
-        return $this->facturaRepository->getByFechaRange($fechaInicio, $fechaFin);
-    }
-
-    public function getTotalFacturasByPeriodo(string $fechaInicio, string $fechaFin): float
-    {
-        return $this->facturaRepository->getTotalFacturasByPeriodo($fechaInicio, $fechaFin);
-    }
-
-    public function getFacturasByMes(int $año, int $mes): Collection
-    {
-        return $this->facturaRepository->getFacturasByMes($año, $mes);
-    }
-
-    public function findByNumeroFactura(string $numeroFactura): ?Factura
-    {
-        return $this->facturaRepository->findByNumeroFactura($numeroFactura);
-    }
-
-    public function getMetricas(): array
-    {
-        $hoy = now()->format('Y-m-d');
-        $primerDiaMes = now()->startOfMonth()->format('Y-m-d');
-        $ultimoDiaMes = now()->endOfMonth()->format('Y-m-d');
-
-        return [
-            'total_facturas_hoy' => $this->facturaRepository->getByFechaRange($hoy, $hoy)->sum('total'),
-            'total_facturas_mes' => $this->facturaRepository->getByFechaRange($primerDiaMes, $ultimoDiaMes)->sum('total'),
-            'cantidad_facturas_mes' => $this->facturaRepository->getByFechaRange($primerDiaMes, $ultimoDiaMes)->count(),
-            'promedio_factura_mes' => $this->facturaRepository->getByFechaRange($primerDiaMes, $ultimoDiaMes)->avg('total'),
-        ];
+        return $factura;
     }
 
     /**
-     * Generar número de factura único
+     * Actualizar factura
      */
-    private function generateNumeroFactura(): string
+    public function updateFactura(int $id, array $data): ?Factura
     {
-        $prefix = 'FAC-';
-        $year = now()->year;
-        $month = now()->format('m');
-        
-        // Buscar el último número de factura del mes actual
-        $lastFactura = Factura::where('numero_factura', 'like', $prefix . $year . $month . '%')
-            ->orderBy('numero_factura', 'desc')
-            ->first();
-        
-        if ($lastFactura) {
-            // Extraer el número secuencial del último número de factura
-            $lastNumber = (int) substr($lastFactura->numero_factura, -4);
-            $newNumber = $lastNumber + 1;
-        } else {
-            $newNumber = 1;
+        // Verificar que la factura existe
+        $factura = $this->facturaRepository->findById($id);
+        if (!$factura) {
+            throw new \Exception('Factura no encontrada');
         }
-        
-        return $prefix . $year . $month . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+
+        // Validaciones de negocio
+        $this->validateFacturaData($data, $id);
+
+        $facturaActualizada = $this->facturaRepository->update($id, $data);
+
+        Log::info('Factura actualizada exitosamente', [
+            'factura_id' => $id
+        ]);
+
+        return $facturaActualizada;
+    }
+
+    /**
+     * Eliminar factura
+     */
+    public function deleteFactura(int $id): bool
+    {
+        $factura = $this->facturaRepository->findById($id);
+        if (!$factura) {
+            throw new \Exception('Factura no encontrada');
+        }
+
+        $result = $this->facturaRepository->delete($id);
+
+        Log::info('Factura eliminada exitosamente', [
+            'factura_id' => $id
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * Restaurar factura
+     */
+    public function restoreFactura(int $id): bool
+    {
+        return $this->facturaRepository->restore($id);
+    }
+
+    /**
+     * Obtener facturas eliminadas
+     */
+    public function getTrashedFacturas(): Collection
+    {
+        return $this->facturaRepository->getTrashed();
+    }
+
+    /**
+     * Obtener métricas de facturas
+     */
+    public function getMetricas(): array
+    {
+        return $this->facturaRepository->getMetricas();
+    }
+
+    /**
+     * Validaciones de reglas de negocio
+     */
+    protected function validateFacturaData(array $data, ?int $excludeId = null): void
+    {
+        // Verificar que el cliente existe
+        if (isset($data['cliente_id'])) {
+            $cliente = \App\Models\Cliente::find($data['cliente_id']);
+            if (!$cliente) {
+                throw new \Exception('El cliente seleccionado no existe');
+            }
+        }
+
+        // Validar que hay detalles
+        if (isset($data['detalles']) && empty($data['detalles'])) {
+            throw new \Exception('La factura debe tener al menos un detalle');
+        }
+
+        // Validar detalles si están presentes
+        if (isset($data['detalles'])) {
+            foreach ($data['detalles'] as $detalle) {
+                if (empty($detalle['descripcion'])) {
+                    throw new \Exception('Todos los detalles deben tener descripción');
+                }
+                
+                if (!isset($detalle['cantidad']) || $detalle['cantidad'] <= 0) {
+                    throw new \Exception('La cantidad debe ser mayor a 0');
+                }
+                
+                if (!isset($detalle['precio_unitario']) || $detalle['precio_unitario'] <= 0) {
+                    throw new \Exception('El precio unitario debe ser mayor a 0');
+                }
+            }
+        }
     }
 }

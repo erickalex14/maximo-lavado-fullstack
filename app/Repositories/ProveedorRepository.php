@@ -55,6 +55,28 @@ class ProveedorRepository implements ProveedorRepositoryInterface
         return false;
     }
 
+    /**
+     * Restaurar proveedor eliminado lógicamente
+     */
+    public function restore(int $id): bool
+    {
+        $proveedor = Proveedor::onlyTrashed()->find($id);
+        if ($proveedor) {
+            return $proveedor->restore();
+        }
+        return false;
+    }
+
+    /**
+     * Obtener proveedores eliminados lógicamente
+     */
+    public function getTrashed(): Collection
+    {
+        return Proveedor::onlyTrashed()
+            ->orderBy('deleted_at', 'desc')
+            ->get();
+    }
+
     public function getProveedoresWithPagos(): Collection
     {
         return $this->model->with('pagos')->get();

@@ -61,6 +61,26 @@ class UserRepository implements UserRepositoryInterface
         return $user ? $user->delete() : false;
     }
 
+    /**
+     * Restaurar usuario eliminado lógicamente
+     */
+    public function restore(int $id): bool
+    {
+        $user = User::onlyTrashed()->find($id);
+        return $user ? $user->restore() : false;
+    }
+
+    /**
+     * Obtener usuarios eliminados lógicamente
+     */
+    public function getTrashed(): Collection
+    {
+        return User::onlyTrashed()
+            ->select('id', 'name', 'email', 'deleted_at')
+            ->orderBy('deleted_at', 'desc')
+            ->get();
+    }
+
     public function findByEmail(string $email): ?User
     {
         return User::where('email', $email)->first();

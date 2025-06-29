@@ -61,6 +61,28 @@ class ProductoAutomotrizRepository implements ProductoAutomotrizRepositoryInterf
         return false;
     }
 
+    /**
+     * Restaurar producto automotriz eliminado lógicamente
+     */
+    public function restore(int $id): bool
+    {
+        $producto = ProductoAutomotriz::onlyTrashed()->find($id);
+        if ($producto) {
+            return $producto->restore();
+        }
+        return false;
+    }
+
+    /**
+     * Obtener productos automotrices eliminados lógicamente
+     */
+    public function getTrashed(): Collection
+    {
+        return ProductoAutomotriz::onlyTrashed()
+            ->orderBy('deleted_at', 'desc')
+            ->get();
+    }
+
     public function getActiveProducts(): Collection
     {
         return $this->model->where('activo', true)->get();
