@@ -1,123 +1,300 @@
 import apiClient from './api';
 
 /**
- * Servicio base genérico que implementa operaciones CRUD estándar
- * Otros servicios pueden extender esta clase para evitar duplicación de código
+ * Servicio base para operaciones CRUD estándar
  */
 export class BaseService {
   constructor(endpoint) {
     this.endpoint = endpoint;
+    this.enableLogging = false;
   }
 
-  /**
-   * Obtener todos los registros con paginación y filtros
-   * @param {object} params - Parámetros de consulta
-   */
-  async getAll(params = {}) {
-    const response = await apiClient.get(this.endpoint, { params });
-    return response.data;
+  // CRUD Básico
+
+  // Obtiene una lista de recursos
+
+  async index(params = {}) {
+    try {
+      const response = await apiClient.get(this.endpoint, { params });
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
   }
 
-  /**
-   * Obtener registro por ID
-   * @param {number} id - ID del registro
-   */
-  async getById(id) {
-    const response = await apiClient.get(`${this.endpoint}/${id}`);
-    return response.data;
+  // Obtiene todos los recursos
+
+  async all(params = {}) {
+    try {
+      const response = await apiClient.get(`${this.endpoint}/all`, { params });
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
   }
 
-  /**
-   * Crear nuevo registro
-   * @param {object} data - Datos del registro
-   */
-  async create(data) {
-    const response = await apiClient.post(this.endpoint, data);
-    return response.data;
+  // Obtiene un recurso específico
+
+  async show(id) {
+    try {
+      const response = await apiClient.get(`${this.endpoint}/${id}`);
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
   }
 
-  /**
-   * Actualizar registro
-   * @param {number} id - ID del registro
-   * @param {object} data - Datos a actualizar
-   */
+  // Crea un nuevo recurso
+
+  async store(data) {
+    try {
+      const response = await apiClient.post(this.endpoint, data);
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
+  }
+
+  // Actualiza un recurso existente
+
   async update(id, data) {
-    const response = await apiClient.put(`${this.endpoint}/${id}`, data);
-    return response.data;
+    try {
+      const response = await apiClient.put(`${this.endpoint}/${id}`, data);
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
   }
 
-  /**
-   * Actualizar parcialmente un registro
-   * @param {number} id - ID del registro
-   * @param {object} data - Datos a actualizar
-   */
-  async patch(id, data) {
-    const response = await apiClient.patch(`${this.endpoint}/${id}`, data);
-    return response.data;
+  // Elimina un recurso (soft delete)
+
+  async destroy(id) {
+    try {
+      const response = await apiClient.delete(`${this.endpoint}/${id}`);
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
   }
 
-  /**
-   * Eliminar registro
-   * @param {number} id - ID del registro
-   */
-  async delete(id) {
-    const response = await apiClient.delete(`${this.endpoint}/${id}`);
-    return response.data;
+  // Obtiene recursos eliminados (soft delete)
+
+  async trashed(params = {}) {
+    try {
+      const response = await apiClient.get(`${this.endpoint}/trashed`, { params });
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
   }
 
-  /**
-   * Buscar registros
-   * @param {string} query - Término de búsqueda
-   * @param {object} params - Parámetros adicionales
-   */
+  // Restaura un recurso eliminado (soft delete)
+
+  async restore(id) {
+    try {
+      const response = await apiClient.put(`${this.endpoint}/${id}/restore`);
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
+  }
+
+  // Búsqueda
+
   async search(query, params = {}) {
-    const response = await apiClient.get(`${this.endpoint}/search`, {
-      params: { q: query, ...params }
-    });
-    return response.data;
+    try {
+      const response = await apiClient.get(`${this.endpoint}/search`, {
+        params: { q: query, ...params }
+      });
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
   }
 
-  /**
-   * Obtener estadísticas/métricas
-   */
-  async getStats() {
-    const response = await apiClient.get(`${this.endpoint}/stats`);
-    return response.data;
+  // Estadísticas
+
+  async stats(params = {}) {
+    try {
+      const response = await apiClient.get(`${this.endpoint}/stats`, { params });
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
   }
 
-  /**
-   * Realizar una acción personalizada
-   * @param {string} action - Nombre de la acción
-   * @param {number} id - ID del registro (opcional)
-   * @param {object} data - Datos para la acción (opcional)
-   * @param {string} method - Método HTTP (default: POST)
-   */
-  async customAction(action, id = null, data = null, method = 'POST') {
-    const url = id ? `${this.endpoint}/${id}/${action}` : `${this.endpoint}/${action}`;
+  // Métricas
+
+  async metricas(params = {}) {
+    try {
+      const response = await apiClient.get(`${this.endpoint}/metricas`, { params });
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
+  }
+
+  // Filtros temporales
+
+  async getByDay(fecha, params = {}) {
+    try {
+      const response = await apiClient.get(`${this.endpoint}/dia`, {
+        params: { fecha, ...params }
+      });
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
+  }
+
+  async getByWeek(fecha, params = {}) {
+    try {
+      const response = await apiClient.get(`${this.endpoint}/semana`, {
+        params: { fecha, ...params }
+      });
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
+  }
+
+  async getByMonth(anio, mes, params = {}) {
+    try {
+      const response = await apiClient.get(`${this.endpoint}/mes`, {
+        params: { anio, mes, ...params }
+      });
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
+  }
+
+  async getByYear(anio, params = {}) {
+    try {
+      const response = await apiClient.get(`${this.endpoint}/anio`, {
+        params: { anio, ...params }
+      });
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
+  }
+
+  // Acciones específicas
+
+  // Activa o desactiva un recurso
+  async toggleActivo(id) {
+    try {
+      const response = await apiClient.patch(`${this.endpoint}/${id}/toggle-activo`);
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
+  }
+
+  // Cambia el estado de un recurso
+  async changeStatus(id, estado) {
+    try {
+      const response = await apiClient.put(`${this.endpoint}/${id}/estado`, { estado });
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
+  }
+
+  // Actualiza el stock de un recurso
+  
+  async updateStock(id, cantidad) {
+    try {
+      const response = await apiClient.put(`${this.endpoint}/${id}/stock`, { cantidad });
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
+  }
+
+  // Acción personalizada
+  async customAction(action, options = {}) {
+    const { id = null, data = null, method = 'POST', useParams = false } = options;
     
-    const config = {
-      method: method.toLowerCase(),
-      url
-    };
+    try {
+      const url = id ? `${this.endpoint}/${id}/${action}` : `${this.endpoint}/${action}`;
+      
+      const config = { method: method.toLowerCase(), url };
 
-    if (data && ['post', 'put', 'patch'].includes(method.toLowerCase())) {
-      config.data = data;
-    } else if (data) {
-      config.params = data;
+      if (data) {
+        if (useParams || ['get', 'delete'].includes(method.toLowerCase())) {
+          config.params = data;
+        } else {
+          config.data = data;
+        }
+      }
+
+      const response = await apiClient(config);
+      return this._handleResponse(response);
+    } catch (error) {
+      throw this._handleError(error);
+    }
+  }
+
+  // Métodos internos
+  _handleResponse(response) {
+    if (this.enableLogging) {
+      console.log(`✅ ${this.endpoint}:`, response.data);
     }
 
-    const response = await apiClient(config);
+    // El backend retorna: { success: true, data: {...}, message: "..." }
+    if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+      return response.data.data;
+    }
+    
     return response.data;
+  }
+
+  _handleError(error) {
+    if (this.enableLogging) {
+      console.error(`❌ ${this.endpoint}:`, error);
+    }
+
+    if (error.response) {
+      const { status, data } = error.response;
+      const message = data?.message || `Error ${status}`;
+      
+      const customError = new Error(message);
+      customError.status = status;
+      customError.data = data;
+      customError.validation = data?.errors;
+      
+      return customError;
+    } else if (error.request) {
+      const networkError = new Error('Error de conexión con el servidor');
+      networkError.status = 0;
+      return networkError;
+    } else {
+      return error;
+    }
+  }
+
+  // Configuración
+  setLogging(enable) {
+    this.enableLogging = enable;
+    return this;
+  }
+
+  getEndpoint() {
+    return this.endpoint;
   }
 }
 
-/**
- * Factory para crear servicios basados en BaseService
- * @param {string} endpoint - Endpoint base del servicio
- * @returns {BaseService} Instancia del servicio
- */
-export const createService = (endpoint) => {
-  return new BaseService(endpoint);
+// Factory
+export const createService = (endpoint, options = {}) => {
+  const service = new BaseService(endpoint);
+  
+  if (options.enableLogging) {
+    service.setLogging(true);
+  }
+  
+  return service;
 };
 
 export default BaseService;

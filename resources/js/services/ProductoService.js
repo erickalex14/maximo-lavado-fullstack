@@ -1,183 +1,285 @@
-import apiClient from './api';
+import { BaseService } from './BaseService';
 
-export class ProductoService {
-  /**
-   * Obtener productos por tipo con paginación y filtros
-   * @param {string} tipo - 'automotriz' o 'despensa'
-   * @param {object} params - Parámetros de filtrado y paginación
-   */
-  static async getProductos(tipo = null, params = {}) {
-    const endpoint = tipo ? `/productos/${tipo}` : '/productos';
-    const response = await apiClient.get(endpoint, { params });
-    return response.data;
+//SERVICIO PARA GESTIONAR PRODUCTOS
+
+class ProductoService extends BaseService {
+  constructor() {
+    super('/productos');
   }
 
-  /**
-   * Obtener todos los productos (sin paginación)
-   * @param {string} tipo - 'automotriz' o 'despensa' (opcional)
-   */
-  static async getAll(tipo = null) {
-    const endpoint = tipo ? `/productos/${tipo}/all` : '/productos/all';
-    const response = await apiClient.get(endpoint);
-    return response.data;
+  // LOS METODOS CRUD BÁSICOS YA ESTÁN HEREDADOS DEL BaseService:
+
+  // METODOS ESPECÍFICOS DE PRODUCTOS
+
+  // OBTENER MÉTRICAS DE PRODUCTOS
+
+  async getMetricas(params = {}) {
+    return this.metricas(params);
   }
 
-  /**
-   * Obtener producto por ID
-   * @param {number} id - ID del producto
-   * @param {string} tipo - 'automotriz' o 'despensa' (opcional para compatibilidad)
-   */
-  static async getById(id, tipo = null) {
-    const endpoint = tipo ? `/productos/${tipo}/${id}` : `/productos/${id}`;
-    const response = await apiClient.get(endpoint);
-    return response.data;
+  // PRODUCTOS AUTOMOTRICES
+
+  // OBTENER TODOS LOS PRODUCTOS AUTOMOTRICES
+
+  async getProductosAutomotrices() {
+    return this.customAction('automotrices', { method: 'GET' });
   }
 
-  /**
-   * Crear nuevo producto
-   * @param {object} data - Datos del producto
-   * @param {string} tipo - 'automotriz' o 'despensa'
-   */
-  static async create(data, tipo) {
-    const endpoint = `/productos/${tipo}`;
-    const response = await apiClient.post(endpoint, data);
-    return response.data;
+  // CREAR UN PRODUCTO AUTOMOTRIZ
+
+  async createProductoAutomotriz(data) {
+    return this.customAction('automotrices', {
+      method: 'POST',
+      data: data
+    });
   }
 
-  /**
-   * Actualizar producto
-   * @param {number} id - ID del producto
-   * @param {object} data - Datos a actualizar
-   * @param {string} tipo - 'automotriz' o 'despensa' (opcional)
-   */
-  static async update(id, data, tipo = null) {
-    const endpoint = tipo ? `/productos/${tipo}/${id}` : `/productos/${id}`;
-    const response = await apiClient.put(endpoint, data);
-    return response.data;
+  // OBTENER UN PRODUCTO AUTOMOTRIZ POR ID
+
+  async getProductoAutomotriz(id) {
+    return this.customAction(`automotrices/${id}`, { method: 'GET' });
   }
 
-  /**
-   * Eliminar producto
-   * @param {number} id - ID del producto
-   * @param {string} tipo - 'automotriz' o 'despensa' (opcional)
-   */
-  static async delete(id, tipo = null) {
-    const endpoint = tipo ? `/productos/${tipo}/${id}` : `/productos/${id}`;
-    const response = await apiClient.delete(endpoint);
-    return response.data;
+  // ACTUALIZAR UN PRODUCTO AUTOMOTRIZ
+
+  async updateProductoAutomotriz(id, data) {
+    return this.customAction(`automotrices/${id}`, {
+      method: 'PUT',
+      data: data
+    });
   }
 
-  /**
-   * Actualizar stock de producto
-   * @param {number} id - ID del producto
-   * @param {object} data - {cantidad, tipo_movimiento, observaciones}
-   */
-  static async updateStock(id, data) {
-    const response = await apiClient.patch(`/productos/${id}/stock`, data);
-    return response.data;
+  // ELIMINAR UN PRODUCTO AUTOMOTRIZ
+
+  async deleteProductoAutomotriz(id) {
+    return this.customAction(`automotrices/${id}`, { method: 'DELETE' });
   }
 
-  /**
-   * Alternar estado activo de producto
-   * @param {number} id - ID del producto
-   */
-  static async toggleActivo(id) {
-    const response = await apiClient.patch(`/productos/${id}/toggle-activo`);
-    return response.data;
+  // RESTAURAR UN PRODUCTO AUTOMOTRIZ
+
+  async restoreProductoAutomotriz(id) {
+    return this.customAction(`automotrices/${id}/restore`, { method: 'PUT' });
   }
 
-  /**
-   * Obtener métricas de productos
-   * @param {string} tipo - 'automotriz' o 'despensa' (opcional)
-   */
-  static async getMetricas(tipo = null) {
-    const endpoint = tipo ? `/productos/${tipo}/metricas` : '/productos/metricas';
-    const response = await apiClient.get(endpoint);
-    return response.data;
+  // OBTENER PRODUCTOS AUTOMOTRICES ELIMINADOS
+
+  async getTrashedProductosAutomotrices() {
+    return this.customAction('automotrices/trashed', { method: 'GET' });
   }
 
-  /**
-   * Obtener productos con stock bajo
-   * @param {string} tipo - 'automotriz' o 'despensa' (opcional)
-   */
-  static async getStockBajo(tipo = null) {
-    const endpoint = tipo ? `/productos/${tipo}/stock-bajo` : '/productos/stock-bajo';
-    const response = await apiClient.get(endpoint);
-    return response.data;
+  // ACTUALIZAR STOCK DE PRODUCTO AUTOMOTRIZ
+
+  async updateStockAutomotriz(id, stock) {
+    return this.customAction(`automotrices/${id}/stock`, {
+      method: 'PUT',
+      data: { stock }
+    });
   }
 
-  /**
-   * Buscar productos
-   * @param {string} query - Término de búsqueda
-   * @param {string} tipo - 'automotriz' o 'despensa' (opcional)
-   */
-  static async search(query, tipo = null) {
-    const endpoint = tipo ? `/productos/${tipo}/search` : '/productos/search';
-    const response = await apiClient.get(endpoint, { params: { q: query } });
-    return response.data;
+  // PRODUCTOS DE DESPENSA
+
+  // OBTENER TODOS LOS PRODUCTOS DE DESPENSA
+
+  async getProductosDespensa() {
+    return this.customAction('despensa', { method: 'GET' });
   }
 
-  /**
-   * Obtener categorías disponibles
-   * @param {string} tipo - 'automotriz' o 'despensa'
-   */
-  static async getCategorias(tipo) {
-    const response = await apiClient.get(`/productos/${tipo}/categorias`);
-    return response.data;
+  // CREAR UN PRODUCTO DE DESPENSA
+
+  async createProductoDespensa(data) {
+    return this.customAction('despensa', {
+      method: 'POST',
+      data: data
+    });
   }
 
-  // =======================================
-  // MÉTODOS DE COMPATIBILIDAD (deprecated)
-  // =======================================
-  
-  /**
-   * @deprecated Usar getProductos('automotriz', params) en su lugar
-   */
-  static async getProductosAutomotrices(params = {}) {
-    return this.getProductos('automotriz', params);
+  // OBTENER UN PRODUCTO DE DESPENSA POR ID
+
+  async getProductoDespensa(id) {
+    return this.customAction(`despensa/${id}`, { method: 'GET' });
   }
 
-  /**
-   * @deprecated Usar getProductos('despensa', params) en su lugar
-   */
-  static async getProductosDespensa(params = {}) {
-    return this.getProductos('despensa', params);
+  // ACTUALIZAR UN PRODUCTO DE DESPENSA
+
+  async updateProductoDespensa(id, data) {
+    return this.customAction(`despensa/${id}`, {
+      method: 'PUT',
+      data: data
+    });
   }
 
-  /**
-   * @deprecated Usar create(data, 'automotriz') en su lugar
-   */
-  static async createProductoAutomotriz(data) {
-    return this.create(data, 'automotriz');
+  // ELIMINAR UN PRODUCTO DE DESPENSA
+
+  async deleteProductoDespensa(id) {
+    return this.customAction(`despensa/${id}`, { method: 'DELETE' });
   }
 
-  /**
-   * @deprecated Usar create(data, 'despensa') en su lugar
-   */
-  static async createProductoDespensa(data) {
-    return this.create(data, 'despensa');
+  // RESTAURAR UN PRODUCTO DE DESPENSA
+
+  async restoreProductoDespensa(id) {
+    return this.customAction(`despensa/${id}/restore`, { method: 'PUT' });
   }
 
-  /**
-   * @deprecated Usar getById(id, 'automotriz') en su lugar
-   */
-  static async getProductoAutomotriz(id) {
-    return this.getById(id, 'automotriz');
+  // OBTENER PRODUCTOS DE DESPENSA ELIMINADOS
+
+  async getTrashedProductosDespensa() {
+    return this.customAction('despensa/trashed', { method: 'GET' });
   }
 
-  /**
-   * @deprecated Usar update(id, data, 'automotriz') en su lugar
-   */
-  static async updateProductoAutomotriz(id, data) {
-    return this.update(id, data, 'automotriz');
+  // ACTUALIZAR STOCK DE PRODUCTO DE DESPENSA
+
+  async updateStockDespensa(id, stock) {
+    return this.customAction(`despensa/${id}/stock`, {
+      method: 'PUT',
+      data: { stock }
+    });
   }
 
-  /**
-   * @deprecated Usar delete(id, 'automotriz') en su lugar
-   */
-  static async deleteProductoAutomotriz(id) {
-    return this.delete(id, 'automotriz');
+  // METODOS DE CONVENIENCIA PARA PRODUCTOS
+
+  // OBTENER TODOS LOS PRODUCTOS (AUTOMOTRICES Y DESPENSA)
+
+  async getTodosLosProductos() {
+    return this.index();
+  }
+
+  // OBTENER PRODUCTOS CON STOCK BAJO
+
+  async getProductosConStockBajo(minimo = 5) {
+    try {
+      const [automotrices, despensa] = await Promise.all([
+        this.getProductosAutomotrices(),
+        this.getProductosDespensa()
+      ]);
+
+      const productosStockBajo = [];
+
+      // Filtrar productos automotrices con stock bajo
+      if (automotrices.data) {
+        const automotricesStockBajo = automotrices.data.filter(producto => producto.stock <= minimo);
+        productosStockBajo.push(...automotricesStockBajo);
+      }
+
+      // Filtrar productos de despensa con stock bajo
+      if (despensa.data) {
+        const despensaStockBajo = despensa.data.filter(producto => producto.stock <= minimo);
+        productosStockBajo.push(...despensaStockBajo);
+      }
+
+      return productosStockBajo;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // OBTENER PRODUCTOS ACTIVOS POR TIPO
+
+  async getProductosActivosPorTipo(tipo) {
+    if (tipo === 'automotriz') {
+      const productos = await this.getProductosAutomotrices();
+      return productos.data ? productos.data.filter(p => p.activo) : [];
+    } else if (tipo === 'despensa') {
+      const productos = await this.getProductosDespensa();
+      return productos.data ? productos.data.filter(p => p.activo) : [];
+    } else {
+      throw new Error('Tipo de producto no válido. Use "automotriz" o "despensa"');
+    }
+  }
+
+  // BUSCAR PRODUCTOS POR NOMBRE
+
+  async buscarProductos(termino) {
+    try {
+      const [automotrices, despensa] = await Promise.all([
+        this.getProductosAutomotrices(),
+        this.getProductosDespensa()
+      ]);
+
+      const resultados = [];
+
+      // Buscar en productos automotrices
+      if (automotrices.data) {
+        const automotricesEncontrados = automotrices.data.filter(producto =>
+          producto.nombre.toLowerCase().includes(termino.toLowerCase()) ||
+          (producto.codigo && producto.codigo.toLowerCase().includes(termino.toLowerCase()))
+        );
+        resultados.push(...automotricesEncontrados);
+      }
+
+      // Buscar en productos de despensa
+      if (despensa.data) {
+        const despensaEncontrados = despensa.data.filter(producto =>
+          producto.nombre.toLowerCase().includes(termino.toLowerCase())
+        );
+        resultados.push(...despensaEncontrados);
+      }
+
+      return resultados;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // OBTENER RESUMEN DE INVENTARIO
+
+  async getResumenInventario() {
+    try {
+      const [automotrices, despensa, metricas] = await Promise.all([
+        this.getProductosAutomotrices(),
+        this.getProductosDespensa(),
+        this.getMetricas()
+      ]);
+
+      const totalAutomotrices = automotrices.data ? automotrices.data.length : 0;
+      const totalDespensa = despensa.data ? despensa.data.length : 0;
+      const stockBajo = await this.getProductosConStockBajo();
+
+      return {
+        total_productos: totalAutomotrices + totalDespensa,
+        productos_automotrices: totalAutomotrices,
+        productos_despensa: totalDespensa,
+        productos_stock_bajo: stockBajo.length,
+        metricas: metricas.data || {}
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // ACTUALIZAR STOCK MASIVO
+
+  async updateStockMasivo(actualizaciones) {
+    const resultados = [];
+    
+    for (const actualizacion of actualizaciones) {
+      try {
+        const { id, tipo, stock } = actualizacion;
+        
+        let resultado;
+        if (tipo === 'automotriz') {
+          resultado = await this.updateStockAutomotriz(id, stock);
+        } else if (tipo === 'despensa') {
+          resultado = await this.updateStockDespensa(id, stock);
+        } else {
+          throw new Error(`Tipo de producto no válido: ${tipo}`);
+        }
+        
+        resultados.push({ id, tipo, success: true, data: resultado });
+      } catch (error) {
+        resultados.push({ 
+          id: actualizacion.id, 
+          tipo: actualizacion.tipo, 
+          success: false, 
+          error: error.message 
+        });
+      }
+    }
+    
+    return resultados;
   }
 }
 
-export default ProductoService;
+// Instancia única del servicio
+const productoService = new ProductoService();
+
+export default productoService;

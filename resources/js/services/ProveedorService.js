@@ -1,172 +1,170 @@
-import api from './api';
+import { BaseService } from './BaseService';
 
-/**
- * Servicio consolidado para gestión de proveedores y sus pagos
- * Consume la API real del backend consolidada en ProveedorController
- * 
- * Toda la gestión de proveedores y pagos está centralizada en ProveedorController
- * 
- * Endpoints consolidados activos:
- * - GET /proveedores - Obtener proveedores con paginación
- * - POST /proveedores - Crear nuevo proveedor
- * - GET /proveedores/{id} - Obtener proveedor por ID
- * - PUT /proveedores/{id} - Actualizar proveedor
- * - DELETE /proveedores/{id} - Eliminar proveedor
- * - GET /proveedores/{id}/deuda - Ver deuda del proveedor
- * - GET /proveedores/{id}/pagos - Historial de pagos de un proveedor
- * - GET /proveedores/pagos - Todos los pagos de todos los proveedores (con filtros)
- * - GET /proveedores/pagos/metricas - Métricas de pagos
- * - GET /proveedores/pagos/{pagoId} - Detalle de un pago específico
- * - PUT /proveedores/pagos/{pagoId} - Actualizar un pago específico
- * - DELETE /proveedores/pagos/{pagoId} - Eliminar un pago específico
- * - POST /proveedores/pagos - Crear pago con transacción completa
- */
-class ProveedorServiceClass {
-  /**
-   * Obtener todos los proveedores con paginación
-   * @param {object} params - Parámetros de consulta (página, filtros, etc.)
-   * @returns {Promise} Respuesta de la API
-   */
-  async getAll(params = {}) {
-    const response = await api.get('/proveedores', { params });
-    return response.data;
+//SERVICIO PARA GESTIONAR PROVEEDORES
+
+class ProveedorService extends BaseService {
+  constructor() {
+    super('/proveedores');
   }
 
-  /**
-   * Obtener un proveedor por ID
-   * @param {number} id - ID del proveedor
-   * @returns {Promise} Respuesta de la API
-   */
-  async getById(id) {
-    const response = await api.get(`/proveedores/${id}`);
-    return response.data;
+  // LOS METODOS CRUD BÁSICOS YA ESTÁN HEREDADOS DEL BaseService:
+
+  // METODOS ESPECÍFICOS DE PROVEEDORES
+
+  // OBTENER DEUDA PENDIENTE DE UN PROVEEDOR
+
+  async getDeuda(id) {
+    return this.customAction(`${id}/deuda`, { method: 'GET' });
   }
 
-  /**
-   * Crear un nuevo proveedor
-   * @param {object} data - Datos del proveedor a crear
-   * @returns {Promise} Respuesta de la API
-   */
-  async create(data) {
-    const response = await api.post('/proveedores', data);
-    return response.data;
+  // OBTENER HISTORIAL DE PAGOS DE UN PROVEEDOR ESPECÍFICO
+
+  async getPagosProveedor(id) {
+    return this.customAction(`${id}/pagos`, { method: 'GET' });
   }
 
-  /**
-   * Actualizar un proveedor
-   * @param {number} id - ID del proveedor
-   * @param {object} data - Datos actualizados del proveedor
-   * @returns {Promise} Respuesta de la API
-   */
-  async update(id, data) {
-    const response = await api.put(`/proveedores/${id}`, data);
-    return response.data;
+  // GESTIÓN DE PAGOS DE PROVEEDORES
+
+  // OBTENER TODOS LOS PAGOS DE PROVEEDORES
+
+  async getAllPagos(params = {}) {
+    return this.customAction('pagos', {
+      method: 'GET',
+      data: params,
+      useParams: true
+    });
   }
 
-  /**
-   * Eliminar un proveedor
-   * @param {number} id - ID del proveedor
-   * @returns {Promise} Respuesta de la API
-   */
-  async delete(id) {
-    const response = await api.delete(`/proveedores/${id}`);
-    return response.data;
+  // OBTENER PAGOS EN UN RANGO DE FECHAS
+
+  async getPagosByRangoFechas(fechaInicio, fechaFin, params = {}) {
+    return this.getAllPagos({
+      fecha_inicio: fechaInicio,
+      fecha_fin: fechaFin,
+      ...params
+    });
   }
 
-  /**
-   * Ver deuda de un proveedor
-   * @param {number} id - ID del proveedor
-   * @returns {Promise} Respuesta de la API
-   */
-  async verDeuda(id) {
-    const response = await api.get(`/proveedores/${id}/deuda`);
-    return response.data;
+  // CREAR UN NUEVO PAGO DE PROVEEDOR
+
+  async createPago(pagoData) {
+    return this.customAction('pagos', {
+      method: 'POST',
+      data: pagoData
+    });
   }
 
-  /**
-   * Obtener historial de pagos de un proveedor específico
-   * @param {number} id - ID del proveedor
-   * @param {object} params - Parámetros de consulta
-   * @returns {Promise} Respuesta de la API
-   */
-  async getPagosProveedor(id, params = {}) {
-    const response = await api.get(`/proveedores/${id}/pagos`, { params });
-    return response.data;
-  }
+  // OBTENER MÉTRICAS DE PAGOS
 
-  // ==========================================================
-  // MÉTODOS PARA GESTIÓN CONSOLIDADA DE PAGOS
-  // (Nuevas rutas consolidadas en ProveedorController)
-  // ==========================================================
-
-  /**
-   * Obtener todos los pagos de todos los proveedores
-   * Ruta consolidada: GET /proveedores/pagos
-   * @param {object} params - Parámetros de consulta (fechas, proveedor_id, etc.)
-   * @returns {Promise} Respuesta de la API
-   */
-  async getTodosPagos(params = {}) {
-    const response = await api.get('/proveedores/pagos', { params });
-    return response.data;
-  }
-
-  /**
-   * Obtener un pago específico por ID
-   * Ruta consolidada: GET /proveedores/pagos/{id}
-   * @param {number} id - ID del pago
-   * @returns {Promise} Respuesta de la API
-   */
-  async getPagoById(id) {
-    const response = await api.get(`/proveedores/pagos/${id}`);
-    return response.data;
-  }
-
-  /**
-   * Crear un pago con transacción completa (pago + actualizar deuda + registrar egreso)
-   * Ruta consolidada: POST /proveedores/pagos
-   * @param {object} data - Datos del pago (debe incluir proveedor_id)
-   * @returns {Promise} Respuesta de la API
-   */
-  async crearPago(data) {
-    const response = await api.post('/proveedores/pagos', data);
-    return response.data;
-  }
-
-  /**
-   * Actualizar un pago específico
-   * Ruta consolidada: PUT /proveedores/pagos/{id}
-   * @param {number} id - ID del pago
-   * @param {object} data - Datos actualizados del pago
-   * @returns {Promise} Respuesta de la API
-   */
-  async actualizarPago(id, data) {
-    const response = await api.put(`/proveedores/pagos/${id}`, data);
-    return response.data;
-  }
-
-  /**
-   * Eliminar un pago específico
-   * Ruta consolidada: DELETE /proveedores/pagos/{id}
-   * @param {number} id - ID del pago
-   * @returns {Promise} Respuesta de la API
-   */
-  async eliminarPago(id) {
-    const response = await api.delete(`/proveedores/pagos/${id}`);
-    return response.data;
-  }
-
-  /**
-   * Obtener métricas de pagos a proveedores
-   * Ruta consolidada: GET /proveedores/pagos/metricas
-   * @param {object} params - Parámetros de consulta (fechas, filtros, etc.)
-   * @returns {Promise} Respuesta de la API
-   */
   async getMetricasPagos(params = {}) {
-    const response = await api.get('/proveedores/pagos/metricas', { params });
-    return response.data;
+    return this.customAction('pagos/metricas', {
+      method: 'GET',
+      data: params,
+      useParams: true
+    });
+  }
+
+  // OBTENER UN PAGO ESPECÍFICO POR ID
+
+  async getPago(pagoId) {
+    return this.customAction(`pagos/${pagoId}`, { method: 'GET' });
+  }
+
+  // ACTUALIZAR UN PAGO ESPECÍFICO
+
+  async updatePago(pagoId, pagoData) {
+    return this.customAction(`pagos/${pagoId}`, {
+      method: 'PUT',
+      data: pagoData
+    });
+  }
+
+  // ELIMINAR UN PAGO ESPECÍFICO
+
+  async deletePago(pagoId) {
+    return this.customAction(`pagos/${pagoId}`, { method: 'DELETE' });
+  }
+
+  // METODOS DE CONVENIENCIA PARA PROVEEDORES
+
+  // OBTENER PROVEEDORES CON DEUDA PENDIENTE
+
+  async getProveedoresConDeuda() {
+    const proveedores = await this.index();
+    const proveedoresConDeuda = [];
+    
+    for (const proveedor of proveedores) {
+      try {
+        const deudaResponse = await this.getDeuda(proveedor.id);
+        if (deudaResponse.data && deudaResponse.data.deuda_pendiente > 0) {
+          proveedoresConDeuda.push({
+            ...proveedor,
+            deuda_pendiente: deudaResponse.data.deuda_pendiente
+          });
+        }
+      } catch (error) {
+        console.warn(`Error obteniendo deuda del proveedor ${proveedor.id}:`, error);
+      }
+    }
+    
+    return proveedoresConDeuda;
+  }
+
+  // OBTENER RESUMEN COMPLETO DE UN PROVEEDOR
+
+  async getResumenProveedor(id, limitePagos = 10) {
+    try {
+      const [proveedor, deuda, pagos] = await Promise.all([
+        this.show(id),
+        this.getDeuda(id),
+        this.getPagosProveedor(id)
+      ]);
+
+      return {
+        proveedor: proveedor.data,
+        deuda_pendiente: deuda.data?.deuda_pendiente || 0,
+        pagos_recientes: pagos.data?.slice(0, limitePagos) || [],
+        total_pagos: pagos.data?.length || 0
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // OBTENER ESTADÍSTICAS DE PAGOS DE UN PROVEEDOR POR PERÍODO
+
+  async getEstadisticasPagosProveedor(id, fechaInicio, fechaFin) {
+    try {
+      const pagos = await this.getPagosProveedor(id);
+      
+      const pagosFiltrados = pagos.data.filter(pago => {
+        const fechaPago = new Date(pago.fecha);
+        const inicio = new Date(fechaInicio);
+        const fin = new Date(fechaFin);
+        return fechaPago >= inicio && fechaPago <= fin;
+      });
+
+      const totalPagado = pagosFiltrados.reduce((sum, pago) => sum + parseFloat(pago.monto), 0);
+      
+      return {
+        total_pagos: pagosFiltrados.length,
+        monto_total: totalPagado,
+        promedio_pago: pagosFiltrados.length > 0 ? totalPagado / pagosFiltrados.length : 0,
+        pagos: pagosFiltrados
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // BUSCAR PROVEEDORES POR NOMBRE O EMPRESA
+
+  async buscarProveedores(termino, params = {}) {
+    return this.index({ buscar: termino, ...params });
   }
 }
 
-// Crear instancia única del servicio
-export const proveedorService = new ProveedorServiceClass();
+// Instancia única del servicio
+const proveedorService = new ProveedorService();
+
 export default proveedorService;

@@ -28,4 +28,8 @@ interface EgresoRepositoryInterface
     public function getTotalEgresosByPeriodo(string $fechaInicio, string $fechaFin): float;
     
     public function getEgresosByMes(int $año, int $mes): Collection;
+    
+    public function findByTipoAndReferencia(string $tipo, int $referenciaId): ?Egreso;
+    
+    public function findTrashedByTipoAndReferencia(string $tipo, int $referenciaId): ?Egreso;
 }

@@ -1,79 +1,57 @@
-import apiClient from './api';
+import { BaseService } from './BaseService';
 
-export class ClienteService {
-  /**
-   * Obtener todos los clientes con paginación y filtros
-   */
-  static async getClientes(params = {}) {
-    const response = await apiClient.get('/clientes', { params });
-    return response.data;
+/**
+ * Servicio para gestionar clientes
+ */
+class ClienteService extends BaseService {
+  constructor() {
+    super('/clientes');
   }
 
-  /**
-   * Obtener todos los clientes (para selects)
-   */
-  static async getAllClientes() {
-    const response = await apiClient.get('/clientes/all');
-    return response.data;
+  // Los métodos CRUD básicos ya están heredados del BaseService:
+
+  // Métodos de conveniencia adicionales
+
+  // Obtener solo clientes activos
+  async getActiveClientes(params = {}) {
+    return this.index({ ...params, activo: true });
   }
 
-  /**
-   * Buscar clientes
-   */
-  static async searchClientes(query) {
-    const response = await apiClient.get('/clientes/search', { 
-      params: { q: query } 
-    });
-    return response.data;
+  // Obtener solo clientes inactivos
+  async getInactiveClientes(params = {}) {
+    return this.index({ ...params, activo: false });
   }
 
-  /**
-   * Obtener estadísticas de clientes
-   */
-  static async getStats() {
-    const response = await apiClient.get('/clientes/stats');
-    return response.data;
+  // Obtener cliente con sus vehículos (si existe endpoint)
+  async getClienteWithVehiculos(id) {
+    try {
+      const response = await this.customAction('vehiculos', {
+        id,
+        method: 'GET'
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
   }
 
-  /**
-   * Obtener cliente por ID
-   */
-  static async getCliente(id) {
-    const response = await apiClient.get(`/clientes/${id}`);
-    return response.data;
-  }
-
-  /**
-   * Crear nuevo cliente
-   */
-  static async createCliente(data) {
-    const response = await apiClient.post('/clientes', data);
-    return response.data;
-  }
-
-  /**
-   * Actualizar cliente
-   */
-  static async updateCliente(id, data) {
-    const response = await apiClient.put(`/clientes/${id}`, data);
-    return response.data;
-  }
-
-  /**
-   * Alternar estado activo del cliente
-   */
-  static async toggleActivo(id) {
-    const response = await apiClient.patch(`/clientes/${id}/toggle-activo`);
-    return response.data;
-  }
-
-  /**
-   * Eliminar cliente
-   */
-  static async deleteCliente(id) {
-    const response = await apiClient.delete(`/clientes/${id}`);
-    return response.data;
+  // Obtener historial de lavados del cliente (si existe endpoint)
+  async getClienteLavados(id, params = {}) {
+    try {
+      const response = await this.customAction('lavados', {
+        id,
+        method: 'GET',
+        data: params,
+        useParams: true
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
   }
 }
 
-export default ClienteService;
+// Instancia única del servicio
+const clienteService = new ClienteService();
+
+export default clienteService;

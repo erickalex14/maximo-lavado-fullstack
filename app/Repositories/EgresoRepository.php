@@ -90,4 +90,19 @@ class EgresoRepository implements EgresoRepositoryInterface
             ->orderBy('fecha', 'desc')
             ->get();
     }
+    
+    public function findByTipoAndReferencia(string $tipo, int $referenciaId): ?Egreso
+    {
+        return Egreso::where('tipo', $tipo)
+            ->where('referencia_id', $referenciaId)
+            ->first();
+    }
+    
+    public function findTrashedByTipoAndReferencia(string $tipo, int $referenciaId): ?Egreso
+    {
+        return Egreso::onlyTrashed()
+            ->where('tipo', $tipo)
+            ->where('referencia_id', $referenciaId)
+            ->first();
+    }
 }

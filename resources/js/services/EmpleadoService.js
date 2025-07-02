@@ -1,69 +1,101 @@
-import apiClient from './api';
+import { BaseService } from './BaseService';
 
-export class EmpleadoService {
-  /**
-   * Obtener todos los empleados con paginación
-   */
-  static async getEmpleados(params = {}) {
-    const response = await apiClient.get('/empleados', { params });
-    return response.data;
+/**
+ * Servicio para gestionar empleados
+ */
+class EmpleadoService extends BaseService {
+  constructor() {
+    super('/empleados');
   }
 
-  /**
-   * Obtener empleado por ID
-   */
-  static async getEmpleado(id) {
-    const response = await apiClient.get(`/empleados/${id}`);
-    return response.data;
+  // Los métodos CRUD básicos ya están heredados del BaseService:
+
+  // Métodos específicos para lavados por empleado
+
+  // Obtener lavados por día de un empleado específico
+  async getLavadosPorDia(empleadoId, fecha, params = {}) {
+    try {
+      const response = await this.customAction(`lavados/dia/${fecha}`, {
+        id: empleadoId,
+        method: 'GET',
+        data: params,
+        useParams: true
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
   }
 
-  /**
-   * Crear nuevo empleado
-   */
-  static async createEmpleado(data) {
-    const response = await apiClient.post('/empleados', data);
-    return response.data;
+  // Obtener lavados por semana de un empleado específico
+  async getLavadosPorSemana(empleadoId, fecha, params = {}) {
+    try {
+      const response = await this.customAction(`lavados/semana/${fecha}`, {
+        id: empleadoId,
+        method: 'GET',
+        data: params,
+        useParams: true
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
   }
 
-  /**
-   * Actualizar empleado
-   */
-  static async updateEmpleado(id, data) {
-    const response = await apiClient.put(`/empleados/${id}`, data);
-    return response.data;
+  // Obtener lavados por mes de un empleado específico
+  async getLavadosPorMes(empleadoId, anio, mes, params = {}) {
+    try {
+      const response = await this.customAction(`lavados/mes/${anio}/${mes}`, {
+        id: empleadoId,
+        method: 'GET',
+        data: params,
+        useParams: true
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
   }
 
-  /**
-   * Eliminar empleado
-   */
-  static async deleteEmpleado(id) {
-    const response = await apiClient.delete(`/empleados/${id}`);
-    return response.data;
+  // Métodos de conveniencia adicionales
+
+  // Obtener empleados activos
+  async getActiveEmpleados(params = {}) {
+    return this.index({ ...params, activo: true });
   }
 
-  /**
-   * Obtener lavados por empleado y día
-   */
-  static async getLavadosPorDia(empleadoId, fecha) {
-    const response = await apiClient.get(`/empleados/${empleadoId}/lavados/dia/${fecha}`);
-    return response.data;
+  // Obtener todos los lavados de un empleado (sin filtro temporal)
+  async getAllLavadosEmpleado(empleadoId, params = {}) {
+    try {
+      const response = await this.customAction('lavados', {
+        id: empleadoId,
+        method: 'GET',
+        data: params,
+        useParams: true
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
   }
 
-  /**
-   * Obtener lavados por empleado y semana
-   */
-  static async getLavadosPorSemana(empleadoId, fecha) {
-    const response = await apiClient.get(`/empleados/${empleadoId}/lavados/semana/${fecha}`);
-    return response.data;
-  }
-
-  /**
-   * Obtener lavados por empleado y mes
-   */
-  static async getLavadosPorMes(empleadoId, anio, mes) {
-    const response = await apiClient.get(`/empleados/${empleadoId}/lavados/mes/${anio}/${mes}`);
-    return response.data;
+  // Obtener estadísticas de rendimiento de un empleado
+  async getEstadisticasEmpleado(empleadoId, params = {}) {
+    try {
+      const response = await this.customAction('estadisticas', {
+        id: empleadoId,
+        method: 'GET',
+        data: params,
+        useParams: true
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
   }
 }
 
-export default EmpleadoService;
+// Instancia única del servicio
+const empleadoService = new EmpleadoService();
+
+export default empleadoService;

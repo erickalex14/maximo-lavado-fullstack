@@ -105,7 +105,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/lavados/anio', [LavadoController::class, 'getByYear']);
     Route::get('/lavados/{id}', [LavadoController::class, 'show']);
     Route::put('/lavados/{id}', [LavadoController::class, 'update']);
-    Route::put('/lavados/{id}/estado', [LavadoController::class, 'changeStatus']);
     Route::put('/lavados/{id}/restore', [LavadoController::class, 'restore']); // Restaurar lavado
     Route::delete('/lavados/{id}', [LavadoController::class, 'destroy']);
 

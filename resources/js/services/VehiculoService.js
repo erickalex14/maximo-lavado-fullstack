@@ -1,69 +1,80 @@
-import apiClient from './api';
+import { BaseService } from './BaseService';
 
-export class VehiculoService {
-  /**
-   * Obtener todos los vehículos con paginación y filtros
-   */
-  static async getVehiculos(params = {}) {
-    const response = await apiClient.get('/vehiculos', { params });
-    return response.data;
+/**
+ * Servicio para gestionar vehículos
+ */
+class VehiculoService extends BaseService {
+  constructor() {
+    super('/vehiculos');
   }
 
-  /**
-   * Obtener todos los vehículos (para selects)
-   */
-  static async getAllVehiculos() {
-    const response = await apiClient.get('/vehiculos/all');
-    return response.data;
+  // Los métodos CRUD básicos ya están heredados del BaseService:
+
+  // Métodos específicos de vehículos
+
+  // Obtener vehículos por cliente
+  async getByCliente(clienteId, params = {}) {
+    try {
+      const response = await this.customAction(`cliente/${clienteId}`, {
+        method: 'GET',
+        data: params,
+        useParams: true
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
   }
 
-  /**
-   * Obtener estadísticas de vehículos
-   */
-  static async getStats() {
-    const response = await apiClient.get('/vehiculos/stats');
-    return response.data;
+  // Métodos de conveniencia adicionales
+
+  // Obtener vehículos activos solamente
+  async getActiveVehiculos(params = {}) {
+    return this.index({ ...params, activo: true });
   }
 
-  /**
-   * Obtener vehículos por cliente
-   */
-  static async getByCliente(clienteId) {
-    const response = await apiClient.get(`/vehiculos/cliente/${clienteId}`);
-    return response.data;
+  // Obtener vehículos por marca
+  async getByMarca(marca, params = {}) {
+    return this.index({ ...params, marca });
   }
 
-  /**
-   * Obtener vehículo por ID
-   */
-  static async getVehiculo(id) {
-    const response = await apiClient.get(`/vehiculos/${id}`);
-    return response.data;
+  // Obtener vehículos por tipo
+  async getByTipo(tipo, params = {}) {
+    return this.index({ ...params, tipo });
   }
 
-  /**
-   * Crear nuevo vehículo
-   */
-  static async createVehiculo(data) {
-    const response = await apiClient.post('/vehiculos', data);
-    return response.data;
+  // Obtener historial de lavados de un vehículo
+  async getLavadosVehiculo(vehiculoId, params = {}) {
+    try {
+      const response = await this.customAction('lavados', {
+        id: vehiculoId,
+        method: 'GET',
+        data: params,
+        useParams: true
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
   }
 
-  /**
-   * Actualizar vehículo
-   */
-  static async updateVehiculo(id, data) {
-    const response = await apiClient.put(`/vehiculos/${id}`, data);
-    return response.data;
-  }
-
-  /**
-   * Eliminar vehículo
-   */
-  static async deleteVehiculo(id) {
-    const response = await apiClient.delete(`/vehiculos/${id}`);
-    return response.data;
+  // Obtener estadísticas de un vehículo específico
+  async getEstadisticasVehiculo(vehiculoId, params = {}) {
+    try {
+      const response = await this.customAction('estadisticas', {
+        id: vehiculoId,
+        method: 'GET',
+        data: params,
+        useParams: true
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
   }
 }
 
-export default VehiculoService;
+// Instancia única del servicio
+const vehiculoService = new VehiculoService();
+
+export default vehiculoService;

@@ -17,6 +17,7 @@ use Carbon\Carbon;
 
 class VentaRepository implements VentaRepositoryInterface
 {
+    // METODO PARA OBTENER TODAS LAS VENTAS DE PRODUCTOS AUTOMOTRICES
     public function getVentasAutomotrices(): Collection
     {
         return VentaProductoAutomotriz::with(['productoAutomotriz', 'cliente'])
@@ -24,12 +25,16 @@ class VentaRepository implements VentaRepositoryInterface
             ->get();
     }
 
+    // METODO PARA OBTENER TODAS LAS VENTAS DE PRODUCTOS DE DESPENSA
+
     public function getVentasDespensa(): Collection
     {
         return VentaProductoDespensa::with(['productoDespensa', 'cliente'])
             ->orderBy('fecha', 'desc')
             ->get();
     }
+
+    // METODO PARA OBTENER TODAS LAS VENTAS, INCLUYENDO AUTOMOTRICES Y DE DESPENSA
 
     public function getAllVentas(): Collection
     {
@@ -63,6 +68,8 @@ class VentaRepository implements VentaRepositoryInterface
             ->sortByDesc('fecha')
             ->values();
     }
+
+    // METODO PARA CREAR UNA VENTA DE PRODUCTO AUTOMOTRIZ 
 
     public function createVentaAutomotriz(array $data): VentaProductoAutomotriz
     {
@@ -119,6 +126,8 @@ class VentaRepository implements VentaRepositoryInterface
         });
     }
 
+    // METODO PARA CREAR UNA VENTA DE PRODUCTO DE DESPENSA
+
     public function createVentaDespensa(array $data): VentaProductoDespensa
     {
         return DB::transaction(function () use ($data) {
@@ -174,15 +183,21 @@ class VentaRepository implements VentaRepositoryInterface
         });
     }
 
+    // METODO PARA OBTENER UNA VENTA DE PRODUCTO AUTOMOTRIZ POR ID
+
     public function findVentaAutomotrizById(int $id): ?VentaProductoAutomotriz
     {
         return VentaProductoAutomotriz::with(['productoAutomotriz', 'cliente'])->find($id);
     }
 
+    // METODO PARA OBTENER UNA VENTA DE PRODUCTO DE DESPENSA POR ID
+
     public function findVentaDespensaById(int $id): ?VentaProductoDespensa
     {
         return VentaProductoDespensa::with(['productoDespensa', 'cliente'])->find($id);
     }
+
+    // METODOS PARA ACTUALIZAR VENTAS DE PRODUCTOS AUTOMOTRICES
 
     public function updateVentaAutomotriz(int $id, array $data): ?VentaProductoAutomotriz
     {
@@ -194,6 +209,8 @@ class VentaRepository implements VentaRepositoryInterface
         return null;
     }
 
+    // METODOS PARA ACTUALIZAR VENTAS DE PRODUCTOS DE DESPENSA
+
     public function updateVentaDespensa(int $id, array $data): ?VentaProductoDespensa
     {
         $venta = VentaProductoDespensa::find($id);
@@ -203,6 +220,10 @@ class VentaRepository implements VentaRepositoryInterface
         }
         return null;
     }
+
+    // METODOS PARA ELIMINAR VENTAS DE PRODUCTOS AUTOMOTRICES Y DE DESPENSA
+
+    // ELIMINAR VENTA DE PRODUCTO AUTOMOTRIZ
 
     public function deleteVentaAutomotriz(int $id): bool
     {
@@ -235,6 +256,8 @@ class VentaRepository implements VentaRepositoryInterface
         });
     }
 
+    // ELIMINAR VENTA DE PRODUCTO DE DESPENSA
+
     public function deleteVentaDespensa(int $id): bool
     {
         return DB::transaction(function () use ($id) {
@@ -266,9 +289,10 @@ class VentaRepository implements VentaRepositoryInterface
         });
     }
 
-    /**
-     * Restaurar venta de producto automotriz eliminada lógicamente
-     */
+    // METODOS PARA RESTAURAR VENTAS ELIMINADAS LÓGICAMENTE
+
+    //RESTURAR VENTA DE PRODUCTO AUTOMOTRIZ ELIMINADA LÓGICAMENTE
+
     public function restoreVentaAutomotriz(int $id): bool
     {
         return DB::transaction(function () use ($id) {
@@ -305,9 +329,8 @@ class VentaRepository implements VentaRepositoryInterface
         });
     }
 
-    /**
-     * Restaurar venta de producto de despensa eliminada lógicamente
-     */
+    // RESTURAR VENTA DE PRODUCTO DE DESPENSA ELIMINADA LÓGICAMENTE
+
     public function restoreVentaDespensa(int $id): bool
     {
         return DB::transaction(function () use ($id) {
@@ -344,9 +367,10 @@ class VentaRepository implements VentaRepositoryInterface
         });
     }
 
-    /**
-     * Obtener ventas eliminadas lógicamente
-     */
+    // METODOS PARA OBTENER VENTAS ELIMINADAS LÓGICAMENTE
+
+    // OBTENER VENTAS AUTOMOTRICES ELIMINADAS LÓGICAMENTE
+
     public function getTrashedVentasAutomotrices(): Collection
     {
         return VentaProductoAutomotriz::onlyTrashed()
@@ -355,9 +379,8 @@ class VentaRepository implements VentaRepositoryInterface
             ->get();
     }
 
-    /**
-     * Obtener ventas de despensa eliminadas lógicamente
-     */
+    // OBTENER VENTAS DE DESPENSA ELIMINADAS LÓGICAMENTE
+
     public function getTrashedVentasDespensa(): Collection
     {
         return VentaProductoDespensa::onlyTrashed()
@@ -365,6 +388,10 @@ class VentaRepository implements VentaRepositoryInterface
             ->orderBy('deleted_at', 'desc')
             ->get();
     }
+
+    // METODOS PARA OBTENER VENTAS POR CLIENTE Y RANGO DE FECHAS
+
+    // OBTENER VENTAS POR CLIENTE ID
 
     public function getVentasByClienteId(int $clienteId): Collection
     {
@@ -405,6 +432,8 @@ class VentaRepository implements VentaRepositoryInterface
             ->values();
     }
 
+    // OBTENER VENTAS POR RANGO DE FECHAS
+
     public function getVentasByFechaRange(string $fechaInicio, string $fechaFin): Collection
     {
         $ventasAutomotrices = VentaProductoAutomotriz::with(['productoAutomotriz', 'cliente'])
@@ -444,6 +473,8 @@ class VentaRepository implements VentaRepositoryInterface
             ->values();
     }
 
+    //OBTENER MÉTRICAS GENERALES DE VENTAS
+    
     public function getMetricas(): array
     {
         $today = Carbon::today();
