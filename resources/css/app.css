@@ -1,98 +1,17 @@
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+/* 
+ * Archivo principal de estilos - Estructura modular
+ * 
+ * Este archivo importa todos los estilos necesarios de manera organizada:
+ * 1. Base styles - Variables CSS y estilos globales
+ * 2. Tailwind utilities - Utilidades con @apply
+ * 3. Components - Estilos de componentes específicos
+ */
 
-/* Variables CSS personalizadas para el tema */
-:root {
-  /* Colores primarios */
-  --color-primary-50: #f0f9ff;
-  --color-primary-100: #e0f2fe;
-  --color-primary-200: #bae6fd;
-  --color-primary-300: #7dd3fc;
-  --color-primary-400: #38bdf8;
-  --color-primary-500: #0ea5e9;
-  --color-primary-600: #0284c7;
-  --color-primary-700: #0369a1;
-  --color-primary-800: #075985;
-  --color-primary-900: #0c4a6e;
+/* Importar estilos base con variables CSS y estilos globales */
+@import './base.css';
 
-  /* Colores de superficie */
-  --color-surface-50: #f8fafc;
-  --color-surface-100: #f1f5f9;
-  --color-surface-200: #e2e8f0;
-  --color-surface-300: #cbd5e1;
-  --color-surface-400: #94a3b8;
-  --color-surface-500: #64748b;
-  --color-surface-600: #475569;
-  --color-surface-700: #334155;
-  --color-surface-800: #1e293b;
-  --color-surface-900: #0f172a;
-}
+/* Importar utilidades de Tailwind con @apply */
+@import './tailwind-utilities.css';
 
-/* Estilos base del cuerpo */
-body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  line-height: 1.6;
-  color: #1f2937;
-  background-color: #f8fafc;
-}
-
-/* Loading spinner personalizado */
-.spinner {
-  border-top-color: currentColor;
-}
-
-/* Scrollbar personalizado */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-track {
-  background-color: #f1f5f9;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 9999px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8;
-}
-
-/* Animaciones personalizadas */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-.slide-enter-active,
-.slide-leave-active {
-  transition: transform 0.3s ease;
-}
-
-.slide-enter-from,
-.slide-leave-to {
-  transform: translateX(-100%);
-}
-
-/* Utilidades adicionales */
-.shadow-soft {
-  box-shadow: 0 2px 8px 0 rgba(99, 99, 99, 0.2);
-}
-
-/* Responsive utilities para sidebar */
-@media (max-width: 768px) {
-  .sidebar-mobile-hidden {
-    transform: translateX(-100%);
-  }
-  
-  .sidebar-mobile-visible {
-    transform: translateX(0);
-  }
-}
+/* Importar estilos de componentes específicos */
+@import './components.css';
