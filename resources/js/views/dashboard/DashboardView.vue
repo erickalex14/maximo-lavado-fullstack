@@ -1,332 +1,517 @@
 <template>
-  <div class="space-y-6">
-    <!-- Header del Dashboard -->
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900">
-          Dashboard
-        </h1>
-        <p class="text-gray-600 mt-1">
-          Bienvenido, {{ authStore.userName }}
-        </p>
-      </div>
-      
-      <div class="flex items-center space-x-3 mt-4 lg:mt-0">
-        <button 
-          @click="refreshData"
-          :disabled="isRefreshing"
-          class="material-button-outlined"
-        >
-          <ArrowPathIcon 
-            :class="['h-4 w-4 mr-2', { 'animate-spin': isRefreshing }]" 
-          />
-          Actualizar
-        </button>
-        
-        <div class="text-sm text-gray-500">
-          Última actualización: {{ lastUpdatedText }}
+  <AppLayout>
+    <!-- Header Section -->
+    <div class="mb-8">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+            Dashboard
+          </h1>
+          <p class="text-gray-600 dark:text-gray-400 mt-1">
+            Bienvenido al panel de control de Máximo Lavado
+          </p>
+        </div>
+        <div class="flex items-center gap-3">
+          <BaseButton 
+            variant="outline" 
+            size="sm"
+            @click="refreshData"
+            :loading="loading"
+          >
+            <Icon name="refresh" class="w-4 h-4 mr-2" />
+            Actualizar
+          </BaseButton>
+          <BaseButton 
+            variant="primary" 
+            size="sm"
+            @click="openReportModal"
+          >
+            <Icon name="document-text" class="w-4 h-4 mr-2" />
+            Generar Reporte
+          </BaseButton>
         </div>
       </div>
     </div>
 
-    <!-- Métricas principales -->
-    <div v-if="dashboardStore.metricas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <MetricCard
-        v-for="metric in metricsCards"
-        :key="metric.key"
-        :title="metric.title"
-        :value="metric.value"
-        :change="metric.change"
-        :icon="metric.icon"
-        :color="metric.color"
+    <!-- Quick Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <DashboardStatCard
+        v-for="stat in stats"
+        :key="stat.id"
+        :icon="stat.icon"
+        :title="stat.title"
+        :value="stat.value"
+        :change="stat.change"
+        :trend="stat.trend"
+        :color="stat.color"
       />
     </div>
 
-    <!-- Alertas del sistema -->
-    <div v-if="dashboardStore.alertasUrgentes.length > 0" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-      <div class="flex items-center">
-        <ExclamationTriangleIcon class="h-5 w-5 text-yellow-400 mr-2" />
-        <h3 class="text-sm font-medium text-yellow-800">
-          Alertas del Sistema ({{ dashboardStore.alertasUrgentes.length }})
-        </h3>
-      </div>
-      <div class="mt-2 space-y-1">
-        <p 
-          v-for="alerta in dashboardStore.alertasUrgentes.slice(0, 3)"
-          :key="alerta.id"
-          class="text-sm text-yellow-700"
-        >
-          • {{ alerta.mensaje }}
-        </p>
-        <router-link 
-          v-if="dashboardStore.alertasUrgentes.length > 3"
-          to="/dashboard/alertas"
-          class="text-sm text-yellow-600 hover:text-yellow-700 font-medium"
-        >
-          Ver todas las alertas →
-        </router-link>
-      </div>
-    </div>
-
-    <!-- Gráficos y actividad -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Gráfico de ingresos -->
-      <div class="material-card">
-        <div class="card-header">
-          <h3 class="text-lg font-semibold text-gray-900">
-            Ingresos vs Egresos
-          </h3>
-        </div>
-        <div class="card-body">
-          <ChartComponent 
-            v-if="dashboardStore.chartData"
-            :data="dashboardStore.chartData.ingresos_egresos"
-            type="line"
-          />
-          <div v-else class="skeleton-loader h-64"></div>
-        </div>
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+      <!-- Sales Chart -->
+      <div class="lg:col-span-2">
+        <BaseCard>
+          <template #header>
+            <div class="flex items-center justify-between">
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                Ventas de los Últimos 7 Días
+              </h3>
+              <BaseSelect
+                v-model="chartPeriod"
+                :options="chartPeriodOptions"
+                size="sm"
+                class="w-32"
+              />
+            </div>
+          </template>
+          <div class="h-80 flex items-center justify-center text-gray-500 dark:text-gray-400">
+            <div class="text-center">
+              <Icon name="chart-bar" class="w-16 h-16 mx-auto mb-4 opacity-50" />
+              <p>Gráfico de ventas</p>
+              <p class="text-sm">(Se integrará con Chart.js)</p>
+            </div>
+          </div>
+        </BaseCard>
       </div>
 
-      <!-- Actividad reciente -->
-      <div class="material-card">
-        <div class="card-header">
-          <h3 class="text-lg font-semibold text-gray-900">
-            Actividad Reciente
-          </h3>
-        </div>
-        <div class="card-body">
-          <div v-if="dashboardStore.actividadReciente.length > 0" class="space-y-3">
+      <!-- Recent Activity -->
+      <div>
+        <BaseCard>
+          <template #header>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+              Actividad Reciente
+            </h3>
+          </template>
+          <div class="space-y-4">
             <div 
-              v-for="actividad in dashboardStore.actividadReciente.slice(0, 5)"
-              :key="actividad.id"
-              class="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded"
+              v-for="activity in recentActivities"
+              :key="activity.id"
+              class="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50"
             >
-              <div class="flex-shrink-0">
-                <div 
-                  class="w-2 h-2 rounded-full"
-                  :class="getActivityColor(actividad.tipo)"
-                ></div>
+              <div :class="[
+                'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
+                activity.type === 'sale' ? 'bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400' :
+                activity.type === 'wash' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' :
+                'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400'
+              ]">
+                <Icon :name="activity.icon" class="w-4 h-4" />
               </div>
               <div class="flex-1 min-w-0">
-                <p class="text-sm text-gray-900 truncate">
-                  {{ actividad.descripcion }}
+                <p class="text-sm font-medium text-gray-900 dark:text-white">
+                  {{ activity.title }}
                 </p>
-                <p class="text-xs text-gray-500">
-                  {{ formatDate(actividad.fecha) }}
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ activity.description }}
+                </p>
+                <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  {{ formatTimeAgo(activity.timestamp) }}
                 </p>
               </div>
             </div>
-            <router-link 
-              to="/dashboard/actividad"
-              class="block text-center text-sm text-primary-600 hover:text-primary-700 font-medium pt-2"
-            >
-              Ver toda la actividad →
-            </router-link>
           </div>
-          <div v-else class="text-center text-gray-500 py-8">
-            No hay actividad reciente
-          </div>
-        </div>
+          <template #footer>
+            <BaseButton variant="ghost" size="sm" class="w-full">
+              Ver todas las actividades
+              <Icon name="arrow-right" class="w-4 h-4 ml-2" />
+            </BaseButton>
+          </template>
+        </BaseCard>
       </div>
     </div>
 
-    <!-- Próximas citas y estadísticas -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Próximas citas -->
-      <div class="material-card">
-        <div class="card-header">
-          <h3 class="text-lg font-semibold text-gray-900">
-            Próximas Citas
+    <!-- Additional Information Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <!-- Top Services -->
+      <BaseCard>
+        <template #header>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+            Servicios Más Populares
           </h3>
-        </div>
-        <div class="card-body">
-          <div v-if="dashboardStore.proximasCitas.length > 0" class="space-y-2">
-            <div 
-              v-for="cita in dashboardStore.proximasCitas.slice(0, 4)"
-              :key="cita.id"
-              class="text-sm"
-            >
-              <div class="font-medium text-gray-900">{{ cita.cliente }}</div>
-              <div class="text-gray-500">{{ formatDateTime(cita.fecha_hora) }}</div>
+        </template>
+        <div class="space-y-4">
+          <div 
+            v-for="service in topServices"
+            :key="service.id"
+            class="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50"
+          >
+            <div class="flex items-center gap-3">
+              <div :class="[
+                'flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center',
+                service.color
+              ]">
+                <Icon :name="service.icon" class="w-5 h-5" />
+              </div>
+              <div>
+                <h4 class="font-medium text-gray-900 dark:text-white">
+                  {{ service.name }}
+                </h4>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ service.count }} servicios este mes
+                </p>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="font-semibold text-gray-900 dark:text-white">
+                ${{ service.revenue.toLocaleString() }}
+              </p>
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                ingresos
+              </p>
             </div>
           </div>
-          <div v-else class="text-center text-gray-500 py-4 text-sm">
-            No hay citas programadas
-          </div>
         </div>
-      </div>
+      </BaseCard>
 
-      <!-- Estadísticas adicionales -->
-      <div class="lg:col-span-2 material-card">
-        <div class="card-header">
-          <h3 class="text-lg font-semibold text-gray-900">
-            Estadísticas del Mes
+      <!-- Quick Actions -->
+      <BaseCard>
+        <template #header>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+            Acciones Rápidas
           </h3>
+        </template>
+        <div class="grid grid-cols-2 gap-4">
+          <BaseButton
+            v-for="action in quickActions"
+            :key="action.id"
+            :variant="action.variant"
+            size="lg"
+            class="h-20 flex-col"
+            @click="handleQuickAction(action.action)"
+          >
+            <Icon :name="action.icon" class="w-6 h-6 mb-2" />
+            <span class="text-sm">{{ action.label }}</span>
+          </BaseButton>
         </div>
-        <div class="card-body">
-          <div v-if="dashboardStore.estadisticas" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="text-center">
-              <div class="text-2xl font-bold text-primary-600">
-                {{ dashboardStore.estadisticas.lavados_mes || 0 }}
-              </div>
-              <div class="text-sm text-gray-500">Lavados</div>
-            </div>
-            <div class="text-center">
-              <div class="text-2xl font-bold text-green-600">
-                {{ dashboardStore.estadisticas.clientes_nuevos || 0 }}
-              </div>
-              <div class="text-sm text-gray-500">Clientes Nuevos</div>
-            </div>
-            <div class="text-center">
-              <div class="text-2xl font-bold text-blue-600">
-                {{ dashboardStore.estadisticas.ventas_productos || 0 }}
-              </div>
-              <div class="text-sm text-gray-500">Ventas Productos</div>
-            </div>
-            <div class="text-center">
-              <div class="text-2xl font-bold text-purple-600">
-                {{ formatCurrency(dashboardStore.estadisticas.ingreso_promedio || 0) }}
-              </div>
-              <div class="text-sm text-gray-500">Ingreso Promedio</div>
-            </div>
+      </BaseCard>
+    </div>
+
+    <!-- Report Modal -->
+    <BaseModal
+      v-model="showReportModal"
+      title="Generar Reporte"
+      size="md"
+    >
+      <div class="space-y-4">
+        <div>
+          <BaseLabel for="reportType">Tipo de Reporte</BaseLabel>
+          <BaseSelect
+            id="reportType"
+            v-model="reportForm.type"
+            :options="reportTypeOptions"
+            placeholder="Selecciona el tipo de reporte"
+          />
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <BaseLabel for="startDate">Fecha Inicio</BaseLabel>
+            <BaseInput
+              id="startDate"
+              v-model="reportForm.startDate"
+              type="date"
+            />
           </div>
-          <div v-else class="skeleton-loader h-16"></div>
+          <div>
+            <BaseLabel for="endDate">Fecha Fin</BaseLabel>
+            <BaseInput
+              id="endDate"
+              v-model="reportForm.endDate"
+              type="date"
+            />
+          </div>
         </div>
       </div>
-    </div>
-  </div>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <BaseButton variant="outline" @click="showReportModal = false">
+            Cancelar
+          </BaseButton>
+          <BaseButton 
+            variant="primary" 
+            @click="generateReport"
+            :loading="generatingReport"
+          >
+            Generar Reporte
+          </BaseButton>
+        </div>
+      </template>
+    </BaseModal>
+  </AppLayout>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useAuthStore } from '@/stores/auth';
-import { useDashboardStore } from '@/stores/dashboard';
-import { useNotificationStore } from '@/stores/notification';
-import { 
-  ArrowPathIcon, 
-  ExclamationTriangleIcon,
-  CurrencyDollarIcon,
-  UserGroupIcon,
-  TruckIcon,
-  ChartBarIcon
-} from '@heroicons/vue/24/outline';
+import { ref, reactive, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import AppLayout from '@/layouts/AppLayout.vue'
+import Icon from '@/components/icons/index.js'
+import {
+  BaseButton,
+  BaseCard,
+  BaseSelect,
+  BaseModal,
+  BaseLabel,
+  BaseInput
+} from '@/components/common'
+import DashboardStatCard from './components/DashboardStatCard.vue'
+import { useToast } from '@/stores/toast'
 
-import MetricCard from '@/components/dashboard/MetricCard.vue';
-import ChartComponent from '@/components/charts/ChartComponent.vue';
+const router = useRouter()
+const toast = useToast()
 
-// Stores
-const authStore = useAuthStore();
-const dashboardStore = useDashboardStore();
-const notificationStore = useNotificationStore();
+// Reactive data
+const loading = ref(false)
+const showReportModal = ref(false)
+const generatingReport = ref(false)
+const chartPeriod = ref('7d')
 
-// Estado
-const isRefreshing = ref(false);
+// Form data
+const reportForm = reactive({
+  type: '',
+  startDate: '',
+  endDate: ''
+})
 
-// Computed
-const lastUpdatedText = computed(() => {
-  if (!dashboardStore.lastUpdated) return 'Nunca';
-  
-  const date = new Date(dashboardStore.lastUpdated);
-  return date.toLocaleString('es-ES', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-});
+// Options
+const chartPeriodOptions = [
+  { value: '7d', label: 'Últimos 7 días' },
+  { value: '30d', label: 'Últimos 30 días' },
+  { value: '90d', label: 'Últimos 3 meses' },
+  { value: '1y', label: 'Último año' }
+]
 
-const metricsCards = computed(() => {
-  if (!dashboardStore.metricas) return [];
+const reportTypeOptions = [
+  { value: 'sales', label: 'Reporte de Ventas' },
+  { value: 'services', label: 'Reporte de Servicios' },
+  { value: 'customers', label: 'Reporte de Clientes' },
+  { value: 'financial', label: 'Reporte Financiero' }
+]
 
-  return [
-    {
-      key: 'ingresos_hoy',
-      title: 'Ingresos Hoy',
-      value: formatCurrency(dashboardStore.metricas.ingresos_hoy || 0),
-      change: dashboardStore.metricas.cambio_ingresos_hoy,
-      icon: CurrencyDollarIcon,
-      color: 'green'
-    },
-    {
-      key: 'lavados_hoy',
-      title: 'Lavados Hoy',
-      value: dashboardStore.metricas.lavados_hoy || 0,
-      change: dashboardStore.metricas.cambio_lavados_hoy,
-      icon: TruckIcon,
-      color: 'blue'
-    },
-    {
-      key: 'clientes_activos',
-      title: 'Clientes Activos',
-      value: dashboardStore.metricas.clientes_activos || 0,
-      change: dashboardStore.metricas.cambio_clientes,
-      icon: UserGroupIcon,
-      color: 'purple'
-    },
-    {
-      key: 'ventas_mes',
-      title: 'Ventas del Mes',
-      value: formatCurrency(dashboardStore.metricas.ventas_mes || 0),
-      change: dashboardStore.metricas.cambio_ventas_mes,
-      icon: ChartBarIcon,
-      color: 'orange'
-    }
-  ];
-});
-
-// Métodos
-const refreshData = async () => {
-  try {
-    isRefreshing.value = true;
-    await dashboardStore.refreshData();
-  } finally {
-    isRefreshing.value = false;
+// Mock data
+const stats = ref([
+  {
+    id: 1,
+    icon: 'currency-dollar',
+    title: 'Ingresos Hoy',
+    value: '$2,350',
+    change: '+12.5%',
+    trend: 'up',
+    color: 'green'
+  },
+  {
+    id: 2,
+    icon: 'sparkles',
+    title: 'Lavados Hoy',
+    value: '24',
+    change: '+8.2%',
+    trend: 'up',
+    color: 'blue'
+  },
+  {
+    id: 3,
+    icon: 'users',
+    title: 'Clientes Activos',
+    value: '186',
+    change: '+15.1%',
+    trend: 'up',
+    color: 'purple'
+  },
+  {
+    id: 4,
+    icon: 'clock',
+    title: 'Tiempo Promedio',
+    value: '45 min',
+    change: '-5.3%',
+    trend: 'down',
+    color: 'orange'
   }
-};
+])
 
-const getActivityColor = (tipo) => {
-  const colors = {
-    lavado: 'bg-blue-500',
-    venta: 'bg-green-500',
-    cliente: 'bg-purple-500',
-    empleado: 'bg-yellow-500',
-    default: 'bg-gray-500'
-  };
-  return colors[tipo] || colors.default;
-};
+const recentActivities = ref([
+  {
+    id: 1,
+    type: 'sale',
+    icon: 'currency-dollar',
+    title: 'Nueva venta registrada',
+    description: 'Lavado completo - Toyota Camry',
+    timestamp: new Date(Date.now() - 10 * 60 * 1000) // 10 minutes ago
+  },
+  {
+    id: 2,
+    type: 'wash',
+    icon: 'sparkles',
+    title: 'Servicio completado',
+    description: 'Lavado exterior - Honda Civic',
+    timestamp: new Date(Date.now() - 25 * 60 * 1000) // 25 minutes ago
+  },
+  {
+    id: 3,
+    type: 'customer',
+    icon: 'user-plus',
+    title: 'Nuevo cliente registrado',
+    description: 'Juan Pérez - Tel: 555-0123',
+    timestamp: new Date(Date.now() - 45 * 60 * 1000) // 45 minutes ago
+  },
+  {
+    id: 4,
+    type: 'sale',
+    icon: 'currency-dollar',
+    title: 'Venta completada',
+    description: 'Lavado premium - Mercedes Benz',
+    timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000) // 1 hour ago
+  }
+])
 
-const formatDate = (fecha) => {
-  if (!fecha) return '';
-  return new Date(fecha).toLocaleDateString('es-ES', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
+const topServices = ref([
+  {
+    id: 1,
+    name: 'Lavado Completo',
+    icon: 'sparkles',
+    color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400',
+    count: 45,
+    revenue: 13500
+  },
+  {
+    id: 2,
+    name: 'Lavado Exterior',
+    icon: 'sun',
+    color: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400',
+    count: 32,
+    revenue: 6400
+  },
+  {
+    id: 3,
+    name: 'Lavado Premium',
+    icon: 'star',
+    color: 'bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400',
+    count: 18,
+    revenue: 9000
+  },
+  {
+    id: 4,
+    name: 'Encerado',
+    icon: 'shield-check',
+    color: 'bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400',
+    count: 12,
+    revenue: 4800
+  }
+])
 
-const formatDateTime = (fecha) => {
-  if (!fecha) return '';
-  return new Date(fecha).toLocaleString('es-ES', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
+const quickActions = ref([
+  {
+    id: 1,
+    label: 'Nueva Venta',
+    icon: 'plus',
+    variant: 'primary',
+    action: 'new-sale'
+  },
+  {
+    id: 2,
+    label: 'Registrar Cliente',
+    icon: 'user-plus',
+    variant: 'outline',
+    action: 'new-customer'
+  },
+  {
+    id: 3,
+    label: 'Ver Inventario',
+    icon: 'cube',
+    variant: 'outline',
+    action: 'inventory'
+  },
+  {
+    id: 4,
+    label: 'Configuración',
+    icon: 'cog-6-tooth',
+    variant: 'ghost',
+    action: 'settings'
+  }
+])
 
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR'
-  }).format(amount);
-};
+// Methods
+const refreshData = async () => {
+  loading.value = true
+  try {
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    toast.success('Datos actualizados correctamente')
+  } catch (error) {
+    toast.error('Error al actualizar los datos')
+  } finally {
+    loading.value = false
+  }
+}
+
+const openReportModal = () => {
+  showReportModal.value = true
+  // Set default dates
+  const today = new Date()
+  const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
+  
+  reportForm.startDate = lastMonth.toISOString().split('T')[0]
+  reportForm.endDate = today.toISOString().split('T')[0]
+}
+
+const generateReport = async () => {
+  if (!reportForm.type || !reportForm.startDate || !reportForm.endDate) {
+    toast.error('Por favor completa todos los campos')
+    return
+  }
+
+  generatingReport.value = true
+  try {
+    // Simulate report generation
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    toast.success('Reporte generado exitosamente')
+    showReportModal.value = false
+    
+    // Reset form
+    Object.assign(reportForm, {
+      type: '',
+      startDate: '',
+      endDate: ''
+    })
+  } catch (error) {
+    toast.error('Error al generar el reporte')
+  } finally {
+    generatingReport.value = false
+  }
+}
+
+const handleQuickAction = (action) => {
+  switch (action) {
+    case 'new-sale':
+      router.push('/ventas/nueva')
+      break
+    case 'new-customer':
+      router.push('/clientes/nuevo')
+      break
+    case 'inventory':
+      router.push('/inventario')
+      break
+    case 'settings':
+      router.push('/configuracion')
+      break
+    default:
+      toast.info(`Funcionalidad "${action}" en desarrollo`)
+  }
+}
+
+const formatTimeAgo = (date) => {
+  const now = new Date()
+  const diff = now - date
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+
+  if (minutes < 1) return 'Hace un momento'
+  if (minutes < 60) return `Hace ${minutes} min`
+  if (hours < 24) return `Hace ${hours}h`
+  return `Hace ${days}d`
+}
 
 // Lifecycle
-onMounted(async () => {
-  if (!dashboardStore.hasData) {
-    await dashboardStore.fetchDashboardData();
-  }
-});
+onMounted(() => {
+  // Load initial data
+  refreshData()
+})
 </script>

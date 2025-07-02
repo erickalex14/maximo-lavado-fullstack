@@ -3,7 +3,7 @@ import { useAuthStore } from '@/stores/auth';
 
 // Importar layouts
 import AuthLayout from '@/layouts/AuthLayout.vue';
-import DashboardLayout from '@/layouts/DashboardLayout.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 
 // Importar rutas modulares
 import authRoutes from './modules/auth.routes';
@@ -37,7 +37,7 @@ const routes = [
   // Rutas del dashboard (requieren autenticación)
   {
     path: '/dashboard',
-    component: DashboardLayout,
+    component: AppLayout,
     meta: { requiresAuth: true },
     children: [
       ...dashboardRoutes,
