@@ -15,6 +15,10 @@ class ApiService {
       withCredentials: true,
     });
 
+    // Configurar XSRF token header para Laravel Sanctum
+    this.api.defaults.xsrfCookieName = 'XSRF-TOKEN';
+    this.api.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
+
     this.setupInterceptors();
   }
 
@@ -39,9 +43,17 @@ class ApiService {
         return response;
       },
       (error) => {
+        // Solo redirigir automáticamente en ciertas condiciones
         if (error.response?.status === 401) {
-          this.removeToken();
-          window.location.href = '/login';
+          // Solo redirigir si no estamos ya en la página de login
+          if (!window.location.pathname.includes('/login')) {
+            this.removeToken();
+            // Usar router para navegar en lugar de window.location
+            if (window.location.pathname !== '/login') {
+              console.warn('Token expirado, redirigiendo al login');
+              window.location.href = '/login';
+            }
+          }
         }
         return Promise.reject(error);
       }
@@ -99,6 +111,13 @@ class ApiService {
     link.download = filename || 'download';
     link.click();
     window.URL.revokeObjectURL(downloadUrl);
+  }
+
+  // Método específico para obtener CSRF cookie (Laravel Sanctum)
+  public async getCsrfCookie(): Promise<void> {
+    await axios.get('/sanctum/csrf-cookie', {
+      withCredentials: true,
+    });
   }
 
   // Getter para acceso directo a la instancia de axios si es necesario

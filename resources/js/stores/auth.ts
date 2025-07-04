@@ -47,6 +47,7 @@ export const useAuthStore = defineStore('auth', () => {
     } finally {
       user.value = null;
       authService.removeToken();
+      localStorage.removeItem('user_last_fetch');
       loading.value = false;
     }
   }
@@ -56,26 +57,61 @@ export const useAuthStore = defineStore('auth', () => {
       return false;
     }
 
+    // Si ya tenemos un usuario y no ha pasado mucho tiempo, no hacer la petición
+    if (user.value && !shouldRefreshUser()) {
+      return true;
+    }
+
     loading.value = true;
     error.value = null;
 
     try {
+      // Obtener CSRF cookie antes de hacer la petición del usuario
+      await authService.getCsrfCookie();
+      
       const response = await authService.getUser();
       
       if (response.success && response.data) {
         user.value = response.data;
+        setLastUserFetch();
         return true;
       } else {
         authService.removeToken();
+        user.value = null;
         return false;
       }
     } catch (err: any) {
-      authService.removeToken();
+      console.error('Error al obtener usuario:', err);
+      
+      // Si es un error 401, limpiar la sesión
+      if (err.response?.status === 401) {
+        authService.removeToken();
+        user.value = null;
+      }
+      
       error.value = err.response?.data?.message || 'Error al obtener usuario';
       return false;
     } finally {
       loading.value = false;
     }
+  }
+
+  // Función para verificar si debemos refrescar el usuario
+  function shouldRefreshUser(): boolean {
+    const lastFetch = localStorage.getItem('user_last_fetch');
+    if (!lastFetch) return true;
+    
+    const now = Date.now();
+    const lastFetchTime = parseInt(lastFetch);
+    const timeDiff = now - lastFetchTime;
+    
+    // Refrescar si han pasado más de 5 minutos
+    return timeDiff > 5 * 60 * 1000;
+  }
+
+  // Función para guardar el timestamp de la última consulta
+  function setLastUserFetch(): void {
+    localStorage.setItem('user_last_fetch', Date.now().toString());
   }
 
   function clearError(): void {
@@ -87,6 +123,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = false;
     error.value = null;
     authService.removeToken();
+    localStorage.removeItem('user_last_fetch');
   }
 
   return {

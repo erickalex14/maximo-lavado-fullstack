@@ -167,7 +167,17 @@ router.beforeEach(async (to, from, next) => {
   if (to.meta.requiresAuth) {
     if (!authStore.isAuthenticated) {
       // Si no hay token, verificar si existe en localStorage
-      if (!await authStore.fetchUser()) {
+      try {
+        const authenticated = await authStore.fetchUser();
+        if (!authenticated) {
+          // Si no se pudo autenticar, limpiar cualquier resto de sesión
+          authStore.$reset();
+          next('/login');
+          return;
+        }
+      } catch (error) {
+        console.error('Error al verificar autenticación:', error);
+        authStore.$reset();
         next('/login');
         return;
       }

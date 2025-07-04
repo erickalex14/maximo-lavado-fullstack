@@ -26,15 +26,21 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
-            return response()->json(['message' => 'Credenciales incorrectas'], 401);
+            return response()->json([
+                'success' => false,
+                'message' => 'Credenciales incorrectas'
+            ], 401);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => $user,
+            'success' => true,
+            'message' => 'Login exitoso',
+            'data' => [
+                'user' => $user,
+                'token' => $token
+            ]
         ]);
     }    // Login para web (con sesiones)
     public function loginWeb(Request $request)
@@ -59,14 +65,18 @@ class AuthController extends Controller
         }
 
         $credentials = $request->only('email', 'password');
-        \Log::info('Attempting authentication', ['email' => $credentials['email']]);        if (Auth::attempt($credentials, true)) { // Remember me = true
+        \Log::info('Attempting authentication', ['email' => $credentials['email']]);
+
+        if (Auth::attempt($credentials, true)) { // Remember me = true
             \Log::info('Authentication successful');
             
             // Obtener el usuario autenticado
             $user = Auth::user();
             
-            // NO regenerar la sesión para evitar perder la autenticación
-            // En su lugar, solo guardar datos adicionales
+            // Regenerar la sesión para seguridad
+            $request->session()->regenerate();
+            
+            // Guardar datos adicionales en la sesión
             $request->session()->put('auth.password_confirmed_at', time());
             $request->session()->put('user_id', $user->id);
             $request->session()->put('logged_in', true);
@@ -92,7 +102,8 @@ class AuthController extends Controller
             }
             
             // Si es una petición AJAX, devolver JSON
-            if ($request->expectsJson()) {                \Log::info('Returning JSON response for AJAX login', [
+            if ($request->expectsJson()) {
+                \Log::info('Returning JSON response for AJAX login', [
                     'user_id' => Auth::id(),
                     'session_id' => session()->getId(),
                     'redirect_url' => '/dashboard'
@@ -101,6 +112,10 @@ class AuthController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Login exitoso',
+                    'data' => [
+                        'user' => $user,
+                        'session_id' => session()->getId()
+                    ],
                     'redirect' => '/dashboard'
                 ]);
             }
@@ -129,7 +144,10 @@ class AuthController extends Controller
     public function logoutApi(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
-        return response()->json(['message' => 'Sesión cerrada correctamente']);
+        return response()->json([
+            'success' => true,
+            'message' => 'Sesión cerrada correctamente'
+        ]);
     }
 
     // Logout para web
@@ -144,7 +162,10 @@ class AuthController extends Controller
 
     public function user(Request $request)
     {
-        return response()->json($request->user());
+        return response()->json([
+            'success' => true,
+            'data' => $request->user()
+        ]);
     }
 
     // Crear usuario por defecto (solo para desarrollo)

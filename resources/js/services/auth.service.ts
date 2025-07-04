@@ -3,10 +3,25 @@ import type { LoginCredentials, AuthUser, ApiResponse } from '@/types';
 
 class AuthService {
   /**
+   * Obtener CSRF cookie antes de realizar peticiones autenticadas
+   * GET /sanctum/csrf-cookie
+   */
+  async getCsrfCookie(): Promise<void> {
+    try {
+      await apiService.getCsrfCookie();
+    } catch (error) {
+      console.warn('Error al obtener CSRF cookie:', error);
+    }
+  }
+
+  /**
    * Iniciar sesión
    * POST /api/login
    */
   async login(credentials: LoginCredentials): Promise<ApiResponse<{ user: AuthUser; token: string }>> {
+    // Obtener CSRF cookie antes del login
+    await this.getCsrfCookie();
+    
     const response = await apiService.post('/login', credentials);
     
     if (response.success && response.data?.token) {
@@ -34,7 +49,15 @@ class AuthService {
    * GET /api/user
    */
   async getUser(): Promise<ApiResponse<AuthUser>> {
-    return await apiService.get('/user');
+    try {
+      return await apiService.get('/user');
+    } catch (error: any) {
+      // Si es un error 401, limpiar el token
+      if (error.response?.status === 401) {
+        this.removeToken();
+      }
+      throw error;
+    }
   }
 
   /**
