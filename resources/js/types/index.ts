@@ -13,6 +13,44 @@ export interface User extends BaseModel {
   email_verified_at?: string | null;
 }
 
+// Form interfaces para usuarios
+export interface CreateUserForm {
+  name: string;
+  email: string;
+  password: string;
+  password_confirmation: string;
+}
+
+export interface UpdateUserForm {
+  name?: string;
+  email?: string;
+  password?: string;
+  password_confirmation?: string;
+}
+
+export interface UpdatePasswordForm {
+  current_password: string;
+  new_password: string;
+  new_password_confirmation: string;
+}
+
+export interface ResetPasswordForm {
+  new_password: string;
+  new_password_confirmation: string;
+}
+
+// Estadísticas de usuarios
+export interface UserStats {
+  total_users: number;
+  active_users: number;
+  verified_users: number;
+  unverified_users: number;
+  deleted_users: number;
+  users_this_month: number;
+  users_last_month: number;
+  growth_percentage: number;
+}
+
 // Cliente
 export interface Cliente extends BaseModel {
   cliente_id: number;
@@ -356,24 +394,14 @@ export interface CreateProveedorRequest {
 
 export interface UpdateProveedorRequest extends Partial<CreateProveedorRequest> {}
 
-export interface CreateGastoGeneralRequest {
-  nombre: string;
-  descripcion?: string;
+export interface CreatePagoProveedorRequest {
+  proveedor_id: number;
   monto: number;
   fecha: string;
-}
-
-export interface UpdateGastoGeneralRequest extends Partial<CreateGastoGeneralRequest> {}
-
-export interface CreateFacturaRequest {
-  numero_factura: string;
-  cliente_id: number;
-  fecha: string;
   descripcion?: string;
-  total: number;
 }
 
-export interface UpdateFacturaRequest extends Partial<CreateFacturaRequest> {}
+export interface UpdatePagoProveedorRequest extends Partial<CreatePagoProveedorRequest> {}
 
 // Selectores
 export interface SelectOption {
@@ -476,6 +504,25 @@ export type CreateEgresoRequest =
   | CreateEgresoProveedorRequest 
   | CreateEgresoGastoGeneralRequest;
 
+// Tipos para Gastos Generales
+export interface CreateGastoGeneralRequest {
+  nombre: string;
+  descripcion?: string;
+  monto: number;
+  fecha: string;
+}
+
+export interface UpdateGastoGeneralRequest extends Partial<CreateGastoGeneralRequest> {}
+
+// Tipos de Update para Ingresos y Egresos
+export interface UpdateIngresoRequest extends Partial<Omit<CreateIngresoRequest, 'tipo'>> {
+  tipo?: CreateIngresoRequest['tipo'];
+}
+
+export interface UpdateEgresoRequest extends Partial<Omit<CreateEgresoRequest, 'tipo'>> {
+  tipo?: CreateEgresoRequest['tipo'];
+}
+
 // Helper types para validaciones de lógica de negocio
 
 // Validador de matrícula según tipo de vehículo
@@ -502,3 +549,384 @@ export const getReferenciaTipo = (tipo: string): string => {
   };
   return referencias[tipo] || 'referencia_id';
 };
+
+// Tipos para las requests de ventas
+export interface CreateVentaAutomotrizRequest {
+  producto_id: number;
+  cliente_id?: number | null;
+  cantidad: number;
+  precio_unitario: number;
+  fecha: string;
+}
+
+export interface UpdateVentaAutomotrizRequest extends Partial<CreateVentaAutomotrizRequest> {}
+
+export interface CreateVentaDespensaRequest {
+  producto_id: number;
+  cliente_id?: number | null;
+  cantidad: number;
+  precio_unitario: number;
+  fecha: string;
+}
+
+export interface UpdateVentaDespensaRequest extends Partial<CreateVentaDespensaRequest> {}
+
+// Tipos para filtros de ventas
+export interface VentaFilters {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  tipo?: 'automotriz' | 'despensa';
+  cliente_id?: number;
+  producto_id?: number;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+}
+
+// Tipo unificado para mostrar ventas en la tabla
+export interface VentaUnificada {
+  id: number;
+  tipo: 'automotriz' | 'despensa';
+  producto_nombre: string;
+  cliente_nombre?: string;
+  cantidad: number;
+  precio_unitario: number;
+  total: number;
+  fecha: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+  // Referencias originales para acciones
+  original_data: VentaProductoAutomotriz | VentaProductoDespensa;
+}
+
+// Tipos para métricas de ventas
+export interface VentaMetricas {
+  total_ventas: number;
+  total_ingresos: number;
+  ventas_automotrices: {
+    total: number;
+    ingresos: number;
+  };
+  ventas_despensa: {
+    total: number;
+    ingresos: number;
+  };
+  producto_mas_vendido: {
+    nombre: string;
+    cantidad: number;
+  } | null;
+  ventas_por_mes: Array<{
+    mes: string;
+    cantidad: number;
+    ingresos: number;
+  }>;
+}
+
+// Tipo para opciones de productos en ventas
+export interface ProductoVentaOption {
+  id: number;
+  nombre: string;
+  codigo?: string;
+  precio_venta: number;
+  stock: number;
+  tipo: 'automotriz' | 'despensa';
+  activo: boolean;
+}
+
+// Tipos para filtros específicos de ventas automotrices y despensa
+export interface VentaAutomotrizFilters extends VentaFilters {
+  codigo_producto?: string;
+}
+
+export interface VentaDespensaFilters extends VentaFilters {
+  stock_minimo?: number;
+}
+
+// ==========================================
+// REPORTES TYPES
+// ==========================================
+
+// Tipos base para reportes
+export interface ReporteDisponible {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  categoria: string;
+  requiere_fechas: boolean;
+  formato_disponible: string[];
+}
+
+export interface ReporteRequest {
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  formato?: 'json' | 'pdf' | 'excel';
+}
+
+export interface ReporteMetricas {
+  total: number;
+  promedio: number;
+  maximo: number;
+  minimo: number;
+  crecimiento?: number;
+}
+
+// Reporte de Ventas
+export interface ReporteVentas {
+  resumen: {
+    total_ventas: number;
+    total_unidades: number;
+    ticket_promedio: number;
+    crecimiento_periodo: number;
+  };
+  ventas_por_dia: Array<{
+    fecha: string;
+    total: number;
+    cantidad: number;
+  }>;
+  productos_mas_vendidos: Array<{
+    producto: string;
+    cantidad: number;
+    total: number;
+  }>;
+  ventas_por_categoria: Array<{
+    categoria: string;
+    total: number;
+    porcentaje: number;
+  }>;
+}
+
+// Reporte de Lavados
+export interface ReporteLavados {
+  resumen: {
+    total_lavados: number;
+    total_ingresos: number;
+    lavado_promedio: number;
+    crecimiento_periodo: number;
+  };
+  lavados_por_dia: Array<{
+    fecha: string;
+    cantidad: number;
+    total: number;
+  }>;
+  tipos_mas_solicitados: Array<{
+    tipo_lavado: string;
+    cantidad: number;
+    total: number;
+  }>;
+  empleados_performance: Array<{
+    empleado: string;
+    lavados_realizados: number;
+    total_generado: number;
+  }>;
+}
+
+// Reporte de Ingresos
+export interface ReporteIngresos {
+  resumen: {
+    total_ingresos: number;
+    promedio_diario: number;
+    crecimiento: number;
+  };
+  ingresos_por_dia: Array<{
+    fecha: string;
+    total: number;
+  }>;
+  ingresos_por_fuente: Array<{
+    fuente: string;
+    total: number;
+    porcentaje: number;
+  }>;
+  detalle_ingresos: Array<{
+    fecha: string;
+    concepto: string;
+    monto: number;
+    tipo: string;
+  }>;
+}
+
+// Reporte de Egresos
+export interface ReporteEgresos {
+  resumen: {
+    total_egresos: number;
+    promedio_diario: number;
+    crecimiento: number;
+  };
+  egresos_por_dia: Array<{
+    fecha: string;
+    total: number;
+  }>;
+  egresos_por_categoria: Array<{
+    categoria: string;
+    total: number;
+    porcentaje: number;
+  }>;
+  detalle_egresos: Array<{
+    fecha: string;
+    concepto: string;
+    monto: number;
+    categoria: string;
+  }>;
+}
+
+// Reporte de Facturas
+export interface ReporteFacturas {
+  resumen: {
+    total_facturas: number;
+    total_facturado: number;
+    factura_promedio: number;
+    crecimiento: number;
+  };
+  facturas_por_dia: Array<{
+    fecha: string;
+    cantidad: number;
+    total: number;
+  }>;
+  clientes_top: Array<{
+    cliente: string;
+    facturas: number;
+    total: number;
+  }>;
+  detalle_facturas: Array<{
+    numero_factura: string;
+    fecha: string;
+    cliente: string;
+    total: number;
+  }>;
+}
+
+// Reporte de Empleados
+export interface ReporteEmpleados {
+  resumen: {
+    total_empleados: number;
+    promedio_performance: number;
+  };
+  performance_empleados: Array<{
+    empleado: string;
+    lavados_realizados: number;
+    ventas_realizadas: number;
+    total_generado: number;
+    calificacion: number;
+  }>;
+  empleados_por_mes: Array<{
+    mes: string;
+    empleados_activos: number;
+  }>;
+}
+
+// Reporte de Productos
+export interface ReporteProductos {
+  resumen: {
+    total_productos: number;
+    productos_agotados: number;
+    valor_inventario: number;
+  };
+  productos_mas_vendidos: Array<{
+    producto: string;
+    categoria: string;
+    cantidad_vendida: number;
+    stock_actual: number;
+    valor_total: number;
+  }>;
+  productos_bajo_stock: Array<{
+    producto: string;
+    stock_actual: number;
+    stock_minimo: number;
+    categoria: string;
+  }>;
+  rotacion_inventario: Array<{
+    producto: string;
+    rotacion: number;
+    dias_promedio: number;
+  }>;
+}
+
+// Reporte de Clientes
+export interface ReporteClientes {
+  resumen: {
+    total_clientes: number;
+    clientes_activos: number;
+    ticket_promedio: number;
+    frecuencia_promedio: number;
+  };
+  clientes_top: Array<{
+    cliente: string;
+    total_gastado: number;
+    visitas: number;
+    ultima_visita: string;
+  }>;
+  clientes_nuevos: Array<{
+    mes: string;
+    nuevos_clientes: number;
+  }>;
+  segmentacion: Array<{
+    segmento: string;
+    cantidad: number;
+    porcentaje: number;
+  }>;
+}
+
+// Reporte Financiero
+export interface ReporteFinanciero {
+  resumen: {
+    total_ingresos: number;
+    total_egresos: number;
+    utilidad_neta: number;
+    margen_ganancia: number;
+  };
+  flujo_caja: Array<{
+    fecha: string;
+    ingresos: number;
+    egresos: number;
+    saldo: number;
+  }>;
+  comparativo_mensual: Array<{
+    mes: string;
+    ingresos: number;
+    egresos: number;
+    utilidad: number;
+  }>;
+  principales_gastos: Array<{
+    categoria: string;
+    total: number;
+    porcentaje: number;
+  }>;
+}
+
+// Reporte de Balance
+export interface ReporteBalance {
+  activos: {
+    efectivo: number;
+    inventario: number;
+    cuentas_por_cobrar: number;
+    total_activos: number;
+  };
+  pasivos: {
+    cuentas_por_pagar: number;
+    total_pasivos: number;
+  };
+  patrimonio: {
+    capital: number;
+    utilidades_retenidas: number;
+    total_patrimonio: number;
+  };
+  ratios: {
+    liquidez: number;
+    rentabilidad: number;
+    endeudamiento: number;
+  };
+}
+
+// Reporte Completo
+export interface ReporteCompleto {
+  periodo: {
+    fecha_inicio: string;
+    fecha_fin: string;
+  };
+  ventas: ReporteVentas;
+  lavados: ReporteLavados;
+  financiero: ReporteFinanciero;
+  clientes: ReporteClientes;
+  empleados: ReporteEmpleados;
+  productos: ReporteProductos;
+}

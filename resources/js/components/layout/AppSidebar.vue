@@ -90,21 +90,9 @@
       <!-- Finanzas -->
       <SidebarSection title="Finanzas" :collapsed="!isOpen">
         <SidebarLink
-          to="/finanzas/ingresos"
-          :icon="ingresosIcon"
-          label="Ingresos"
-          :collapsed="!isOpen"
-        />
-        <SidebarLink
-          to="/finanzas/egresos"
-          :icon="egresosIcon"
-          label="Egresos"
-          :collapsed="!isOpen"
-        />
-        <SidebarLink
-          to="/finanzas/balance"
+          to="/finanzas"
           :icon="balanceIcon"
-          label="Balance"
+          label="Finanzas"
           :collapsed="!isOpen"
         />
       </SidebarSection>
@@ -131,6 +119,16 @@
           to="/reportes"
           :icon="reportesIcon"
           label="Reportes"
+          :collapsed="!isOpen"
+        />
+      </SidebarSection>
+
+      <!-- Administración -->
+      <SidebarSection title="Administración" :collapsed="!isOpen">
+        <SidebarLink
+          to="/usuarios"
+          :icon="usuariosIcon"
+          label="Usuarios"
           :collapsed="!isOpen"
         />
       </SidebarSection>
@@ -222,5 +220,9 @@ const ventasIcon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewB
 
 const reportesIcon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+</svg>`;
+
+const usuariosIcon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
 </svg>`;
 </script>

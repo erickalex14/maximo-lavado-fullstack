@@ -136,6 +136,14 @@ const routes = [
         component: Reportes,
         meta: { title: 'Reportes' }
       },
+
+      // Usuarios
+      {
+        path: '/usuarios',
+        name: 'usuarios.index',
+        component: () => import('@/views/usuarios/Usuarios.vue'),
+        meta: { title: 'Usuarios' }
+      },
     ]
   },
   
