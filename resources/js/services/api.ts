@@ -43,16 +43,20 @@ class ApiService {
         return response;
       },
       (error) => {
+        console.error('API Error:', error.response?.status, error.response?.data);
+        
         // Solo redirigir automáticamente en ciertas condiciones
         if (error.response?.status === 401) {
-          // Solo redirigir si no estamos ya en la página de login
+          // Solo limpiar token y redirigir si no estamos ya en login
           if (!window.location.pathname.includes('/login')) {
+            console.log('401 error, clearing token and redirecting');
             this.removeToken();
-            // Usar router para navegar en lugar de window.location
-            if (window.location.pathname !== '/login') {
-              console.warn('Token expirado, redirigiendo al login');
-              window.location.href = '/login';
-            }
+            // Usar una redirección suave
+            setTimeout(() => {
+              if (!window.location.pathname.includes('/login')) {
+                window.location.href = '/login';
+              }
+            }, 100);
           }
         }
         return Promise.reject(error);

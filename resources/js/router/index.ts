@@ -163,18 +163,45 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore();
   
+  console.log('Router guard:', {
+    route: to.path,
+    requiresAuth: to.meta.requiresAuth,
+    requiresGuest: to.meta.requiresGuest,
+    isAuthenticated: authStore.isAuthenticated,
+    hasToken: !!localStorage.getItem('auth_token')
+  });
+  
   // Rutas que requieren autenticación
   if (to.meta.requiresAuth) {
+    // Si no está autenticado, intentar obtener el usuario
     if (!authStore.isAuthenticated) {
-      // Si no hay token, verificar si existe en localStorage
+      // Verificar si hay token en localStorage
+      const hasToken = !!localStorage.getItem('auth_token');
+      if (!hasToken) {
+        console.log('No token found, redirecting to login');
+        next('/login');
+        return;
+      }
+      
       try {
-        const authenticated = await authStore.fetchUser();
+        console.log('Attempting to fetch user...');
+        // Dar un tiempo límite para la autenticación
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Timeout')), 10000);
+        });
+        
+        const authenticated = await Promise.race([
+          authStore.fetchUser(),
+          timeoutPromise
+        ]);
+        
         if (!authenticated) {
-          // Si no se pudo autenticar, limpiar cualquier resto de sesión
+          console.log('Failed to authenticate, redirecting to login');
           authStore.$reset();
           next('/login');
           return;
         }
+        console.log('User authenticated successfully');
       } catch (error) {
         console.error('Error al verificar autenticación:', error);
         authStore.$reset();

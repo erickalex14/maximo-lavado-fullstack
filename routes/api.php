@@ -25,6 +25,40 @@ Route::post('/login', [AuthController::class, 'loginApi']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logoutApi']);
 Route::middleware('auth:sanctum')->get('/user', [AuthController::class, 'user']);
 
+// Ruta de prueba (sin autenticación)
+Route::get('/test', function () {
+    return response()->json([
+        'success' => true,
+        'message' => 'API funcionando correctamente',
+        'timestamp' => now()
+    ]);
+});
+
+// Ruta de debug para tokens
+Route::middleware('auth:sanctum')->get('/debug-token', function (Request $request) {
+    $token = $request->bearerToken();
+    $user = $request->user();
+    
+    return response()->json([
+        'token_received' => $token ? substr($token, 0, 10) . '...' : null,
+        'user_authenticated' => !!$user,
+        'user_id' => $user ? $user->id : null,
+        'auth_guard' => auth()->getDefaultDriver(),
+        'sanctum_guard' => auth('sanctum')->check(),
+        'sanctum_user' => auth('sanctum')->user() ? auth('sanctum')->user()->id : null
+    ]);
+});
+
+// Ruta de prueba con autenticación
+Route::middleware('auth:sanctum')->get('/test-auth', function () {
+    return response()->json([
+        'success' => true,
+        'message' => 'Autenticación funcionando correctamente',
+        'user' => auth()->user(),
+        'timestamp' => now()
+    ]);
+});
+
 Route::middleware('auth:sanctum')->group(function () {
     // Dashboard
     Route::get('/dashboard/data', [DashboardController::class, 'getData']);

@@ -12,14 +12,12 @@ class Authenticate extends Middleware
      */
     protected function redirectTo($request): ?string
     {
-        Log::info('Authenticate middleware - redirectTo called', [
-            'expects_json' => $request->expectsJson(),
-            'session_id' => session()->getId(),
-            'auth_check' => auth()->check(),
-            'user_id' => auth()->id(),
-            'url' => $request->url()
-        ]);
+        // Para APIs, nunca redirigir, solo devolver null para que lance un 401
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return null;
+        }
         
-        return $request->expectsJson() ? null : route('login');
+        // Para web, redirigir a la página de login del frontend
+        return '/login';
     }
 }

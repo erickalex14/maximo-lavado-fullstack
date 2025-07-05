@@ -53,12 +53,16 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function fetchUser(): Promise<boolean> {
+    console.log('fetchUser called');
+    
     if (!authService.hasToken()) {
+      console.log('No token found');
       return false;
     }
 
     // Si ya tenemos un usuario y no ha pasado mucho tiempo, no hacer la petición
     if (user.value && !shouldRefreshUser()) {
+      console.log('Using cached user');
       return true;
     }
 
@@ -66,16 +70,18 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null;
 
     try {
-      // Obtener CSRF cookie antes de hacer la petición del usuario
-      await authService.getCsrfCookie();
-      
+      console.log('Attempting to get user from API...');
       const response = await authService.getUser();
+      
+      console.log('User API response:', response);
       
       if (response.success && response.data) {
         user.value = response.data;
         setLastUserFetch();
+        console.log('User fetched successfully:', user.value);
         return true;
       } else {
+        console.log('Failed to get user, clearing session');
         authService.removeToken();
         user.value = null;
         return false;
@@ -85,6 +91,7 @@ export const useAuthStore = defineStore('auth', () => {
       
       // Si es un error 401, limpiar la sesión
       if (err.response?.status === 401) {
+        console.log('401 error, clearing session');
         authService.removeToken();
         user.value = null;
       }

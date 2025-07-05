@@ -1,14 +1,27 @@
 <template>
-  <AppModal
-    :visible="visible"
-    :title="modalTitle"
-    :loading="loading"
-    @update:visible="$emit('update:visible', $event)"
-    @confirm="handleSubmit"
-    @cancel="handleCancel"
-    :show-actions="mode !== 'view'"
-    size="large"
+  <div
+    v-if="visible"
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+    @click="handleCancel"
   >
+    <div
+      class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+      @click.stop
+    >
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-semibold text-gray-900">
+            {{ modalTitle }}
+          </h3>
+          <button
+            @click="handleCancel"
+            class="text-gray-400 hover:text-gray-600"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
     <form @submit.prevent="handleSubmit" class="space-y-6">
       <!-- Información del Producto -->
       <div class="form-section">
@@ -157,13 +170,31 @@
         </div>
       </div>
     </form>
-  </AppModal>
+        
+        <div v-if="mode !== 'view'" class="flex justify-end gap-3 mt-6">
+          <button
+            type="button"
+            @click="handleCancel"
+            class="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Cancelar
+          </button>
+          <button
+            @click="handleSubmit"
+            :disabled="loading"
+            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            {{ loading ? 'Guardando...' : (mode === 'create' ? 'Crear' : 'Actualizar') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { useVentaStore } from '@/stores/venta';
-import AppModal from '@/components/ui/AppModal.vue';
 import type { VentaProductoDespensa, CreateVentaDespensaRequest, UpdateVentaDespensaRequest } from '@/types';
 
 // Props
