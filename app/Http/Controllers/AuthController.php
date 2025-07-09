@@ -57,9 +57,26 @@ class AuthController extends Controller
      */
     public function user(Request $request)
     {
+        \Log::info('AuthController::user method called');
+        \Log::info('Request headers:', $request->headers->all());
+        \Log::info('Auth header:', [$request->header('Authorization')]);
+        \Log::info('Request user:', [$request->user()]);
+        \Log::info('Auth check:', [auth('sanctum')->check()]);
+        \Log::info('Auth user:', [auth('sanctum')->user()]);
+        
+        $user = $request->user();
+        
+        if (!$user) {
+            \Log::error('No user found in request');
+            return response()->json([
+                'success' => false,
+                'message' => 'Usuario no autenticado'
+            ], 401);
+        }
+        
         return response()->json([
             'success' => true,
-            'data' => $request->user()
+            'data' => $user
         ]);
     }
 

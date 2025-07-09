@@ -46,11 +46,11 @@ class AuthService {
 
   /**
    * Obtener usuario autenticado
-   * GET /api/user
+   * GET /api/usuario
    */
   async getUser(): Promise<ApiResponse<AuthUser>> {
     try {
-      return await apiService.get('/user');
+      return await apiService.get('/usuario');
     } catch (error: any) {
       // Si es un error 401, limpiar el token
       if (error.response?.status === 401) {

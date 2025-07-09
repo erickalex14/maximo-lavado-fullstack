@@ -15,26 +15,18 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'auth' => \App\Http\Middleware\Authenticate::class,
             'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
-            'session.persist' => \App\Http\Middleware\EnsureSessionPersistence::class,
         ]);
         
-        $middleware->web(append: [
-            \Illuminate\Session\Middleware\StartSession::class,
-            // \App\Http\Middleware\EnsureSessionPersistence::class,
-        ]);
-
-        // Configurar CORS para APIs
-        // $middleware->api(prepend: [
-        //     \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-        // ]);
-
         $middleware->validateCsrfTokens(except: [
             'api/*',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        // Configurar redirección para peticiones no autenticadas
+        // Para APIs, siempre devolver JSON en errores de autenticación
         $exceptions->shouldRenderJsonWhen(function ($request, $throwable) {
-            return $request->expectsJson() || $request->is('api/*');
+            if ($request->is('api/*')) {
+                return true;
+            }
+            return $request->expectsJson();
         });
     })->create();

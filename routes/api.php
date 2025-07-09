@@ -18,46 +18,14 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VentaController;
-use App\Http\Controllers\TestController;
 
 // Rutas de autenticación Sanctum
 Route::post('/login', [AuthController::class, 'loginApi']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logoutApi']);
-Route::middleware('auth:sanctum')->get('/user', [AuthController::class, 'user']);
 
-// Ruta de prueba (sin autenticación)
-Route::get('/test', function () {
-    return response()->json([
-        'success' => true,
-        'message' => 'API funcionando correctamente',
-        'timestamp' => now()
-    ]);
-});
-
-// Ruta de debug para tokens
-Route::middleware('auth:sanctum')->get('/debug-token', function (Request $request) {
-    $token = $request->bearerToken();
-    $user = $request->user();
-    
-    return response()->json([
-        'token_received' => $token ? substr($token, 0, 10) . '...' : null,
-        'user_authenticated' => !!$user,
-        'user_id' => $user ? $user->id : null,
-        'auth_guard' => auth()->getDefaultDriver(),
-        'sanctum_guard' => auth('sanctum')->check(),
-        'sanctum_user' => auth('sanctum')->user() ? auth('sanctum')->user()->id : null
-    ]);
-});
-
-// Ruta de prueba con autenticación
-Route::middleware('auth:sanctum')->get('/test-auth', function () {
-    return response()->json([
-        'success' => true,
-        'message' => 'Autenticación funcionando correctamente',
-        'user' => auth()->user(),
-        'timestamp' => now()
-    ]);
-});
+// Endpoint para obtener usuario autenticado
+// NOTA IMPORTANTE: No usar '/user' como ruta - conflicto con rutas internas de Laravel/Sanctum
+Route::middleware('auth:sanctum')->get('/usuario', [AuthController::class, 'user']);
 
 Route::middleware('auth:sanctum')->group(function () {
     // Dashboard
@@ -280,7 +248,4 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/balance/comparativo', [BalanceController::class, 'comparativoMensual']);
     Route::get('/balance/proyeccion', [BalanceController::class, 'proyeccion']);
     Route::get('/balance/resumen', [BalanceController::class, 'resumenCompleto']);
-
-    // Ruta de prueba para TestController
-    Route::get('/test', [TestController::class, 'index']);
 });
