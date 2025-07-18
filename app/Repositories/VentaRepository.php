@@ -3,754 +3,325 @@
 namespace App\Repositories;
 
 use App\Contracts\VentaRepositoryInterface;
-use App\Models\VentaProductoAutomotriz;
-use App\Models\VentaProductoDespensa;
-use App\Models\Ingreso;
-use App\Models\ProductoAutomotriz;
-use App\Models\ProductoDespensa;
-use App\Models\Cliente;
-use App\Models\Factura;
-use App\Models\FacturaDetalle;
+use App\Models\Venta;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class VentaRepository implements VentaRepositoryInterface
 {
-    // METODO PARA OBTENER TODAS LAS VENTAS DE PRODUCTOS AUTOMOTRICES
-    public function getVentasAutomotrices(): Collection
+    /**
+     * Obtener todas las ventas
+     */
+    public function getAll(): Collection
     {
-        return VentaProductoAutomotriz::with(['productoAutomotriz', 'cliente'])
-            ->orderBy('fecha', 'desc')
-            ->get();
+        return Venta::with(['cliente', 'detalles.vendible'])->orderBy('fecha', 'desc')->get();
     }
 
-    // METODO PARA OBTENER TODAS LAS VENTAS DE PRODUCTOS DE DESPENSA
-
-    public function getVentasDespensa(): Collection
+    /**
+     * Obtener todas incluyendo eliminadas (soft deletes)
+     */
+    public function getAllWithTrashed(): Collection
     {
-        return VentaProductoDespensa::with(['productoDespensa', 'cliente'])
-            ->orderBy('fecha', 'desc')
-            ->get();
+        return Venta::withTrashed()->with(['cliente', 'detalles.vendible'])->orderBy('fecha', 'desc')->get();
     }
 
-    // METODO PARA OBTENER TODAS LAS VENTAS, INCLUYENDO AUTOMOTRICES Y DE DESPENSA
-
-    public function getAllVentas(): Collection
+    /**
+     * Obtener solo las eliminadas (soft deletes)
+     */
+    public function getOnlyTrashed(): Collection
     {
-        $ventasAutomotrices = $this->getVentasAutomotrices()->map(function($venta) {
-            return [
-                'id' => $venta->venta_producto_automotriz_id,
-                'fecha' => $venta->fecha,
-                'cliente' => $venta->cliente ? $venta->cliente->nombre : 'Cliente General',
-                'producto' => $venta->productoAutomotriz->nombre,
-                'cantidad' => $venta->cantidad,
-                'precio_unitario' => $venta->precio_unitario,
-                'total' => $venta->total,
-                'tipo' => 'automotriz'
-            ];
-        });
-
-        $ventasDespensa = $this->getVentasDespensa()->map(function($venta) {
-            return [
-                'id' => $venta->venta_producto_despensa_id,
-                'fecha' => $venta->fecha,
-                'cliente' => $venta->cliente ? $venta->cliente->nombre : 'Cliente General',
-                'producto' => $venta->productoDespensa->nombre,
-                'cantidad' => $venta->cantidad,
-                'precio_unitario' => $venta->precio_unitario,
-                'total' => $venta->total,
-                'tipo' => 'despensa'
-            ];
-        });
-
-        return $ventasAutomotrices->merge($ventasDespensa)
-            ->sortByDesc('fecha')
-            ->values();
+        return Venta::onlyTrashed()->with(['cliente', 'detalles.vendible'])->orderBy('fecha', 'desc')->get();
     }
 
-    // METODO PARA CREAR UNA VENTA DE PRODUCTO AUTOMOTRIZ 
+    /**
+     * Buscar venta por ID
+     */
+    public function findById(int $id): ?Venta
+    {
+        return Venta::with(['cliente', 'detalles.vendible', 'facturaElectronica'])->find($id);
+    }
 
-    public function createVentaAutomotriz(array $data): VentaProductoAutomotriz
+    /**
+     * Buscar venta por ID incluyendo eliminadas
+     */
+    public function findByIdWithTrashed(int $id): ?Venta
+    {
+        return Venta::withTrashed()->with(['cliente', 'detalles.vendible', 'facturaElectronica'])->find($id);
+    }
+
+    /**
+     * Crear nueva venta
+     */
+    public function create(array $data): Venta
     {
         return DB::transaction(function () use ($data) {
+            return Venta::create($data);
+        });
+    }
+
+    /**
+     * Actualizar venta
+     */
+    public function update(int $id, array $data): ?Venta
+    {
+        return DB::transaction(function () use ($id, $data) {
+            $venta = Venta::find($id);
+            if ($venta) {
+                $venta->update($data);
+                return $venta->fresh();
+            }
+            return null;
+        });
+    }
+
+    /**
+     * Eliminar venta (soft delete)
+     */
+    public function delete(int $id): bool
+    {
+        return DB::transaction(function () use ($id) {
+            $venta = Venta::find($id);
+            return $venta ? $venta->delete() : false;
+        });
+    }
+
+    /**
+     * Restaurar venta eliminada
+     */
+    public function restore(int $id): bool
+    {
+        return DB::transaction(function () use ($id) {
+            $venta = Venta::onlyTrashed()->find($id);
+            return $venta ? $venta->restore() : false;
+        });
+    }
+
+    /**
+     * Eliminar permanentemente
+     */
+    public function forceDelete(int $id): bool
+    {
+        return DB::transaction(function () use ($id) {
+            $venta = Venta::withTrashed()->find($id);
+            return $venta ? $venta->forceDelete() : false;
+        });
+    }
+
+    /**
+     * Crear venta completa con detalles
+     */
+    public function createVentaCompleta(array $ventaData, array $detallesData): Venta
+    {
+        return DB::transaction(function () use ($ventaData, $detallesData) {
             // Crear la venta
-            $venta = VentaProductoAutomotriz::create($data);
+            $venta = Venta::create($ventaData);
             
-            // Obtener información del producto para la descripción del ingreso
-            $producto = ProductoAutomotriz::find($data['producto_id']);
-            $cliente = null;
-            if (isset($data['cliente_id']) && $data['cliente_id']) {
-                $cliente = Cliente::find($data['cliente_id']);
+            // Crear los detalles
+            foreach ($detallesData as $detalleData) {
+                $detalleData['venta_id'] = $venta->venta_id;
+                $venta->detalles()->create($detalleData);
             }
             
-            // Crear descripción del ingreso
-            $descripcion = 'Venta de ' . $producto->nombre;
-            if ($cliente) {
-                $descripcion .= ' - Cliente: ' . $cliente->nombre;
-            } else {
-                $descripcion .= ' - Cliente General';
-            }
-            
-            // Crear el ingreso automáticamente
-            $ingreso = Ingreso::create([
-                'fecha' => $data['fecha'] ?? now(),
-                'tipo' => 'producto_automotriz',
-                'referencia_id' => $venta->id,
-                'monto' => $data['total'],
-                'descripcion' => $descripcion,
-            ]);
-
-            // Generar factura automáticamente
-            $numeroFactura = $this->generateNumeroFactura();
-            $descripcionFactura = 'Factura por venta de ' . $producto->nombre;
-            
-            $factura = Factura::create([
-                'numero_factura' => $numeroFactura,
-                'cliente_id' => $data['cliente_id'] ?? null,
-                'fecha' => $data['fecha'] ?? now(),
-                'descripcion' => $descripcionFactura,
-                'total' => $data['total'],
-            ]);
-
-            // Crear detalle de factura
-            FacturaDetalle::create([
-                'factura_id' => $factura->factura_id,
-                'venta_producto_automotriz_id' => $venta->venta_producto_automotriz_id,
-                'cantidad' => $data['cantidad'],
-                'precio_unitario' => $data['precio_unitario'],
-                'subtotal' => $data['total'],
-            ]);
-            
-            return $venta->load(['productoAutomotriz', 'cliente']);
+            return $venta->fresh(['cliente', 'detalles.vendible']);
         });
     }
 
-    // METODO PARA CREAR UNA VENTA DE PRODUCTO DE DESPENSA
-
-    public function createVentaDespensa(array $data): VentaProductoDespensa
+    /**
+     * Actualizar venta completa con detalles
+     */
+    public function updateVentaCompleta(int $id, array $ventaData, array $detallesData): ?Venta
     {
-        return DB::transaction(function () use ($data) {
-            // Crear la venta
-            $venta = VentaProductoDespensa::create($data);
-            
-            // Obtener información del producto para la descripción del ingreso
-            $producto = ProductoDespensa::find($data['producto_id']);
-            $cliente = null;
-            if (isset($data['cliente_id']) && $data['cliente_id']) {
-                $cliente = Cliente::find($data['cliente_id']);
+        return DB::transaction(function () use ($id, $ventaData, $detallesData) {
+            $venta = Venta::find($id);
+            if (!$venta) {
+                return null;
             }
             
-            // Crear descripción del ingreso
-            $descripcion = 'Venta de ' . $producto->nombre;
-            if ($cliente) {
-                $descripcion .= ' - Cliente: ' . $cliente->nombre;
-            } else {
-                $descripcion .= ' - Cliente General';
+            // Actualizar la venta
+            $venta->update($ventaData);
+            
+            // Eliminar detalles existentes
+            $venta->detalles()->delete();
+            
+            // Crear nuevos detalles
+            foreach ($detallesData as $detalleData) {
+                $detalleData['venta_id'] = $venta->venta_id;
+                $venta->detalles()->create($detalleData);
             }
             
-            // Crear el ingreso automáticamente
-            $ingreso = Ingreso::create([
-                'fecha' => $data['fecha'] ?? now(),
-                'tipo' => 'producto_despensa',
-                'referencia_id' => $venta->id,
-                'monto' => $data['total'],
-                'descripcion' => $descripcion,
-            ]);
-
-            // Generar factura automáticamente
-            $numeroFactura = $this->generateNumeroFactura();
-            $descripcionFactura = 'Factura por venta de ' . $producto->nombre;
-            
-            $factura = Factura::create([
-                'numero_factura' => $numeroFactura,
-                'cliente_id' => $data['cliente_id'] ?? null,
-                'fecha' => $data['fecha'] ?? now(),
-                'descripcion' => $descripcionFactura,
-                'total' => $data['total'],
-            ]);
-
-            // Crear detalle de factura
-            FacturaDetalle::create([
-                'factura_id' => $factura->factura_id,
-                'venta_producto_despensa_id' => $venta->venta_producto_despensa_id,
-                'cantidad' => $data['cantidad'],
-                'precio_unitario' => $data['precio_unitario'],
-                'subtotal' => $data['total'],
-            ]);
-            
-            return $venta->load(['productoDespensa', 'cliente']);
+            return $venta->fresh(['cliente', 'detalles.vendible']);
         });
     }
 
-    // METODO PARA OBTENER UNA VENTA DE PRODUCTO AUTOMOTRIZ POR ID
-
-    public function findVentaAutomotrizById(int $id): ?VentaProductoAutomotriz
+    /**
+     * Obtener ventas por cliente
+     */
+    public function getByClienteId(int $clienteId): Collection
     {
-        return VentaProductoAutomotriz::with(['productoAutomotriz', 'cliente'])->find($id);
+        return Venta::where('cliente_id', $clienteId)
+                   ->with(['detalles.vendible', 'facturaElectronica'])
+                   ->orderBy('fecha', 'desc')
+                   ->get();
     }
 
-    // METODO PARA OBTENER UNA VENTA DE PRODUCTO DE DESPENSA POR ID
-
-    public function findVentaDespensaById(int $id): ?VentaProductoDespensa
+    /**
+     * Obtener ventas por rango de fechas
+     */
+    public function getByDateRange(string $fechaInicio, string $fechaFin): Collection
     {
-        return VentaProductoDespensa::with(['productoDespensa', 'cliente'])->find($id);
+        return Venta::whereBetween('fecha', [$fechaInicio, $fechaFin])
+                   ->with(['cliente', 'detalles.vendible'])
+                   ->orderBy('fecha', 'desc')
+                   ->get();
     }
 
-    // METODOS PARA ACTUALIZAR VENTAS DE PRODUCTOS AUTOMOTRICES
-
-    public function updateVentaAutomotriz(int $id, array $data): ?VentaProductoAutomotriz
+    /**
+     * Obtener ventas del día
+     */
+    public function getVentasDelDia(?string $fecha = null): Collection
     {
-        $venta = VentaProductoAutomotriz::find($id);
-        if ($venta) {
-            $venta->update($data);
-            return $venta->fresh(['productoAutomotriz', 'cliente']);
-        }
-        return null;
-    }
-
-    // METODOS PARA ACTUALIZAR VENTAS DE PRODUCTOS DE DESPENSA
-
-    public function updateVentaDespensa(int $id, array $data): ?VentaProductoDespensa
-    {
-        $venta = VentaProductoDespensa::find($id);
-        if ($venta) {
-            $venta->update($data);
-            return $venta->fresh(['productoDespensa', 'cliente']);
-        }
-        return null;
-    }
-
-    // METODOS PARA ELIMINAR VENTAS DE PRODUCTOS AUTOMOTRICES Y DE DESPENSA
-
-    // ELIMINAR VENTA DE PRODUCTO AUTOMOTRIZ
-
-    public function deleteVentaAutomotriz(int $id): bool
-    {
-        return DB::transaction(function () use ($id) {
-            $venta = VentaProductoAutomotriz::find($id);
-            if (!$venta) return false;
-
-            // Soft delete la factura relacionada si existe
-            $facturaDetalle = FacturaDetalle::where('venta_producto_automotriz_id', $id)->first();
-            if ($facturaDetalle) {
-                $factura = $facturaDetalle->factura;
-                // Soft delete detalles de factura
-                $facturaDetalle->delete();
-                // Soft delete factura si no tiene más detalles activos
-                if ($factura->detalles()->count() == 0) {
-                    $factura->delete();
-                }
-            }
-
-            // Soft delete el ingreso relacionado si existe
-            $ingreso = Ingreso::where('tipo', 'producto_automotriz')
-                ->where('referencia_id', $id)
-                ->first();
-            if ($ingreso) {
-                $ingreso->delete();
-            }
-
-            // Soft delete la venta
-            return $venta->delete();
-        });
-    }
-
-    // ELIMINAR VENTA DE PRODUCTO DE DESPENSA
-
-    public function deleteVentaDespensa(int $id): bool
-    {
-        return DB::transaction(function () use ($id) {
-            $venta = VentaProductoDespensa::find($id);
-            if (!$venta) return false;
-
-            // Soft delete la factura relacionada si existe
-            $facturaDetalle = FacturaDetalle::where('venta_producto_despensa_id', $id)->first();
-            if ($facturaDetalle) {
-                $factura = $facturaDetalle->factura;
-                // Soft delete detalles de factura
-                $facturaDetalle->delete();
-                // Soft delete factura si no tiene más detalles activos
-                if ($factura->detalles()->count() == 0) {
-                    $factura->delete();
-                }
-            }
-
-            // Soft delete el ingreso relacionado si existe
-            $ingreso = Ingreso::where('tipo', 'producto_despensa')
-                ->where('referencia_id', $id)
-                ->first();
-            if ($ingreso) {
-                $ingreso->delete();
-            }
-
-            // Soft delete la venta
-            return $venta->delete();
-        });
-    }
-
-    // METODOS PARA RESTAURAR VENTAS ELIMINADAS LÓGICAMENTE
-
-    //RESTURAR VENTA DE PRODUCTO AUTOMOTRIZ ELIMINADA LÓGICAMENTE
-
-    public function restoreVentaAutomotriz(int $id): bool
-    {
-        return DB::transaction(function () use ($id) {
-            $venta = VentaProductoAutomotriz::onlyTrashed()->findOrFail($id);
-            
-            $restored = $venta->restore();
-            
-            if ($restored) {
-                // Restaurar el ingreso relacionado
-                $ingreso = Ingreso::onlyTrashed()
-                    ->where('tipo', 'producto_automotriz')
-                    ->where('referencia_id', $id)
-                    ->first();
-                
-                if ($ingreso) {
-                    $ingreso->restore();
-                }
-                
-                // Restaurar la factura relacionada
-                $facturaDetalle = FacturaDetalle::onlyTrashed()
-                    ->where('venta_producto_automotriz_id', $id)
-                    ->first();
-                    
-                if ($facturaDetalle) {
-                    $facturaDetalle->restore();
-                    $factura = Factura::onlyTrashed()->find($facturaDetalle->factura_id);
-                    if ($factura) {
-                        $factura->restore();
-                    }
-                }
-            }
-            
-            return $restored;
-        });
-    }
-
-    // RESTURAR VENTA DE PRODUCTO DE DESPENSA ELIMINADA LÓGICAMENTE
-
-    public function restoreVentaDespensa(int $id): bool
-    {
-        return DB::transaction(function () use ($id) {
-            $venta = VentaProductoDespensa::onlyTrashed()->findOrFail($id);
-            
-            $restored = $venta->restore();
-            
-            if ($restored) {
-                // Restaurar el ingreso relacionado
-                $ingreso = Ingreso::onlyTrashed()
-                    ->where('tipo', 'producto_despensa')
-                    ->where('referencia_id', $id)
-                    ->first();
-                
-                if ($ingreso) {
-                    $ingreso->restore();
-                }
-                
-                // Restaurar la factura relacionada
-                $facturaDetalle = FacturaDetalle::onlyTrashed()
-                    ->where('venta_producto_despensa_id', $id)
-                    ->first();
-                    
-                if ($facturaDetalle) {
-                    $facturaDetalle->restore();
-                    $factura = Factura::onlyTrashed()->find($facturaDetalle->factura_id);
-                    if ($factura) {
-                        $factura->restore();
-                    }
-                }
-            }
-            
-            return $restored;
-        });
-    }
-
-    // METODOS PARA OBTENER VENTAS ELIMINADAS LÓGICAMENTE
-
-    // OBTENER VENTAS AUTOMOTRICES ELIMINADAS LÓGICAMENTE
-
-    public function getTrashedVentasAutomotrices(): Collection
-    {
-        return VentaProductoAutomotriz::onlyTrashed()
-            ->with(['productoAutomotriz', 'cliente'])
-            ->orderBy('deleted_at', 'desc')
-            ->get();
-    }
-
-    // OBTENER VENTAS DE DESPENSA ELIMINADAS LÓGICAMENTE
-
-    public function getTrashedVentasDespensa(): Collection
-    {
-        return VentaProductoDespensa::onlyTrashed()
-            ->with(['productoDespensa', 'cliente'])
-            ->orderBy('deleted_at', 'desc')
-            ->get();
-    }
-
-    // METODOS PARA OBTENER VENTAS POR CLIENTE Y RANGO DE FECHAS
-
-    // OBTENER VENTAS POR CLIENTE ID
-
-    public function getVentasByClienteId(int $clienteId): Collection
-    {
-        $ventasAutomotrices = VentaProductoAutomotriz::with(['productoAutomotriz', 'cliente'])
-            ->where('cliente_id', $clienteId)
-            ->get()
-            ->map(function($venta) {
-                return [
-                    'id' => $venta->venta_producto_automotriz_id,
-                    'fecha' => $venta->fecha,
-                    'cliente' => $venta->cliente->nombre,
-                    'producto' => $venta->productoAutomotriz->nombre,
-                    'cantidad' => $venta->cantidad,
-                    'precio_unitario' => $venta->precio_unitario,
-                    'total' => $venta->total,
-                    'tipo' => 'automotriz'
-                ];
-            });
-
-        $ventasDespensa = VentaProductoDespensa::with(['productoDespensa', 'cliente'])
-            ->where('cliente_id', $clienteId)
-            ->get()
-            ->map(function($venta) {
-                return [
-                    'id' => $venta->venta_producto_despensa_id,
-                    'fecha' => $venta->fecha,
-                    'cliente' => $venta->cliente->nombre,
-                    'producto' => $venta->productoDespensa->nombre,
-                    'cantidad' => $venta->cantidad,
-                    'precio_unitario' => $venta->precio_unitario,
-                    'total' => $venta->total,
-                    'tipo' => 'despensa'
-                ];
-            });
-
-        return $ventasAutomotrices->merge($ventasDespensa)
-            ->sortByDesc('fecha')
-            ->values();
-    }
-
-    // OBTENER VENTAS POR RANGO DE FECHAS
-
-    public function getVentasByFechaRange(string $fechaInicio, string $fechaFin): Collection
-    {
-        $ventasAutomotrices = VentaProductoAutomotriz::with(['productoAutomotriz', 'cliente'])
-            ->whereBetween('fecha', [$fechaInicio, $fechaFin])
-            ->get()
-            ->map(function($venta) {
-                return [
-                    'id' => $venta->venta_producto_automotriz_id,
-                    'fecha' => $venta->fecha,
-                    'cliente' => $venta->cliente ? $venta->cliente->nombre : 'Cliente General',
-                    'producto' => $venta->productoAutomotriz->nombre,
-                    'cantidad' => $venta->cantidad,
-                    'precio_unitario' => $venta->precio_unitario,
-                    'total' => $venta->total,
-                    'tipo' => 'automotriz'
-                ];
-            });
-
-        $ventasDespensa = VentaProductoDespensa::with(['productoDespensa', 'cliente'])
-            ->whereBetween('fecha', [$fechaInicio, $fechaFin])
-            ->get()
-            ->map(function($venta) {
-                return [
-                    'id' => $venta->venta_producto_despensa_id,
-                    'fecha' => $venta->fecha,
-                    'cliente' => $venta->cliente ? $venta->cliente->nombre : 'Cliente General',
-                    'producto' => $venta->productoDespensa->nombre,
-                    'cantidad' => $venta->cantidad,
-                    'precio_unitario' => $venta->precio_unitario,
-                    'total' => $venta->total,
-                    'tipo' => 'despensa'
-                ];
-            });
-
-        return $ventasAutomotrices->merge($ventasDespensa)
-            ->sortByDesc('fecha')
-            ->values();
-    }
-
-    //OBTENER MÉTRICAS GENERALES DE VENTAS
-    
-    public function getMetricas(): array
-    {
-        $today = Carbon::today();
-        $thisMonth = Carbon::now()->startOfMonth();
-
-        $ventasHoy = VentaProductoAutomotriz::whereDate('created_at', $today)->count() + 
-                    VentaProductoDespensa::whereDate('created_at', $today)->count();
-
-        $ventasMes = VentaProductoAutomotriz::where('created_at', '>=', $thisMonth)->count() + 
-                    VentaProductoDespensa::where('created_at', '>=', $thisMonth)->count();
-
-        $ingresoHoy = VentaProductoAutomotriz::whereDate('created_at', $today)->sum('total') + 
-                     VentaProductoDespensa::whereDate('created_at', $today)->sum('total');
-
-        $ingresoMes = VentaProductoAutomotriz::where('created_at', '>=', $thisMonth)->sum('total') + 
-                     VentaProductoDespensa::where('created_at', '>=', $thisMonth)->sum('total');
-
-        return [
-            'ventasHoy' => $ventasHoy,
-            'ventasMes' => $ventasMes,
-            'ingresoHoy' => $ingresoHoy,
-            'ingresoMes' => $ingresoMes
-        ];
-    }
-
-    // =======================================================
-    // MÉTODOS ESPECÍFICOS PARA VENTAS AUTOMOTRICES
-    // =======================================================
-
-    public function getAllVentasAutomotrices(): Collection
-    {
-        return VentaProductoAutomotriz::with(['productoAutomotriz', 'cliente'])
-            ->orderBy('fecha', 'desc')
-            ->get();
-    }
-
-    public function getVentasAutomotricesByFechaRange(string $fechaInicio, string $fechaFin): Collection
-    {
-        return VentaProductoAutomotriz::with(['productoAutomotriz', 'cliente'])
-            ->whereBetween('fecha', [$fechaInicio, $fechaFin])
-            ->orderBy('fecha', 'desc')
-            ->get();
-    }
-
-    public function getMetricasAutomotrices(array $params = []): array
-    {
-        $query = VentaProductoAutomotriz::query();
-
-        if (isset($params['fecha_inicio']) && isset($params['fecha_fin'])) {
-            $query->whereBetween('fecha', [$params['fecha_inicio'], $params['fecha_fin']]);
-        }
-
-        $totalVentas = $query->count();
-        $totalIngresos = $query->sum('total');
-        $promedioVenta = $totalVentas > 0 ? $totalIngresos / $totalVentas : 0;
-
-        return [
-            'total_ventas' => $totalVentas,
-            'total_ingresos' => $totalIngresos,
-            'promedio_venta' => $promedioVenta,
-            'productos_mas_vendidos' => $this->getProductosAutomotricesMasVendidos($params)
-        ];
-    }
-
-    private function getProductosAutomotricesMasVendidos(array $params = []): Collection
-    {
-        $query = VentaProductoAutomotriz::with('productoAutomotriz')
-            ->selectRaw('producto_id, SUM(cantidad) as total_cantidad, SUM(total) as total_ingresos')
-            ->groupBy('producto_id');
-
-        if (isset($params['fecha_inicio']) && isset($params['fecha_fin'])) {
-            $query->whereBetween('fecha', [$params['fecha_inicio'], $params['fecha_fin']]);
-        }
-
-        return $query->orderBy('total_cantidad', 'desc')
-            ->limit(10)
-            ->get();
-    }
-
-    // =======================================================
-    // MÉTODOS ESPECÍFICOS PARA VENTAS DE DESPENSA
-    // =======================================================
-
-    public function getAllVentasDespensa(): Collection
-    {
-        return VentaProductoDespensa::with(['productoDespensa', 'cliente'])
-            ->orderBy('fecha', 'desc')
-            ->get();
-    }
-
-    public function getVentasDespensaByFechaRange(string $fechaInicio, string $fechaFin): Collection
-    {
-        return VentaProductoDespensa::with(['productoDespensa', 'cliente'])
-            ->whereBetween('fecha', [$fechaInicio, $fechaFin])
-            ->orderBy('fecha', 'desc')
-            ->get();
-    }
-
-    public function getMetricasDespensa(array $params = []): array
-    {
-        $query = VentaProductoDespensa::query();
-
-        if (isset($params['fecha_inicio']) && isset($params['fecha_fin'])) {
-            $query->whereBetween('fecha', [$params['fecha_inicio'], $params['fecha_fin']]);
-        }
-
-        $totalVentas = $query->count();
-        $totalIngresos = $query->sum('total');
-        $promedioVenta = $totalVentas > 0 ? $totalIngresos / $totalVentas : 0;
-
-        return [
-            'total_ventas' => $totalVentas,
-            'total_ingresos' => $totalIngresos,
-            'promedio_venta' => $promedioVenta,
-            'productos_mas_vendidos' => $this->getProductosDespensaMasVendidos($params)
-        ];
-    }
-
-    private function getProductosDespensaMasVendidos(array $params = []): Collection
-    {
-        $query = VentaProductoDespensa::with('productoDespensa')
-            ->selectRaw('producto_id, SUM(cantidad) as total_cantidad, SUM(total) as total_ingresos')
-            ->groupBy('producto_id');
-
-        if (isset($params['fecha_inicio']) && isset($params['fecha_fin'])) {
-            $query->whereBetween('fecha', [$params['fecha_inicio'], $params['fecha_fin']]);
-        }
-
-        return $query->orderBy('total_cantidad', 'desc')
-            ->limit(10)
-            ->get();
-    }
-
-    public function getProductosDisponibles(): array
-    {
-        $automotrices = ProductoAutomotriz::where('stock', '>', 0)
-            ->get()
-            ->map(function($producto) {
-                return [
-                    'id' => $producto->producto_automotriz_id,
-                    'nombre' => $producto->nombre,
-                    'precio_venta' => $producto->precio_venta,
-                    'stock' => $producto->stock,
-                    'tipo' => 'automotriz'
-                ];
-            });
-
-        $despensa = ProductoDespensa::where('stock', '>', 0)
-            ->get()
-            ->map(function($producto) {
-                return [
-                    'id' => $producto->producto_despensa_id,
-                    'nombre' => $producto->nombre,
-                    'precio_venta' => $producto->precio_venta,
-                    'stock' => $producto->stock,
-                    'tipo' => 'despensa'
-                ];
-            });
-
-        return [
-            'automotrices' => $automotrices,
-            'despensa' => $despensa
-        ];
-    }
-
-    public function getClientes(): Collection
-    {
-        return Cliente::select('cliente_id as id', 'nombre', 'telefono')
-            ->orderBy('nombre')
-            ->get();
-    }
-
-    public function procesarVentaCompleta(array $data): array
-    {
-        return DB::transaction(function () use ($data) {
-            $ventasCreadas = [];
-            $montoTotal = 0;
-
-            foreach ($data['items'] as $item) {
-                if ($item['tipo'] === 'automotriz') {
-                    $resultado = $this->procesarVentaAutomotrizInternal($item, $data['cliente_id'] ?? null);
-                } else {
-                    $resultado = $this->procesarVentaDespensaInternal($item, $data['cliente_id'] ?? null);
-                }
-
-                $ventasCreadas[] = $resultado['venta'];
-                $montoTotal += $resultado['total'];
-            }
-
-            return [
-                'ventas' => $ventasCreadas,
-                'monto_total' => $montoTotal
-            ];
-        });
-    }
-
-    private function procesarVentaAutomotrizInternal(array $item, ?int $clienteId): array
-    {
-        $producto = ProductoAutomotriz::findOrFail($item['producto_id']);
+        $fecha = $fecha ?? now()->format('Y-m-d');
         
-        if ($producto->stock < $item['cantidad']) {
-            throw new \Exception("Stock insuficiente para {$producto->nombre}. Disponible: {$producto->stock}");
-        }
-
-        $precioUnitario = $producto->precio_venta;
-        $total = $precioUnitario * $item['cantidad'];
-
-        $venta = $this->createVentaAutomotriz([
-            'producto_id' => $item['producto_id'],
-            'cliente_id' => $clienteId,
-            'cantidad' => $item['cantidad'],
-            'precio_unitario' => $precioUnitario,
-            'total' => $total,
-            'fecha' => now()
-        ]);
-
-        // Actualizar stock
-        $producto->decrement('stock', $item['cantidad']);
-
-        return [
-            'venta' => $venta,
-            'total' => $total
-        ];
+        return Venta::whereDate('fecha', $fecha)
+                   ->with(['cliente', 'detalles.vendible'])
+                   ->orderBy('fecha', 'desc')
+                   ->get();
     }
 
-    private function procesarVentaDespensaInternal(array $item, ?int $clienteId): array
+    /**
+     * Obtener ventas del mes
+     */
+    public function getVentasDelMes(int $year, int $month): Collection
     {
-        $producto = ProductoDespensa::findOrFail($item['producto_id']);
+        return Venta::whereYear('fecha', $year)
+                   ->whereMonth('fecha', $month)
+                   ->with(['cliente', 'detalles.vendible'])
+                   ->orderBy('fecha', 'desc')
+                   ->get();
+    }
+
+    /**
+     * Obtener total de ventas por rango de fechas
+     */
+    public function getTotalVentasByDateRange(string $fechaInicio, string $fechaFin): float
+    {
+        return Venta::whereBetween('fecha', [$fechaInicio, $fechaFin])
+                   ->sum('total');
+    }
+
+    /**
+     * Obtener total de ventas del día
+     */
+    public function getTotalVentasDelDia(?string $fecha = null): float
+    {
+        $fecha = $fecha ?? now()->format('Y-m-d');
         
-        if ($producto->stock < $item['cantidad']) {
-            throw new \Exception("Stock insuficiente para {$producto->nombre}. Disponible: {$producto->stock}");
-        }
+        return Venta::whereDate('fecha', $fecha)->sum('total');
+    }
 
-        $precioUnitario = $producto->precio_venta;
-        $total = $precioUnitario * $item['cantidad'];
+    /**
+     * Obtener total de ventas del mes
+     */
+    public function getTotalVentasDelMes(int $year, int $month): float
+    {
+        return Venta::whereYear('fecha', $year)
+                   ->whereMonth('fecha', $month)
+                   ->sum('total');
+    }
 
-        $venta = $this->createVentaDespensa([
-            'producto_id' => $item['producto_id'],
-            'cliente_id' => $clienteId,
-            'cantidad' => $item['cantidad'],
-            'precio_unitario' => $precioUnitario,
-            'total' => $total,
-            'fecha' => now()
-        ]);
-
-        // Actualizar stock
-        $producto->decrement('stock', $item['cantidad']);
-
+    /**
+     * Obtener estadísticas de ventas
+     */
+    public function getStats(): array
+    {
+        $hoy = now()->format('Y-m-d');
+        $mesActual = now();
+        
         return [
-            'venta' => $venta,
-            'total' => $total
+            'total_ventas' => Venta::count(),
+            'ventas_hoy' => Venta::whereDate('fecha', $hoy)->count(),
+            'ventas_mes' => Venta::whereYear('fecha', $mesActual->year)
+                                 ->whereMonth('fecha', $mesActual->month)
+                                 ->count(),
+            'total_facturado_hoy' => $this->getTotalVentasDelDia($hoy),
+            'total_facturado_mes' => $this->getTotalVentasDelMes($mesActual->year, $mesActual->month),
+            'eliminadas' => Venta::onlyTrashed()->count(),
         ];
     }
 
     /**
-     * Generar número de factura único
+     * Buscar ventas por término
      */
-    private function generateNumeroFactura(): string
+    public function search(string $term): Collection
     {
-        $prefix = 'FAC-';
-        $year = now()->year;
-        $month = now()->format('m');
-        
-        // Buscar el último número de factura del mes actual
-        $lastFactura = Factura::where('numero_factura', 'like', $prefix . $year . $month . '%')
-            ->orderBy('numero_factura', 'desc')
-            ->first();
-        
-        if ($lastFactura) {
-            // Extraer el número secuencial del último número de factura
-            $lastNumber = (int) substr($lastFactura->numero_factura, -4);
-            $newNumber = $lastNumber + 1;
-        } else {
-            $newNumber = 1;
-        }
-        
-        return $prefix . $year . $month . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+        return Venta::where(function ($query) use ($term) {
+            $query->whereHas('cliente', function ($q) use ($term) {
+                $q->where('nombre', 'ILIKE', "%{$term}%")
+                  ->orWhere('telefono', 'ILIKE', "%{$term}%")
+                  ->orWhere('cedula', 'ILIKE', "%{$term}%");
+            });
+        })->with(['cliente', 'detalles.vendible'])->get();
+    }
+
+    /**
+     * Obtener ventas con productos específicos
+     */
+    public function getVentasConProductos(): Collection
+    {
+        return Venta::whereHas('detalles', function ($query) {
+            $query->where('vendible_type', 'LIKE', '%Producto%');
+        })->with(['cliente', 'detalles.vendible'])->get();
+    }
+
+    /**
+     * Obtener ventas con servicios específicos
+     */
+    public function getVentasConServicios(): Collection
+    {
+        return Venta::whereHas('detalles', function ($query) {
+            $query->where('vendible_type', 'App\Models\Servicio');
+        })->with(['cliente', 'detalles.vendible'])->get();
+    }
+
+    /**
+     * Obtener ventas mixtas (productos + servicios)
+     */
+    public function getVentasMixtas(): Collection
+    {
+        return Venta::whereHas('detalles', function ($query) {
+            $query->where('vendible_type', 'LIKE', '%Producto%');
+        })->whereHas('detalles', function ($query) {
+            $query->where('vendible_type', 'App\Models\Servicio');
+        })->with(['cliente', 'detalles.vendible'])->get();
+    }
+
+    /**
+     * Verificar si una venta tiene factura electrónica
+     */
+    public function tieneFacturaElectronica(int $ventaId): bool
+    {
+        return Venta::find($ventaId)?->facturaElectronica()->exists() ?? false;
+    }
+
+    /**
+     * Obtener ventas sin factura electrónica
+     */
+    public function getVentasSinFacturaElectronica(): Collection
+    {
+        return Venta::whereDoesntHave('facturaElectronica')
+                   ->with(['cliente', 'detalles.vendible'])
+                   ->get();
+    }
+
+    /**
+     * Calcular totales por método de pago
+     */
+    public function getTotalesPorMetodoPago(string $fechaInicio, string $fechaFin): array
+    {
+        return Venta::whereBetween('fecha', [$fechaInicio, $fechaFin])
+                   ->selectRaw('metodo_pago, SUM(total) as total_metodo, COUNT(*) as cantidad_ventas')
+                   ->groupBy('metodo_pago')
+                   ->get()
+                   ->toArray();
     }
 }

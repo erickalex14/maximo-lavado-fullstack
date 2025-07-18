@@ -2,64 +2,121 @@
 
 namespace App\Contracts;
 
-use App\Models\VentaProductoAutomotriz;
-use App\Models\VentaProductoDespensa;
+use App\Models\Venta;
 use Illuminate\Database\Eloquent\Collection;
 
 interface VentaRepositoryInterface
 {
-    // Métodos generales
-    public function getAllVentas(): Collection;
-    public function getVentasByClienteId(int $clienteId): Collection;
-    public function getVentasByFechaRange(string $fechaInicio, string $fechaFin): Collection;
-    public function getMetricas(): array;
-
-    // Métodos específicos para ventas automotrices
-    public function getAllVentasAutomotrices(): Collection;
-    public function getVentasAutomotricesByFechaRange(string $fechaInicio, string $fechaFin): Collection;
-    public function createVentaAutomotriz(array $data): VentaProductoAutomotriz; // Crea venta + ingreso + factura
-    public function findVentaAutomotrizById(int $id): ?VentaProductoAutomotriz;
-    public function updateVentaAutomotriz(int $id, array $data): ?VentaProductoAutomotriz;
-    public function deleteVentaAutomotriz(int $id): bool; // Elimina venta + ingreso + factura
-    
     /**
-     * Restaurar venta automotriz eliminada lógicamente (con restauración de ingresos y facturas)
+     * Obtener todas las ventas
      */
-    public function restoreVentaAutomotriz(int $id): bool;
-    
-    /**
-     * Obtener ventas automotrices eliminadas lógicamente
-     */
-    public function getTrashedVentasAutomotrices(): Collection;
-    
-    public function getMetricasAutomotrices(array $params = []): array;
+    public function getAll(): Collection;
 
-    // Métodos específicos para ventas de despensa
-    public function getAllVentasDespensa(): Collection;
-    public function getVentasDespensaByFechaRange(string $fechaInicio, string $fechaFin): Collection;
-    public function createVentaDespensa(array $data): VentaProductoDespensa; // Crea venta + ingreso + factura
-    public function findVentaDespensaById(int $id): ?VentaProductoDespensa;
-    public function updateVentaDespensa(int $id, array $data): ?VentaProductoDespensa;
-    public function deleteVentaDespensa(int $id): bool; // Elimina venta + ingreso + factura
-    
     /**
-     * Restaurar venta de despensa eliminada lógicamente (con restauración de ingresos y facturas)
+     * Obtener todas incluyendo eliminadas (soft deletes)
      */
-    public function restoreVentaDespensa(int $id): bool;
-    
+    public function getAllWithTrashed(): Collection;
+
     /**
-     * Obtener ventas de despensa eliminadas lógicamente
+     * Obtener solo las eliminadas (soft deletes)
      */
-    public function getTrashedVentasDespensa(): Collection;
-    
-    public function getMetricasDespensa(array $params = []): array;
+    public function getOnlyTrashed(): Collection;
 
-    // Métodos adicionales
-    public function getProductosDisponibles(): array;
-    public function getClientes(): Collection;
-    public function procesarVentaCompleta(array $data): array; // Procesa múltiples items + facturas automáticas
+    /**
+     * Buscar venta por ID
+     */
+    public function findById(int $id): ?Venta;
 
-    // Métodos legacy (mantener compatibilidad)
-    public function getVentasAutomotrices(): Collection;
-    public function getVentasDespensa(): Collection;
+    /**
+     * Buscar venta por ID incluyendo eliminadas
+     */
+    public function findByIdWithTrashed(int $id): ?Venta;
+
+    /**
+     * Crear nueva venta con todo el flujo automático
+     * (Venta + VentaDetalles + FacturaElectronica + Ingreso + Actualización Stock)
+     */
+    public function create(array $data): Venta;
+
+    /**
+     * Actualizar venta
+     */
+    public function update(int $id, array $data): bool;
+
+    /**
+     * Eliminar venta (soft delete)
+     * Incluye reversión de stock y eliminación de factura/ingreso relacionados
+     */
+    public function delete(int $id): bool;
+
+    /**
+     * Restaurar venta eliminada
+     */
+    public function restore(int $id): bool;
+
+    /**
+     * Eliminar permanentemente
+     */
+    public function forceDelete(int $id): bool;
+
+    /**
+     * Buscar ventas por cliente ID
+     */
+    public function findByClienteId(int $clienteId): Collection;
+
+    /**
+     * Buscar ventas por empleado ID
+     */
+    public function findByEmpleadoId(int $empleadoId): Collection;
+
+    /**
+     * Buscar ventas por vehículo ID
+     */
+    public function findByVehiculoId(int $vehiculoId): Collection;
+
+    /**
+     * Buscar ventas en rango de fechas
+     */
+    public function findByFechaRango(\DateTime $fechaInicio, \DateTime $fechaFin): Collection;
+
+    /**
+     * Obtener ventas con sus detalles
+     */
+    public function getVentasConDetalles(): Collection;
+
+    /**
+     * Calcular total de una venta
+     */
+    public function calcularTotal(int $ventaId): float;
+
+    /**
+     * Obtener métricas de ventas
+     */
+    public function getMetricas(array $filtros = []): array;
+
+    /**
+     * Validar stock disponible para una venta
+     */
+    public function validarStockDisponible(array $detalles): array;
+
+    /**
+     * Procesar venta completa con transacción atómica
+     * (Validar stock + Crear venta + Generar factura + Crear ingreso + Actualizar inventario)
+     */
+    public function procesarVentaCompleta(array $data): array;
+
+    /**
+     * Obtener ventas del día
+     */
+    public function getVentasDelDia(\DateTime $fecha = null): Collection;
+
+    /**
+     * Obtener mejores clientes por volumen de ventas
+     */
+    public function getMejoresClientes(int $limite = 10): Collection;
+
+    /**
+     * Obtener productos/servicios más vendidos
+     */
+    public function getProductosMasVendidos(int $limite = 10): Collection;
 }
