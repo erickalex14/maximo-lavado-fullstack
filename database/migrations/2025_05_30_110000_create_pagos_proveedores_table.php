@@ -16,6 +16,10 @@ return new class extends Migration
             $table->text('descripcion')->nullable();
             $table->foreign('proveedor_id')->references('proveedor_id')->on('proveedores')->onDelete('cascade');
             $table->timestamps();
+            $table->softDeletes(); // Soft deletes optimizado
+            
+            // Índice para performance
+            $table->index(['proveedor_id', 'fecha']);
         });
     }
 

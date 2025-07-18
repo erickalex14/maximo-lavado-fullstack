@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('direccion')->nullable();
             $table->string('cedula')->nullable();
             $table->timestamps();
+            $table->softDeletes(); // Soft deletes optimizado
         });
     }
 

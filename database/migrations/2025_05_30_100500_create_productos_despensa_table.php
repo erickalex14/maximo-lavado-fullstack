@@ -16,6 +16,7 @@ return new class extends Migration
             $table->integer('stock')->default(0);
             $table->boolean('activo')->default(true);
             $table->timestamps();
+            $table->softDeletes(); // Soft deletes optimizado
         });
     }
 

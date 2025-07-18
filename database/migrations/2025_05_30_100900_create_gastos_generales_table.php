@@ -15,6 +15,10 @@ return new class extends Migration
             $table->decimal('monto', 10, 2);
             $table->date('fecha');
             $table->timestamps();
+            $table->softDeletes(); // Soft deletes optimizado
+            
+            // Índice para performance
+            $table->index('fecha');
         });
     }
 

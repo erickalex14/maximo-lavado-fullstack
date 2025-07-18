@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('telefono')->nullable();
             $table->decimal('deuda_pendiente', 10, 2)->default(0);
             $table->timestamps();
+            $table->softDeletes(); // Soft deletes optimizado
         });
     }
 

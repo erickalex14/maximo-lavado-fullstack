@@ -11,10 +11,11 @@ return new class extends Migration
         Schema::create('vehiculos', function (Blueprint $table) {
             $table->id('vehiculo_id');
             $table->foreignId('cliente_id')->constrained('clientes', 'cliente_id')->onDelete('cascade');
-            $table->enum('tipo', ['moto', 'camioneta', 'auto_pequeno', 'auto_mediano']);
-            $table->string('matricula')->nullable();
+            $table->foreignId('tipo_vehiculo_id')->constrained('tipos_vehiculos', 'tipo_vehiculo_id')->onDelete('cascade');
+            $table->string('matricula')->nullable(); // Nullable - validación por tipo en modelo
             $table->string('descripcion')->nullable();
             $table->timestamps();
+            $table->softDeletes(); // Soft deletes optimizado
         });
     }
 

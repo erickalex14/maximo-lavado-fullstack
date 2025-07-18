@@ -17,6 +17,7 @@ return new class extends Migration
             $table->enum('tipo_salario', ['mensual', 'diario', 'quincenal', 'semanal']);
             $table->decimal('salario', 10, 2);
             $table->timestamps();
+            $table->softDeletes(); // Soft deletes optimizado
         });
     }
 

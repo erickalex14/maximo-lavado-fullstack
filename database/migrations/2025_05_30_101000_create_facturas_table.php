@@ -14,8 +14,28 @@ return new class extends Migration
             $table->foreignId('cliente_id')->constrained('clientes', 'cliente_id')->onDelete('cascade');
             $table->date('fecha');
             $table->text('descripcion')->nullable();
-            $table->decimal('total', 10, 2);
+            
+            // Campos para facturación electrónica SRI Ecuador
+            $table->string('numero_autorizacion', 37)->nullable();
+            $table->string('clave_acceso', 49)->nullable();
+            $table->timestamp('fecha_autorizacion')->nullable();
+            $table->enum('estado_sri', ['BORRADOR', 'AUTORIZADA', 'RECHAZADA'])->default('BORRADOR');
+            $table->string('tipo_identificacion_comprador', 2)->default('05'); // 04=RUC, 05=CEDULA, 06=PASAPORTE
+            
+            // Campos monetarios para SRI
+            $table->decimal('subtotal_sin_impuestos', 12, 2);
+            $table->decimal('subtotal_0', 12, 2)->default(0);
+            $table->decimal('subtotal_12', 12, 2)->default(0);
+            $table->decimal('iva', 12, 2)->default(0);
+            $table->decimal('total', 12, 2);
+            
             $table->timestamps();
+            $table->softDeletes(); // Soft deletes optimizado
+            
+            // Índices para performance
+            $table->index(['fecha', 'estado_sri']);
+            $table->index('clave_acceso');
+            $table->index('numero_autorizacion');
         });
     }
 

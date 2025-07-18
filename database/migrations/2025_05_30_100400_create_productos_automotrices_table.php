@@ -29,6 +29,7 @@ return new class extends Migration
             $table->boolean('activo')->default(true);
             // Timestamps de creación y actualización
             $table->timestamps();
+            $table->softDeletes(); // Soft deletes optimizado
         });
     }
 
