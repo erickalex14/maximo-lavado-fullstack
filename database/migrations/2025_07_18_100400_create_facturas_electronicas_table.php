@@ -13,8 +13,7 @@ return new class extends Migration
     {
         Schema::create('facturas_electronicas', function (Blueprint $table) {
             $table->id('factura_electronica_id');
-            $table->foreignId('factura_id')->constrained('facturas', 'factura_id')->onDelete('cascade');
-            $table->foreignId('venta_id')->nullable()->constrained('ventas', 'venta_id')->onDelete('set null');
+            $table->foreignId('venta_id')->constrained('ventas', 'venta_id')->onDelete('cascade');
             
             // Datos del emisor (empresa)
             $table->string('ruc_emisor', 13);
@@ -49,11 +48,6 @@ return new class extends Migration
             $table->index(['ruc_emisor', 'fecha_autorizacion']);
             $table->index('identificacion_comprador');
         });
-        
-        // Agregar la columna de referencia en facturas
-        Schema::table('facturas', function (Blueprint $table) {
-            $table->timestamp('fecha_autorizacion')->nullable()->after('clave_acceso');
-        });
     }
 
     /**
@@ -61,10 +55,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('facturas', function (Blueprint $table) {
-            $table->dropColumn('fecha_autorizacion');
-        });
-        
         Schema::dropIfExists('facturas_electronicas');
     }
 };

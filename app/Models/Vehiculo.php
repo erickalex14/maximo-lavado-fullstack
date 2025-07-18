@@ -20,21 +20,59 @@ class Vehiculo extends Model
 
     // Permite asignación masiva en estos campos
     protected $fillable = [
-        'cliente_id',   // ID del cliente propietario
-        'tipo',        // Tipo de vehículo
-        'matricula',   // Matrícula (puede ser null para motos)
-        'descripcion', // Descripción
+        'cliente_id',        // ID del cliente propietario
+        'tipo_vehiculo_id',  // FK al tipo de vehículo (nueva relación V2.0)
+        'matricula',        // Matrícula (puede ser null para motos)
+        'descripcion',      // Descripción adicional
     ];
 
-    // Relación: Un vehículo pertenece a un cliente
+    // No hay casting adicional, campos son string y IDs
+
+    /**
+     * Relación: Un vehículo pertenece a un cliente
+     */
     public function cliente()
     {
         return $this->belongsTo(Cliente::class, 'cliente_id', 'cliente_id');
     }
 
-    // Relación: Un vehículo puede tener muchos lavados
+    /**
+     * Relación: Un vehículo pertenece a un tipo de vehículo (V2.0)
+     */
+    public function tipoVehiculo()
+    {
+        return $this->belongsTo(TipoVehiculo::class, 'tipo_vehiculo_id', 'tipo_vehiculo_id');
+    }
+
+    /**
+     * Relación: Un vehículo puede tener muchos lavados
+     */
     public function lavados()
     {
         return $this->hasMany(Lavado::class, 'vehiculo_id', 'vehiculo_id');
+    }
+
+    /**
+     * Relación: Un vehículo puede estar en muchas ventas (V2.0)
+     */
+    public function ventas()
+    {
+        return $this->hasMany(Venta::class, 'vehiculo_id', 'vehiculo_id');
+    }
+
+    /**
+     * Scope para obtener vehículos por tipo
+     */
+    public function scopePorTipo($query, $tipoVehiculoId)
+    {
+        return $query->where('tipo_vehiculo_id', $tipoVehiculoId);
+    }
+
+    /**
+     * Scope para obtener vehículos con matrícula
+     */
+    public function scopeConMatricula($query)
+    {
+        return $query->whereNotNull('matricula');
     }
 }

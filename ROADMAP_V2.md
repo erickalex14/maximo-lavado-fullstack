@@ -18,8 +18,21 @@
 ### **MEJORAS FUNCIONALES**
 - ✅ **Grilla de Ventas**: Interfaz moderna para agregar productos/servicios
 - ✅ **Precios Modificables**: Valores por defecto pero editables
-- ✅ **Generación Automática**: Venta → Factura → Ingreso
+- ✅ **Generación Automática**: Venta → Factura → Ingreso ⚡ **CRÍTICO**
 - ✅ **Trazabilidad Completa**: Mantener empleado/vehículo/cliente en servicios
+
+### **🔄 FLUJO AUTOMÁTICO VENTA → FACTURA ELECTRÓNICA → INGRESO**
+> **⚠️ REQUISITO CRÍTICO**: Al generar una venta, automáticamente se debe:
+> 1. **Crear la FACTURA ELECTRÓNICA** correspondiente con todos los detalles SRI
+> 2. **Generar el INGRESO** financiero por el monto total
+> 3. **Actualizar inventario** (productos) y registrar servicios
+> 4. **Mantener consistencia** transaccional en todo el proceso
+
+### **🏛️ SISTEMA UNIFICADO DE FACTURACIÓN**
+- **✅ ELIMINADO**: Modelo `Factura` legacy
+- **✅ UNIFICADO**: Solo `FacturaElectronica` (100% SRI compatible)
+- **✅ FLUJO**: Venta → FacturaElectronica → PDF/XML → Cliente
+- **✅ RELACIÓN**: Cliente accede vía venta_id (no directo)
 
 ---
 
@@ -73,6 +86,68 @@
 
 ---
 
+## ⚡ FLUJO CRÍTICO: VENTA → FACTURA ELECTRÓNICA → INGRESO
+
+### **🎯 REGLA DE NEGOCIO FUNDAMENTAL**
+**TODA VENTA DEBE GENERAR AUTOMÁTICAMENTE:**
+
+#### **0. VALIDACIÓN PREVIA** ✅
+- **Stock suficiente**: Verificar disponibilidad de todos los productos
+- **Productos activos**: Solo productos con `activo = true`
+- **Precios válidos**: Verificar que precios sean > 0
+- **Cliente válido**: Verificar existencia del cliente
+
+#### **1. FACTURA ELECTRÓNICA COMPLETA** 📄
+- **Secuencial único SRI** y ambiente configurado
+- **XML automático** para SRI + **PDF para cliente**
+- **Todos los detalles** via VentaDetalle (no tabla separada)
+- **Cálculos SRI completos** (subtotal_0, subtotal_12, IVA)
+- **Cliente via venta_id** (relación indirecta)
+- **100% cumplimiento legal** Ecuador
+
+#### **2. INGRESO FINANCIERO** 💰
+- Registro en tabla `ingresos`
+- Tipo: 'venta' 
+- Monto: total de la venta
+- Referencia: ID de la venta
+- Fecha: fecha de la venta
+
+#### **4. ACTUALIZACIONES DE INVENTARIO** 📦
+- **Productos automotrices**: Reducir stock automáticamente
+- **Productos despensa**: Reducir stock automáticamente  
+- **Fórmula**: `nuevo_stock = stock_actual - cantidad_vendida`
+- **Validación**: `nuevo_stock >= 0` (no permitir stock negativo)
+- **Alertas**: Notificar si stock queda por debajo del mínimo
+
+#### **5. TRAZABILIDAD DE SERVICIOS** 🔄
+- **Servicios**: Registrar con empleado y vehículo
+- **Trazabilidad**: Mantener historial completo
+- **Stock productos**: Reducir inventario automáticamente por cantidad vendida
+- **Servicios**: Registrar con empleado y vehículo
+- **Trazabilidad**: Mantener historial completo
+
+### **📦 GESTIÓN AUTOMÁTICA DE STOCK**
+> **⚠️ REQUISITO CRÍTICO PARA PRODUCTOS**: 
+> - **Productos Automotrices**: `stock = stock - cantidad_vendida`
+> - **Productos Despensa**: `stock = stock - cantidad_vendida`
+> - **Validación previa**: Verificar stock suficiente antes de venta
+> - **Control de inventario**: Alertas de stock bajo
+
+### **🛡️ GARANTÍAS TRANSACCIONALES**
+- **Atomicidad**: Todo o nada - si falla cualquier paso, se revierte todo
+- **Consistencia**: Los datos siempre quedan en estado válido
+- **Aislamiento**: Una venta no interfiere con otra
+- **Durabilidad**: Una vez confirmada, la información persiste
+
+### **⚠️ CASOS DE ERROR**
+- **Stock insuficiente**: Cancelar toda la venta si no hay inventario suficiente
+- **Cliente inválido**: Rechazar operación
+- **Error en cálculos**: Rollback completo
+- **Fallo de sistema**: Restaurar estado anterior
+- **Producto inactivo**: No permitir venta de productos desactivados
+
+---
+
 ## 📋 FASES DE IMPLEMENTACIÓN
 
 ### **FASE 1: MIGRACIONES OPTIMIZADAS** 🗄️
@@ -110,21 +185,35 @@
 
 ---
 
-### **FASE 2: MODELOS ELOQUENT** 🏗️
+### **✅ FASE 2: MODELOS ELOQUENT (COMPLETADA)** 🏗️
 **Duración**: 1-2 días
 
 #### Nuevos Modelos
-- [ ] `TipoVehiculo.php`
-- [ ] `Servicio.php`
-- [ ] `Venta.php`
-- [ ] `VentaDetalle.php`
-- [ ] `FacturaElectronica.php`
+- [x] `TipoVehiculo.php`
+- [x] `Servicio.php`
+- [x] `Venta.php`
+- [x] `VentaDetalle.php`
+- [x] `FacturaElectronica.php`
 
 #### Actualizar Existentes
-- [ ] Agregar `use SoftDeletes` a todos
-- [ ] `Vehiculo.php` - relación tipos
-- [ ] `Lavado.php` - relación servicios
-- [ ] `Factura.php` - campos SRI
+- [x] Agregar `use SoftDeletes` a todos
+- [x] `Vehiculo.php` - actualizado para consistencia con migración
+- [x] `Cliente.php` - actualizado, eliminada relación legacy con Factura
+- [x] `ProductoAutomotriz.php` - actualizado, eliminadas relaciones legacy
+- [x] `ProductoDespensa.php` - actualizado, eliminadas relaciones legacy
+- [x] `Lavado.php` - actualizado para consistencia con migración
+- [x] `Empleado.php` - actualizado para consistencia con migración
+- [x] `FacturaElectronica.php` - modelo unificado actualizado para consistencia exacta con migración
+- [x] Eliminación de archivos legacy (Factura.php, FacturaDetalle.php, VentaProducto*)
+- [x] Sistema de facturación unificado: Solo FacturaElectronica para cumplimiento SRI
+
+**ARQUITECTURA DE FACTURACIÓN UNIFICADA:**
+- Sistema único: Venta → VentaDetalle → FacturaElectronica
+- Cumplimiento SRI Ecuador con XML/PDF generación
+- Eliminada duplicidad Factura/FacturaElectronica
+- Modelo FacturaElectronica alineado 100% con migración
+- **Enfoque snapshot:** Datos del comprador mantenidos en FacturaElectronica para inmutabilidad legal requerida por SRI
+- Relación: Cliente accesible vía venta_id→cliente_id, pero datos snapshot preservados para auditorías
 
 ---
 
@@ -160,11 +249,13 @@
 
 #### Lógica VentaService
 - [ ] Cálculo automático totales
-- [ ] Generación automática factura
-- [ ] Creación automática ingreso
-- [ ] Manejo stock productos
+- [ ] **Validación stock disponible** ⚡ **CRÍTICO**
+- [ ] **Generación automática factura** ⚡ **CRÍTICO**
+- [ ] **Creación automática ingreso** ⚡ **CRÍTICO**
+- [ ] **Actualización stock productos** ⚡ **CRÍTICO**
 - [ ] Trazabilidad servicios
 - [ ] Validaciones negocio
+- [ ] **Transacciones atómicas** (todo o nada)
 
 ---
 
@@ -271,10 +362,42 @@
 **Responsabilidades principales:**
 - Manejar grilla de productos/servicios
 - Calcular totales dinámicamente
-- Generar factura automáticamente
-- Crear ingreso correspondiente
+- **Generar factura automáticamente** ⚡ **FLUJO CRÍTICO**
+- **Crear ingreso correspondiente** ⚡ **FLUJO CRÍTICO**
+- **Validar stock productos** ⚡ **FLUJO CRÍTICO**
+- **Crear ingreso correspondiente** ⚡ **FLUJO CRÍTICO**
 - Validar stock productos
 - Mantener trazabilidad servicios
+- **Ejecutar todo en transacción atómica**
+
+### **📦 VALIDACIONES DE STOCK**
+**Antes de procesar la venta:**
+1. **Verificar disponibilidad**: `producto.stock >= cantidad_solicitada`
+2. **Productos activos**: Solo permitir venta de productos `activo = true`
+3. **Stock mínimo**: Alertar si después de la venta queda stock bajo
+4. **Reserva temporal**: Opcional - reservar stock durante proceso de venta
+
+**Durante la venta:**
+- **Actualización atómica**: `UPDATE productos SET stock = stock - ? WHERE id = ?`
+- **Validación final**: Verificar que stock no sea negativo
+- **Rollback automático**: Si cualquier producto falla, cancelar toda la venta
+
+**Flujo de proceso:**
+```
+VENTA CREADA
+    ↓
+VALIDAR STOCK DISPONIBLE (productos)
+    ↓
+GENERAR FACTURA (con detalles completos)
+    ↓
+CREAR INGRESO (monto total de venta)
+    ↓
+ACTUALIZAR STOCK (productos: stock -= cantidad)
+    ↓
+REGISTRAR SERVICIOS (con empleado/vehículo)
+    ↓
+COMMIT TRANSACCIÓN ✅
+```
 
 ### **2. VentaForm.vue**
 **Características principales:**
@@ -297,6 +420,9 @@
 
 ### **Funcionales**
 - ✅ Ventas unificadas productos + servicios
+- ✅ **Facturación automática desde ventas** ⚡
+- ✅ **Ingresos automáticos desde ventas** ⚡
+- ✅ **Control automático de inventario** ⚡
 - ✅ Facturación electrónica válida SRI
 - ✅ Trazabilidad completa servicios
 - ✅ Tipos vehículos dinámicos
@@ -339,6 +465,20 @@ Semana 5: Fases 7-8 (Integración + Testing)
 - Validaciones robustas ventas
 - Integridad referencial estricta
 - Auditoría cambios precios
+- **Transacciones atómicas** venta→factura→ingreso
+
+### **🔄 FLUJO TRANSACCIONAL CRÍTICO**
+```sql
+BEGIN TRANSACTION;
+  -- 1. VALIDAR STOCK disponible para productos
+  -- 2. Crear VENTA con detalles
+  -- 3. Generar FACTURA automática
+  -- 4. Crear INGRESO financiero
+  -- 5. ACTUALIZAR STOCK productos (stock -= cantidad)
+  -- 6. Registrar trazabilidad SERVICIOS
+COMMIT; -- Todo exitoso ✅
+-- Si falla cualquier paso: ROLLBACK ❌
+```
 
 ---
 

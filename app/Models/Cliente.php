@@ -20,22 +20,59 @@ class Cliente extends Model
 
     // Permite asignación masiva en estos campos
     protected $fillable = [
-        'nombre',     // Nombre del cliente
-        'telefono',   // Teléfono
-        'email',      // Email
-        'direccion',  // Dirección
-        'cedula',     // Cédula
+        'nombre',       // Nombre del cliente
+        'telefono',     // Teléfono
+        'email',        // Email
+        'direccion',    // Dirección
+        'cedula',       // Cédula
     ];
 
-    // Relación: Un cliente puede tener muchos vehículos
+    // No hay casting adicional según migración
+
+    /**
+     * Relación: Un cliente puede tener muchos vehículos
+     */
     public function vehiculos()
     {
         return $this->hasMany(Vehiculo::class, 'cliente_id', 'cliente_id');
     }
 
-    // Relación: Un cliente puede tener muchas facturas
-    public function facturas()
+    /**
+     * Relación: Un cliente puede tener muchas ventas (V2.0)
+     */
+    public function ventas()
     {
-        return $this->hasMany(Factura::class, 'cliente_id', 'cliente_id');
+        return $this->hasMany(Venta::class, 'cliente_id', 'cliente_id');
+    }
+
+    /**
+     * Relación: Un cliente puede tener muchas facturas electrónicas (V2.0)
+     */
+    public function facturasElectronicas()
+    {
+        return $this->hasManyThrough(
+            FacturaElectronica::class,
+            Venta::class,
+            'cliente_id', // FK en ventas
+            'venta_id',   // FK en facturas_electronicas
+            'cliente_id', // PK en clientes
+            'venta_id'    // PK en ventas
+        );
+    }
+
+    /**
+     * Scope para buscar clientes por nombre
+     */
+    public function scopePorNombre($query, $nombre)
+    {
+        return $query->where('nombre', 'like', '%' . $nombre . '%');
+    }
+
+    /**
+     * Scope para buscar clientes por cédula
+     */
+    public function scopePorCedula($query, $cedula)
+    {
+        return $query->where('cedula', $cedula);
     }
 }

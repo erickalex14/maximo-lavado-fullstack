@@ -27,10 +27,64 @@ class ProductoDespensa extends Model
         'activo',        // Estado del producto (activo/inactivo)
     ];
 
-    // Relación: Un producto de despensa puede estar en muchos detalles de factura
-    public function detallesFactura()
+    // Casting de tipos
+    protected $casts = [
+        'precio_venta' => 'decimal:2',
+        'stock' => 'integer',
+        'activo' => 'boolean',
+    ];
+
+    /**
+     * Relación: Un producto de despensa puede estar en muchos detalles de venta (V2.0)
+     */
+    public function ventaDetalles()
     {
-        // La clave foránea en FacturaDetalle es producto_id
-        return $this->hasMany(FacturaDetalle::class, 'producto_id', 'producto_despensa_id');
+        return $this->hasMany(VentaDetalle::class, 'item_id', 'producto_despensa_id')
+                    ->where('tipo_item', 'producto');
+    }
+
+    /**
+     * Scope para obtener solo productos activos
+     */
+    public function scopeActivos($query)
+    {
+        return $query->where('activo', true);
+    }
+
+    /**
+     * Scope para obtener productos con stock bajo
+     */
+    public function scopeStockBajo($query, $limite = 5)
+    {
+        return $query->where('stock', '<=', $limite);
+    }
+
+    /**
+     * Accessor para obtener precio formateado
+     */
+    public function getPrecioVentaFormateadoAttribute()
+    {
+        return '$' . number_format($this->precio_venta, 2);
+    }
+
+    /**
+     * Método para validar stock disponible
+     */
+    public function tieneStock($cantidad = 1)
+    {
+        return $this->stock >= $cantidad;
+    }
+
+    /**
+     * Método para reducir stock
+     */
+    public function reducirStock($cantidad)
+    {
+        if ($this->tieneStock($cantidad)) {
+            $this->stock -= $cantidad;
+            $this->save();
+            return true;
+        }
+        return false;
     }
 }

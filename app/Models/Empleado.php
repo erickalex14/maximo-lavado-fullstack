@@ -28,9 +28,40 @@ class Empleado extends Model
         'salario',      // Monto del salario
     ];
 
-    // Relación: Un empleado puede tener muchos lavados
+    // Casting de tipos
+    protected $casts = [
+        'salario' => 'decimal:2',
+    ];
+
+    /**
+     * Relación: Un empleado puede tener muchos lavados
+     */
     public function lavados()
     {
         return $this->hasMany(Lavado::class, 'empleado_id', 'empleado_id');
+    }
+
+    /**
+     * Relación: Un empleado puede atender muchas ventas (V2.0)
+     */
+    public function ventas()
+    {
+        return $this->hasMany(Venta::class, 'empleado_id', 'empleado_id');
+    }
+
+    /**
+     * Accessor para obtener nombre completo
+     */
+    public function getNombreCompletoAttribute()
+    {
+        return $this->nombres . ' ' . $this->apellidos;
+    }
+
+    /**
+     * Scope para buscar empleados por cédula
+     */
+    public function scopePorCedula($query, $cedula)
+    {
+        return $query->where('cedula', $cedula);
     }
 }
