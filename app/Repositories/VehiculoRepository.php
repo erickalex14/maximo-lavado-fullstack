@@ -11,7 +11,7 @@ class VehiculoRepository implements VehiculoRepositoryInterface
 {
     public function getAllPaginated(int $perPage = 15, array $filters = []): LengthAwarePaginator
     {
-        $query = Vehiculo::with(['cliente']);
+        $query = Vehiculo::with(['cliente', 'tipoVehiculo']);
 
         // Aplicar filtros
         if (!empty($filters['search'])) {
@@ -21,6 +21,9 @@ class VehiculoRepository implements VehiculoRepositoryInterface
                   ->orWhere('descripcion', 'like', "%{$search}%")
                   ->orWhereHas('cliente', function ($clienteQuery) use ($search) {
                       $clienteQuery->where('nombre', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('tipoVehiculo', function ($tipoQuery) use ($search) {
+                      $tipoQuery->where('nombre', 'like', "%{$search}%");
                   });
             });
         }
@@ -29,8 +32,16 @@ class VehiculoRepository implements VehiculoRepositoryInterface
             $query->where('cliente_id', $filters['cliente_id']);
         }
 
+        // ✅ ACTUALIZADO: Usar tipo_vehiculo_id en lugar de tipo directo
+        if (!empty($filters['tipo_vehiculo_id'])) {
+            $query->where('tipo_vehiculo_id', $filters['tipo_vehiculo_id']);
+        }
+
+        // 🔄 COMPATIBILIDAD: Mantener filtro por tipo legacy mientras se migra
         if (!empty($filters['tipo'])) {
-            $query->where('tipo', $filters['tipo']);
+            $query->whereHas('tipoVehiculo', function ($tipoQuery) use ($filters) {
+                $tipoQuery->where('nombre', $filters['tipo']);
+            });
         }
 
         return $query->orderBy('created_at', 'desc')->paginate($perPage);
@@ -38,12 +49,12 @@ class VehiculoRepository implements VehiculoRepositoryInterface
 
     public function getAll(): Collection
     {
-        return Vehiculo::with(['cliente'])->orderBy('matricula')->get();
+        return Vehiculo::with(['cliente', 'tipoVehiculo'])->orderBy('matricula')->get();
     }
 
     public function findById(int $id): ?Vehiculo
     {
-        return Vehiculo::with(['cliente'])->find($id);
+        return Vehiculo::with(['cliente', 'tipoVehiculo'])->find($id);
     }
 
     public function create(array $data): Vehiculo
@@ -128,9 +139,14 @@ class VehiculoRepository implements VehiculoRepositoryInterface
     public function getStats(): array
     {
         $total = Vehiculo::count();
-        $porTipo = Vehiculo::selectRaw('tipo, COUNT(*) as total')
-                          ->groupBy('tipo')
-                          ->pluck('total', 'tipo')
+        
+        // ✅ ACTUALIZADO: Obtener estadísticas por tipo de vehículo usando relación
+        $porTipo = Vehiculo::with('tipoVehiculo')
+                          ->get()
+                          ->groupBy('tipoVehiculo.nombre')
+                          ->map(function ($grupo) {
+                              return $grupo->count();
+                          })
                           ->toArray();
 
         $nuevosEsteMes = Vehiculo::whereMonth('created_at', now()->month)

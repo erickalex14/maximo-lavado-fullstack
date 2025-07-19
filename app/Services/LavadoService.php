@@ -3,250 +3,521 @@
 namespace App\Services;
 
 use App\Contracts\LavadoRepositoryInterface;
+use App\Contracts\ServicioRepositoryInterface;
 use App\Models\Lavado;
+use App\Models\Vehiculo;
+use App\Services\VentaService;
+use App\Services\ServicioService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * 🔄 LavadoService V2 - MIGRACIÓN GRADUAL AL SISTEMA UNIFICADO
+ * 
+ * Este servicio maneja la transición del sistema legacy de lavados
+ * al nuevo sistema unificado de ventas y servicios
+ */
 class LavadoService
 {
-    public function __construct(
-        protected LavadoRepositoryInterface $lavadoRepository
-    ) {}
+    protected LavadoRepositoryInterface $lavadoRepository;
+    protected ServicioRepositoryInterface $servicioRepository;
+    protected VentaService $ventaService;
+    protected ServicioService $servicioService;
 
+    public function __construct(
+        LavadoRepositoryInterface $lavadoRepository,
+        ServicioRepositoryInterface $servicioRepository,
+        VentaService $ventaService,
+        ServicioService $servicioService
+    ) {
+        $this->lavadoRepository = $lavadoRepository;
+        $this->servicioRepository = $servicioRepository;
+        $this->ventaService = $ventaService;
+        $this->servicioService = $servicioService;
+    }
+
+    /**
+     * ⚡ MÉTODO PRINCIPAL: Crear lavado usando el nuevo sistema unificado
+     * Migra automáticamente a Venta + Servicio
+     */
+    public function crearLavado(array $data): array
+    {
+        try {
+            Log::info('🔄 Creando lavado usando sistema unificado V2', [
+                'vehiculo_id' => $data['vehiculo_id'],
+                'tipo_lavado' => $data['tipo_lavado']
+            ]);
+
+            // PASO 1: Buscar/crear servicio equivalente al tipo de lavado
+            $servicio = $this->obtenerServicioEquivalente($data['tipo_lavado'], $data['vehiculo_id']);
+
+            // PASO 2: Crear venta unificada usando VentaService
+            $ventaData = [
+                'cliente_id' => $this->obtenerClienteDelVehiculo($data['vehiculo_id']),
+                'empleado_id' => $data['empleado_id'] ?? null,
+                'fecha' => $data['fecha'] ?? now()->format('Y-m-d'),
+                'observaciones' => "Migrado desde lavado: {$data['tipo_lavado']}"
+            ];
+
+            $detallesVenta = [
+                [
+                    'vendible_type' => 'App\Models\Servicio',
+                    'vendible_id' => $servicio->servicio_id,
+                    'cantidad' => 1,
+                    'precio_unitario' => $data['precio'],
+                    'descripcion' => "Servicio de lavado {$data['tipo_lavado']}"
+                ]
+            ];
+
+            // Crear venta completa usando el flujo automático
+            $venta = $this->ventaService->crearVentaCompleta($ventaData, $detallesVenta);
+
+            // PASO 3: Crear registro legacy para compatibilidad
+            $lavadoLegacy = null;
+            // Mantener compatibilidad legacy por defecto
+            $lavadoLegacy = $this->crearRegistroLegacy($data, $venta);
+
+            Log::info('✅ Lavado creado exitosamente usando sistema unificado', [
+                'venta_id' => $venta->venta_id,
+                'servicio_id' => $servicio->servicio_id,
+                'lavado_legacy_id' => $lavadoLegacy?->lavado_id,
+                'total' => $venta->total
+            ]);
+
+            return [
+                'success' => true,
+                'venta' => $venta,
+                'servicio' => $servicio,
+                'lavado_legacy' => $lavadoLegacy,
+                'message' => 'Lavado creado usando sistema unificado V2'
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('❌ Error al crear lavado usando sistema unificado', [
+                'error' => $e->getMessage(),
+                'data' => $data
+            ]);
+
+            // 🔄 FALLBACK: Si falla el nuevo sistema, usar el legacy
+            Log::warning('🔄 Fallback: Usando sistema legacy de lavados');
+            return $this->crearLavadoLegacy($data);
+        }
+    }
+
+    /**
+     * 🔄 MÉTODO DE MIGRACIÓN: Migrar lavados legacy al sistema unificado
+     */
+    public function migrarLavadosLegacy(int $limit = 100): array
+    {
+        Log::info('🔄 Iniciando migración masiva de lavados legacy');
+
+        $lavadosLegacy = Lavado::whereNull('migrado_a_venta_id')
+                              ->limit($limit)
+                              ->get();
+
+        $migrados = 0;
+        $errores = 0;
+        $detalles = [];
+
+        foreach ($lavadosLegacy as $lavado) {
+            try {
+                $resultado = $this->migrarLavadoIndividual($lavado);
+                if ($resultado['success']) {
+                    $migrados++;
+                    $detalles[] = [
+                        'lavado_id' => $lavado->lavado_id,
+                        'venta_id' => $resultado['venta_id'],
+                        'status' => 'migrado'
+                    ];
+                } else {
+                    $errores++;
+                    $detalles[] = [
+                        'lavado_id' => $lavado->lavado_id,
+                        'error' => $resultado['error'],
+                        'status' => 'error'
+                    ];
+                }
+            } catch (\Exception $e) {
+                $errores++;
+                $detalles[] = [
+                    'lavado_id' => $lavado->lavado_id,
+                    'error' => $e->getMessage(),
+                    'status' => 'error'
+                ];
+            }
+        }
+
+        Log::info('🎯 Migración masiva completada', [
+            'total_procesados' => count($lavadosLegacy),
+            'migrados' => $migrados,
+            'errores' => $errores
+        ]);
+
+        return [
+            'total_procesados' => count($lavadosLegacy),
+            'migrados' => $migrados,
+            'errores' => $errores,
+            'detalles' => $detalles
+        ];
+    }
+
+    /**
+     * Obtener lavados con paginación (método legacy mantenido por compatibilidad)
+     */
     public function getLavadosPaginated(int $perPage = 15, array $filters = []): LengthAwarePaginator
     {
         return $this->lavadoRepository->getAllPaginated($perPage, $filters);
     }
 
+    /**
+     * Obtener todos los lavados
+     */
     public function getAllLavados(array $filters = []): Collection
     {
         return $this->lavadoRepository->getAll($filters);
     }
 
+    /**
+     * Obtener lavado por ID
+     */
     public function getLavadoById(int $id): ?Lavado
     {
         return $this->lavadoRepository->findById($id);
     }
 
-    public function createLavado(array $data): array
-    {
-        try {
-            // Validaciones de negocio
-            $validation = $this->validateBusinessRules($data);
-            if (!$validation['valid']) {
-                return ['success' => false, 'message' => $validation['message']];
-            }
-
-            $result = $this->lavadoRepository->create($data);
-            
-            if ($result['success']) {
-                Log::info('Lavado, ingreso y factura creados exitosamente', [
-                    'lavado_id' => $result['lavado']->lavado_id,
-                    'ingreso_id' => $result['ingreso']->ingreso_id,
-                    'factura_id' => $result['factura']->factura_id,
-                    'numero_factura' => $result['factura']->numero_factura,
-                    'vehiculo_id' => $result['lavado']->vehiculo_id,
-                    'precio' => $result['lavado']->precio
-                ]);
-                
-                return [
-                    'success' => true,
-                    'message' => 'Lavado creado, registrado como ingreso y facturado correctamente',
-                    'data' => [
-                        'lavado' => $result['lavado'],
-                        'ingreso' => $result['ingreso'],
-                        'factura' => $result['factura']
-                    ]
-                ];
-            }
-
-            return $result;
-
-        } catch (\Exception $e) {
-            Log::error('Error al crear lavado', [
-                'data' => $data,
-                'error' => $e->getMessage()
-            ]);
-            return ['success' => false, 'message' => 'Error interno: ' . $e->getMessage()];
-        }
-    }
-
+    /**
+     * Actualizar lavado (redirige al sistema unificado si es posible)
+     */
     public function updateLavado(int $id, array $data): Lavado
     {
-        // Validaciones de negocio
-        $validation = $this->validateBusinessRules($data, $id);
-        if (!$validation['valid']) {
-            throw new \Exception($validation['message']);
+        $lavado = $this->lavadoRepository->findById($id);
+        
+        if (!$lavado) {
+            throw new \Exception("Lavado no encontrado con ID: {$id}");
         }
 
-        $lavadoActualizado = $this->lavadoRepository->update($id, $data);
-        
-        Log::info('Lavado actualizado exitosamente', [
-            'lavado_id' => $id
-        ]);
+        // Si el lavado ya fue migrado, actualizar la venta unificada
+        if ($lavado->migrado_a_venta_id) {
+            Log::info('🔄 Actualizando lavado migrado usando sistema unificado', [
+                'lavado_id' => $id,
+                'venta_id' => $lavado->migrado_a_venta_id
+            ]);
 
-        return $lavadoActualizado;
+            // Actualizar la venta unificada
+            $this->actualizarVentaDesdelavado($lavado->migrado_a_venta_id, $data);
+        }
+
+        // Actualizar el registro legacy
+        return $this->lavadoRepository->update($id, $data);
     }
 
+    /**
+     * Eliminar lavado
+     */
     public function deleteLavado(int $id): bool
     {
         $lavado = $this->lavadoRepository->findById($id);
+        
         if (!$lavado) {
-            throw new \Exception('Lavado no encontrado');
+            throw new \Exception("Lavado no encontrado con ID: {$id}");
         }
 
-        // Verificar si se puede eliminar
-        $this->validateDeletion($lavado);
+        // Si el lavado fue migrado, eliminar también la venta unificada
+        if ($lavado->migrado_a_venta_id) {
+            Log::info('🔄 Eliminando lavado migrado desde sistema unificado', [
+                'lavado_id' => $id,
+                'venta_id' => $lavado->migrado_a_venta_id
+            ]);
 
-        $result = $this->lavadoRepository->delete($id);
+            $this->ventaService->eliminarVenta($lavado->migrado_a_venta_id);
+        }
 
-        Log::info('Lavado eliminado exitosamente', [
-            'lavado_id' => $id,
-            'cliente_id' => $lavado->vehiculo->cliente_id ?? null
-        ]);
-
-        return $result;
+        return $this->lavadoRepository->delete($id);
     }
 
     /**
-     * Restaurar lavado eliminado lógicamente
+     * Restaurar lavado (método legacy mantenido por compatibilidad)
      */
     public function restoreLavado(int $id): bool
     {
-        $result = $this->lavadoRepository->restore($id);
-
-        if ($result) {
-            Log::info('Lavado restaurado exitosamente', [
-                'lavado_id' => $id
-            ]);
-        }
-
-        return $result;
+        return $this->lavadoRepository->restore($id);
     }
 
     /**
-     * Obtener lavados eliminados lógicamente
+     * Obtener lavados eliminados (método legacy mantenido por compatibilidad)
      */
     public function getTrashedLavados(): Collection
     {
         return $this->lavadoRepository->getTrashed();
     }
 
+    /**
+     * Obtener estadísticas de lavados
+     */
+    public function getEstadisticas(array $filters = []): array
+    {
+        $estadisticasLegacy = $this->lavadoRepository->getStats($filters);
+        
+        // Agregar estadísticas de migración
+        $totalLavados = Lavado::count();
+        $migrados = Lavado::whereNotNull('migrado_a_venta_id')->count();
+        $pendientesMigracion = $totalLavados - $migrados;
+
+        return array_merge($estadisticasLegacy, [
+            'migracion' => [
+                'total_lavados' => $totalLavados,
+                'migrados' => $migrados,
+                'pendientes_migracion' => $pendientesMigracion,
+                'porcentaje_migrado' => $totalLavados > 0 ? round(($migrados / $totalLavados) * 100, 2) : 0
+            ]
+        ]);
+    }
+
+    /**
+     * Obtener lavados por cliente (método legacy mantenido por compatibilidad)
+     */
     public function getLavadosByCliente(int $clienteId): Collection
     {
         return $this->lavadoRepository->getByCliente($clienteId);
     }
 
+    /**
+     * Obtener lavados por empleado (método legacy mantenido por compatibilidad)
+     */
     public function getLavadosByEmpleado(int $empleadoId, array $filters = []): Collection
     {
         return $this->lavadoRepository->getByEmpleado($empleadoId, $filters);
     }
 
+    /**
+     * Obtener lavados por vehículo (método legacy mantenido por compatibilidad)
+     */
     public function getLavadosByVehiculo(int $vehiculoId, array $filters = []): Collection
     {
         return $this->lavadoRepository->getByVehiculo($vehiculoId, $filters);
     }
 
-    public function getLavadosByDay(string $fecha, array $filters = []): Collection
-    {
-        return $this->lavadoRepository->getByDay($fecha, $filters);
-    }
-
-    public function getLavadosByWeek(string $fecha, array $filters = []): Collection
-    {
-        return $this->lavadoRepository->getByWeek($fecha, $filters);
-    }
-
-    public function getLavadosByMonth(int $anio, int $mes, array $filters = []): Collection
-    {
-        return $this->lavadoRepository->getByMonth($anio, $mes, $filters);
-    }
-
-    public function getLavadosByYear(int $anio, array $filters = []): Collection
-    {
-        return $this->lavadoRepository->getByYear($anio, $filters);
-    }
-
-    public function getLavadosByDateRange(string $fechaInicio, string $fechaFin): Collection
-    {
-        return $this->lavadoRepository->getByDateRange($fechaInicio, $fechaFin);
-    }
-
-    public function getEstadisticas(array $filters = []): array
-    {
-        return $this->lavadoRepository->getStats($filters);
-    }
-
+    /**
+     * Obtener lavados recientes (método legacy mantenido por compatibilidad)
+     */
     public function getLavadosRecientes(int $limit = 10): Collection
     {
         return $this->lavadoRepository->getRecientes($limit);
     }
 
-    public function cambiarEstado(int $id, string $estado): Lavado
+    /**
+     * Obtener lavados por día
+     */
+    public function getLavadosByDay(string $fecha, array $filters = []): Collection
     {
-        $lavado = $this->getLavadoById($id);
-        if (!$lavado) {
-            throw new \Exception('Lavado no encontrado');
-        }
-
-        $estadosValidos = ['pendiente', 'en_proceso', 'completado', 'cancelado'];
-        if (!in_array($estado, $estadosValidos)) {
-            throw new \Exception('Estado no válido');
-        }
-
-        return $this->updateLavado($id, ['estado' => $estado]);
+        return $this->lavadoRepository->getByDay($fecha, $filters);
     }
 
-    protected function validateBusinessRules(array $data, ?int $excludeId = null): array
+    /**
+     * Obtener lavados por semana
+     */
+    public function getLavadosByWeek(string $fecha, array $filters = []): Collection
     {
-        try {
-            // Verificar que el vehículo existe
-            if (isset($data['vehiculo_id'])) {
-                $vehiculo = \App\Models\Vehiculo::find($data['vehiculo_id']);
-                if (!$vehiculo) {
-                    return ['valid' => false, 'message' => 'El vehículo seleccionado no existe'];
-                }
-            }
-
-            // Verificar que el empleado existe
-            if (isset($data['empleado_id'])) {
-                $empleado = \App\Models\Empleado::find($data['empleado_id']);
-                if (!$empleado) {
-                    return ['valid' => false, 'message' => 'El empleado seleccionado no existe'];
-                }
-            }
-
-            // Validar precio
-            if (isset($data['precio']) && $data['precio'] <= 0) {
-                return ['valid' => false, 'message' => 'El precio debe ser mayor a 0'];
-            }
-
-            return ['valid' => true];
-        } catch (\Exception $e) {
-            return ['valid' => false, 'message' => $e->getMessage()];
-        }
+        return $this->lavadoRepository->getByWeek($fecha, $filters);
     }
 
-    protected function validateDeletion(Lavado $lavado): void
+    /**
+     * Obtener lavados por mes
+     */
+    public function getLavadosByMonth(int $anio, int $mes, array $filters = []): Collection
     {
-        // Solo se pueden eliminar lavados pendientes o cancelados
-        if (in_array($lavado->estado, ['completado', 'en_proceso'])) {
-            throw new \Exception('No se puede eliminar un lavado completado o en proceso');
-        }
+        return $this->lavadoRepository->getByMonth($anio, $mes, $filters);
     }
 
-    protected function validatePrecioByTipo(string $tipo, float $precio): void
+    /**
+     * Obtener lavados por año
+     */
+    public function getLavadosByYear(int $anio, array $filters = []): Collection
     {
-        $preciosMinimos = [
-            'basico' => 50,
-            'completo' => 100,
-            'premium' => 150,
-            'encerado' => 200
+        return $this->lavadoRepository->getByYear($anio, $filters);
+    }
+
+    /**
+     * Obtener lavados por rango de fechas
+     */
+    public function getLavadosByDateRange(string $fechaInicio, string $fechaFin): Collection
+    {
+        return $this->lavadoRepository->getByDateRange($fechaInicio, $fechaFin);
+    }
+
+    // =========================================================================
+    // MÉTODOS PRIVADOS DE MIGRACIÓN Y COMPATIBILIDAD
+    // =========================================================================
+
+    /**
+     * Obtener o crear servicio equivalente al tipo de lavado
+     */
+    private function obtenerServicioEquivalente(string $tipoLavado, int $vehiculoId): object
+    {
+        // Mapeo de tipos de lavado legacy a servicios
+        $mapeoServicios = [
+            'basico' => 'Lavado Básico',
+            'completo' => 'Lavado Completo',
+            'premium' => 'Lavado Premium',
+            'express' => 'Lavado Express',
+            'detallado' => 'Lavado Detallado'
         ];
 
-        if (isset($preciosMinimos[$tipo]) && $precio < $preciosMinimos[$tipo]) {
-            throw new \Exception("El precio mínimo para lavado {$tipo} es \${$preciosMinimos[$tipo]}");
+        $nombreServicio = $mapeoServicios[$tipoLavado] ?? "Lavado {$tipoLavado}";
+
+        // Buscar servicio existente
+        $servicio = $this->servicioRepository->findByNombre($nombreServicio);
+
+        // Si no existe, crearlo
+        if (!$servicio) {
+            $vehiculo = Vehiculo::with('tipoVehiculo')->find($vehiculoId);
+            
+            $servicioData = [
+                'nombre' => $nombreServicio,
+                'descripcion' => "Servicio de {$nombreServicio} migrado desde sistema legacy",
+                'activo' => true
+            ];
+
+            $servicio = $this->servicioService->createServicio($servicioData);
+
+            // Crear precios por tipo de vehículo si es necesario
+            if ($vehiculo && $vehiculo->tipoVehiculo) {
+                $this->servicioService->updatePrecio($servicio->servicio_id, $vehiculo->tipoVehiculo->tipo_vehiculo_id, 15.00);
+            }
+
+            Log::info('✅ Servicio creado automáticamente durante migración', [
+                'servicio_id' => $servicio->servicio_id,
+                'nombre' => $nombreServicio,
+                'tipo_lavado_legacy' => $tipoLavado
+            ]);
+        }
+
+        return $servicio;
+    }
+
+    /**
+     * Obtener cliente del vehículo
+     */
+    private function obtenerClienteDelVehiculo(int $vehiculoId): int
+    {
+        $vehiculo = Vehiculo::find($vehiculoId);
+        
+        if (!$vehiculo || !$vehiculo->cliente_id) {
+            throw new \Exception("Vehículo no encontrado o sin cliente asociado");
+        }
+
+        return $vehiculo->cliente_id;
+    }
+
+    /**
+     * Crear registro legacy para compatibilidad
+     */
+    private function crearRegistroLegacy(array $data, object $venta): ?Lavado
+    {
+        try {
+            $lavadoData = array_merge($data, [
+                'migrado_a_venta_id' => $venta->venta_id,
+                'migrado_at' => now()
+            ]);
+
+            $resultado = $this->lavadoRepository->create($lavadoData);
+            
+            return $resultado['success'] ? $resultado['lavado'] : null;
+        } catch (\Exception $e) {
+            Log::warning('⚠️ No se pudo crear registro legacy de compatibilidad', [
+                'venta_id' => $venta->venta_id,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Crear lavado usando sistema legacy (fallback)
+     */
+    private function crearLavadoLegacy(array $data): array
+    {
+        Log::info('🔄 Usando sistema legacy para crear lavado');
+        return $this->lavadoRepository->create($data);
+    }
+
+    /**
+     * Migrar un lavado individual al sistema unificado
+     */
+    private function migrarLavadoIndividual(Lavado $lavado): array
+    {
+        try {
+            // Preparar datos para el nuevo sistema
+            $data = [
+                'vehiculo_id' => $lavado->vehiculo_id,
+                'tipo_lavado' => $lavado->tipo_lavado,
+                'precio' => $lavado->precio,
+                'empleado_id' => $lavado->empleado_id,
+                'fecha' => $lavado->fecha,
+            ];
+
+            $resultado = $this->crearLavado($data);
+
+            if ($resultado['success'] && $resultado['venta']) {
+                // Marcar lavado como migrado
+                $lavado->update([
+                    'migrado_a_venta_id' => $resultado['venta']->venta_id,
+                    'migrado_at' => now()
+                ]);
+
+                return [
+                    'success' => true,
+                    'venta_id' => $resultado['venta']->venta_id
+                ];
+            }
+
+            return [
+                'success' => false,
+                'error' => 'No se pudo crear venta unificada'
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Actualizar venta desde datos de lavado
+     */
+    private function actualizarVentaDesdelavado(int $ventaId, array $datosLavado): void
+    {
+        // Mapear datos de lavado a datos de venta
+        $tipoLavado = isset($datosLavado['tipo_lavado']) ? $datosLavado['tipo_lavado'] : '';
+        $ventaData = [
+            'empleado_id' => $datosLavado['empleado_id'] ?? null,
+            'fecha' => $datosLavado['fecha'] ?? null,
+            'observaciones' => "Actualizado desde lavado: {$tipoLavado}"
+        ];
+
+        $detallesVenta = [];
+        if (isset($datosLavado['precio'])) {
+            // Actualizar precio del servicio en el detalle
+            $venta = $this->ventaService->getById($ventaId);
+            if ($venta && $venta->detalles->isNotEmpty()) {
+                $detallesVenta = $venta->detalles->map(function ($detalle) use ($datosLavado) {
+                    return [
+                        'vendible_type' => $detalle->vendible_type,
+                        'vendible_id' => $detalle->vendible_id,
+                        'cantidad' => $detalle->cantidad,
+                        'precio_unitario' => $datosLavado['precio'],
+                        'descripcion' => $detalle->descripcion
+                    ];
+                })->toArray();
+            }
+        }
+
+        if (!empty($detallesVenta)) {
+            $this->ventaService->actualizarVentaCompleta($ventaId, $ventaData, $detallesVenta);
         }
     }
 }

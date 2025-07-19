@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\VehiculoRepositoryInterface;
+use App\Contracts\TipoVehiculoRepositoryInterface;
 use App\Models\Vehiculo;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
@@ -11,7 +12,8 @@ use Illuminate\Support\Facades\Log;
 class VehiculoService
 {
     public function __construct(
-        protected VehiculoRepositoryInterface $vehiculoRepository
+        protected VehiculoRepositoryInterface $vehiculoRepository,
+        protected TipoVehiculoRepositoryInterface $tipoVehiculoRepository
     ) {}
 
     public function getVehiculosPaginated(int $perPage = 15, array $filters = []): LengthAwarePaginator
@@ -39,7 +41,8 @@ class VehiculoService
         Log::info('Vehículo creado exitosamente', [
             'vehiculo_id' => $vehiculo->vehiculo_id,
             'cliente_id' => $vehiculo->cliente_id,
-            'matricula' => $vehiculo->matricula
+            'matricula' => $vehiculo->matricula,
+            'tipo_vehiculo_id' => $vehiculo->tipo_vehiculo_id
         ]);
 
         return $vehiculo;
@@ -118,6 +121,22 @@ class VehiculoService
         return $this->vehiculoRepository->getStats();
     }
 
+    /**
+     * Obtener tipos de vehículo activos disponibles
+     */
+    public function getTiposVehiculoDisponibles(): Collection
+    {
+        return $this->tipoVehiculoRepository->getActivos();
+    }
+
+    /**
+     * Obtener vehículos por tipo
+     */
+    public function getVehiculosPorTipo(int $tipoVehiculoId): Collection
+    {
+        return $this->vehiculoRepository->getByTipoVehiculo($tipoVehiculoId);
+    }
+
     protected function validateBusinessRules(array $data, ?int $excludeId = null): void
     {
         // Verificar matrícula única (si se proporciona)
@@ -135,28 +154,59 @@ class VehiculoService
             }
         }
 
-        // Validar tipo de vehículo
-        $tiposValidos = ['moto', 'camioneta', 'auto_pequeno', 'auto_mediano'];
-        if (isset($data['tipo']) && !in_array($data['tipo'], $tiposValidos)) {
-            throw new \Exception('Tipo de vehículo no válido');
+        // ⚡ NUEVO: Validar tipo de vehículo dinámico
+        if (isset($data['tipo_vehiculo_id'])) {
+            $tipoVehiculo = $this->tipoVehiculoRepository->findById($data['tipo_vehiculo_id']);
+            if (!$tipoVehiculo) {
+                throw new \Exception('El tipo de vehículo seleccionado no existe');
+            }
+            if (!$tipoVehiculo->activo) {
+                throw new \Exception('El tipo de vehículo seleccionado no está activo');
+            }
+        }
+
+        // ⚠️ DEPRECADO: Mantener compatibilidad con tipos legacy temporalmente
+        if (isset($data['tipo'])) {
+            Log::warning('Uso de campo "tipo" legacy detectado', [
+                'tipo_legacy' => $data['tipo'],
+                'mensaje' => 'Migrar a tipo_vehiculo_id'
+            ]);
+            
+            $tiposValidos = ['moto', 'camioneta', 'auto_pequeno', 'auto_mediano'];
+            if (!in_array($data['tipo'], $tiposValidos)) {
+                throw new \Exception('Tipo de vehículo legacy no válido');
+            }
         }
     }
 
     protected function validateDeletion(Vehiculo $vehiculo): void
     {
-        // Verificar si tiene lavados asociados
-        $lavadosCount = \App\Models\Lavado::where('vehiculo_id', $vehiculo->vehiculo_id)->count();
-        if ($lavadosCount > 0) {
-            throw new \Exception('No se puede eliminar el vehículo porque tiene lavados registrados');
+        // ⚡ NUEVO: Verificar si tiene ventas asociadas (sistema unificado)
+        $ventasCount = \App\Models\VentaDetalle::whereHas('vendible', function($query) use ($vehiculo) {
+            $query->where('vendible_type', 'App\Models\Servicio')
+                  ->whereHas('servicios', function($subQuery) use ($vehiculo) {
+                      // Verificar servicios que requieren este tipo de vehículo
+                      $subQuery->where('tipo_vehiculo_id', $vehiculo->tipo_vehiculo_id);
+                  });
+        })->count();
+        
+        if ($ventasCount > 0) {
+            throw new \Exception('No se puede eliminar el vehículo porque tiene ventas de servicios registradas');
         }
 
-        // Verificar si está en facturas
+        // ⚠️ LEGACY: Verificar lavados legacy (mantener temporalmente)
+        $lavadosCount = \App\Models\Lavado::where('vehiculo_id', $vehiculo->vehiculo_id)->count();
+        if ($lavadosCount > 0) {
+            throw new \Exception('No se puede eliminar el vehículo porque tiene lavados legacy registrados');
+        }
+
+        // ⚠️ LEGACY: Verificar facturas legacy (mantener temporalmente)
         $facturasCount = \App\Models\FacturaDetalle::whereHas('lavado', function($query) use ($vehiculo) {
             $query->where('vehiculo_id', $vehiculo->vehiculo_id);
         })->count();
         
         if ($facturasCount > 0) {
-            throw new \Exception('No se puede eliminar el vehículo porque está asociado a facturas');
+            throw new \Exception('No se puede eliminar el vehículo porque está asociado a facturas legacy');
         }
     }
 }

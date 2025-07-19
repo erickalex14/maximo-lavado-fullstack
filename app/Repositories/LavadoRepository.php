@@ -11,132 +11,156 @@ use App\Models\FacturaDetalle;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
+/**
+ * 🔄 LavadoRepository V2 - SOPORTE PARA MIGRACIÓN AL SISTEMA UNIFICADO
+ * 
+ * Mantiene compatibilidad con sistema legacy mientras soporta migración
+ * gradual al nuevo sistema unificado de ventas y servicios
+ */
 class LavadoRepository implements LavadoRepositoryInterface
 {
+    /**
+     * Obtener lavados paginados con filtros
+     */
     public function getAllPaginated(int $perPage = 15, array $filters = []): LengthAwarePaginator
     {
-        $query = Lavado::with(['vehiculo.cliente', 'empleado']);
+        $query = Lavado::with(['vehiculo.cliente', 'vehiculo.tipoVehiculo', 'empleado']);
 
-        // Aplicar filtros
-        if (!empty($filters['search'])) {
-            $search = $filters['search'];
-            $query->whereHas('vehiculo.cliente', function ($q) use ($search) {
-                $q->where('nombre', 'like', "%{$search}%");
-            })->orWhereHas('vehiculo', function ($q) use ($search) {
-                $q->where('matricula', 'like', "%{$search}%");
-            });
-        }
-
-        if (!empty($filters['vehiculo_id'])) {
-            $query->where('vehiculo_id', $filters['vehiculo_id']);
-        }
-
-        if (!empty($filters['empleado_id'])) {
-            $query->where('empleado_id', $filters['empleado_id']);
-        }
-
-        if (!empty($filters['fecha_inicio'])) {
-            $query->whereDate('fecha', '>=', $filters['fecha_inicio']);
-        }
-
-        if (!empty($filters['fecha_fin'])) {
-            $query->whereDate('fecha', '<=', $filters['fecha_fin']);
-        }
+        $this->applyFilters($query, $filters);
 
         return $query->orderBy('fecha', 'desc')->paginate($perPage);
     }
 
+    /**
+     * Obtener todos los lavados con filtros
+     */
     public function getAll(array $filters = []): Collection
     {
-        $query = Lavado::with(['vehiculo.cliente', 'empleado']);
+        $query = Lavado::with(['vehiculo.cliente', 'vehiculo.tipoVehiculo', 'empleado']);
         
         $this->applyFilters($query, $filters);
         
         return $query->orderBy('fecha', 'desc')->get();
     }
 
+    /**
+     * Buscar lavado por ID
+     */
     public function findById(int $id): ?Lavado
     {
-        return Lavado::with(['vehiculo.cliente', 'empleado'])->find($id);
+        return Lavado::with(['vehiculo.cliente', 'vehiculo.tipoVehiculo', 'empleado'])->find($id);
     }
 
+    /**
+     * Buscar lavado por nombre (para compatibilidad con interfaces estandarizadas)
+     */
+    public function findByNombre(string $nombre): ?Lavado
+    {
+        return Lavado::where('tipo_lavado', $nombre)->first();
+    }
+
+    /**
+     * ⚡ CREAR LAVADO V2 - Con soporte para migración
+     */
     public function create(array $data): array
     {
         try {
             return DB::transaction(function () use ($data) {
-                // Verificar que el vehículo existe
-                $vehiculo = Vehiculo::with('cliente')->find($data['vehiculo_id']);
+                Log::info('🔄 Creando lavado en repository V2', [
+                    'vehiculo_id' => $data['vehiculo_id'],
+                    'tipo_lavado' => $data['tipo_lavado'] ?? 'no_especificado'
+                ]);
+
+                // Verificar que el vehículo existe con tipo de vehículo
+                $vehiculo = Vehiculo::with(['cliente', 'tipoVehiculo'])->find($data['vehiculo_id']);
                 if (!$vehiculo) {
                     return ['success' => false, 'message' => 'Vehículo no encontrado'];
+                }
+
+                if (!$vehiculo->cliente) {
+                    return ['success' => false, 'message' => 'Vehículo sin cliente asociado'];
                 }
                 
                 $data['fecha'] = $data['fecha'] ?? now()->format('Y-m-d');
                 
-                // Crear el lavado
-                $lavado = Lavado::create($data);
+                // Crear el lavado con campos de migración V2
+                $lavadoData = array_merge($data, [
+                    'migrado_a_venta_id' => $data['migrado_a_venta_id'] ?? null,
+                    'migrado_at' => $data['migrado_at'] ?? null,
+                ]);
+
+                $lavado = Lavado::create($lavadoData);
                 
-                // Crear descripción para ingreso
-                $descripcionIngreso = 'Lavado ' . $data['tipo_lavado'] . ' - ' . $vehiculo->cliente->nombre;
-                if ($vehiculo->matricula) {
-                    $descripcionIngreso .= ' (' . $vehiculo->matricula . ')';
+                // Solo crear ingreso y factura si NO está siendo migrado desde el sistema unificado
+                $ingreso = null;
+                $factura = null;
+
+                if (!isset($data['migrado_a_venta_id'])) {
+                    // ⚠️ SISTEMA LEGACY: Crear ingreso y factura manual
+                    $ingreso = $this->crearIngresoLegacy($lavado, $vehiculo);
+                    $factura = $this->crearFacturaLegacy($lavado, $vehiculo);
+                    
+                    Log::info('📄 Creados ingreso y factura legacy', [
+                        'lavado_id' => $lavado->lavado_id,
+                        'ingreso_id' => $ingreso?->ingreso_id,
+                        'factura_id' => $factura?->factura_id
+                    ]);
+                } else {
+                    Log::info('🔄 Lavado creado como parte de migración, no se crean documentos legacy', [
+                        'lavado_id' => $lavado->lavado_id,
+                        'venta_id' => $data['migrado_a_venta_id']
+                    ]);
                 }
-                
-                // Crear el ingreso correspondiente
-                $ingreso = Ingreso::create([
-                    'fecha' => $data['fecha'],
-                    'tipo' => 'lavado',
-                    'referencia_id' => $lavado->lavado_id,
-                    'monto' => $lavado->precio,
-                    'descripcion' => $descripcionIngreso,
-                ]);
-
-                // Generar factura automáticamente
-                $numeroFactura = $this->generateNumeroFactura();
-                $descripcionFactura = 'Factura por servicio de lavado ' . $data['tipo_lavado'];
-                
-                $factura = Factura::create([
-                    'numero_factura' => $numeroFactura,
-                    'cliente_id' => $vehiculo->cliente_id,
-                    'fecha' => $data['fecha'],
-                    'descripcion' => $descripcionFactura,
-                    'total' => $lavado->precio,
-                ]);
-
-                // Crear detalle de factura
-                FacturaDetalle::create([
-                    'factura_id' => $factura->factura_id,
-                    'lavado_id' => $lavado->lavado_id,
-                    'cantidad' => 1,
-                    'precio_unitario' => $lavado->precio,
-                    'subtotal' => $lavado->precio,
-                ]);
                 
                 return [
                     'success' => true,
-                    'lavado' => $lavado->load(['vehiculo.cliente', 'empleado']),
+                    'lavado' => $lavado->load(['vehiculo.cliente', 'vehiculo.tipoVehiculo', 'empleado']),
                     'ingreso' => $ingreso,
-                    'factura' => $factura->load(['cliente', 'detalles'])
+                    'factura' => $factura?->load(['cliente', 'detalles'])
                 ];
             });
         } catch (\Exception $e) {
+            Log::error('❌ Error al crear lavado en repository V2', [
+                'error' => $e->getMessage(),
+                'data' => $data
+            ]);
             return ['success' => false, 'message' => 'Error al crear el lavado: ' . $e->getMessage()];
         }
     }
 
+    /**
+     * Actualizar lavado
+     */
     public function update(int $id, array $data): Lavado
     {
         return DB::transaction(function () use ($id, $data) {
+            Log::info('🔄 Actualizando lavado', [
+                'lavado_id' => $id,
+                'campos_actualizar' => array_keys($data)
+            ]);
+
             $lavado = Lavado::findOrFail($id);
             $lavado->update($data);
-            return $lavado->fresh(['vehiculo.cliente', 'empleado']);
+            
+            Log::info('✅ Lavado actualizado exitosamente', [
+                'lavado_id' => $id
+            ]);
+
+            return $lavado->fresh(['vehiculo.cliente', 'vehiculo.tipoVehiculo', 'empleado']);
         });
     }
 
+    /**
+     * Eliminar lavado (soft delete) con cascade a documentos relacionados
+     */
     public function delete(int $id): bool
     {
         return DB::transaction(function () use ($id) {
+            Log::info('🗑️ Eliminando lavado', ['lavado_id' => $id]);
+
             $lavado = Lavado::findOrFail($id);
             
             // Soft delete la factura relacionada si existe
@@ -148,6 +172,9 @@ class LavadoRepository implements LavadoRepositoryInterface
                 // Soft delete factura si no tiene más detalles activos
                 if ($factura->detalles()->count() == 0) {
                     $factura->delete();
+                    Log::info('📄 Factura eliminada junto con lavado', [
+                        'factura_id' => $factura->factura_id
+                    ]);
                 }
             }
             
@@ -158,10 +185,19 @@ class LavadoRepository implements LavadoRepositoryInterface
             
             if ($ingreso) {
                 $ingreso->delete();
+                Log::info('💰 Ingreso eliminado junto con lavado', [
+                    'ingreso_id' => $ingreso->ingreso_id
+                ]);
             }
             
             // Soft delete el lavado
-            return $lavado->delete();
+            $resultado = $lavado->delete();
+            
+            Log::info('✅ Lavado eliminado exitosamente', [
+                'lavado_id' => $id
+            ]);
+
+            return $resultado;
         });
     }
 
@@ -404,6 +440,85 @@ class LavadoRepository implements LavadoRepositoryInterface
 
         if (!empty($filters['precio_max'])) {
             $query->where('precio', '<=', $filters['precio_max']);
+        }
+
+        // 🔄 FILTROS V2: Soporte para migración
+        if (isset($filters['migrado'])) {
+            if ($filters['migrado']) {
+                $query->whereNotNull('migrado_a_venta_id');
+            } else {
+                $query->whereNull('migrado_a_venta_id');
+            }
+        }
+    }
+
+    // =========================================================================
+    // MÉTODOS AUXILIARES V2 - SOPORTE PARA SISTEMA LEGACY
+    // =========================================================================
+
+    /**
+     * Crear ingreso legacy (solo cuando no es migración)
+     */
+    private function crearIngresoLegacy(Lavado $lavado, $vehiculo): ?Ingreso
+    {
+        try {
+            // Crear descripción para ingreso
+            $descripcionIngreso = 'Lavado ' . $lavado->tipo_lavado . ' - ' . $vehiculo->cliente->nombre;
+            if ($vehiculo->matricula) {
+                $descripcionIngreso .= ' (' . $vehiculo->matricula . ')';
+            }
+            
+            // Crear el ingreso correspondiente
+            return Ingreso::create([
+                'fecha' => $lavado->fecha,
+                'tipo' => 'lavado',
+                'referencia_id' => $lavado->lavado_id,
+                'monto' => $lavado->precio,
+                'descripcion' => $descripcionIngreso,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('❌ Error al crear ingreso legacy', [
+                'lavado_id' => $lavado->lavado_id,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Crear factura legacy (solo cuando no es migración)
+     */
+    private function crearFacturaLegacy(Lavado $lavado, $vehiculo): ?Factura
+    {
+        try {
+            // Generar factura automáticamente
+            $numeroFactura = $this->generateNumeroFactura();
+            $descripcionFactura = 'Factura por servicio de lavado ' . $lavado->tipo_lavado;
+            
+            $factura = Factura::create([
+                'numero_factura' => $numeroFactura,
+                'cliente_id' => $vehiculo->cliente_id,
+                'fecha' => $lavado->fecha,
+                'descripcion' => $descripcionFactura,
+                'total' => $lavado->precio,
+            ]);
+
+            // Crear detalle de factura
+            FacturaDetalle::create([
+                'factura_id' => $factura->factura_id,
+                'lavado_id' => $lavado->lavado_id,
+                'cantidad' => 1,
+                'precio_unitario' => $lavado->precio,
+                'subtotal' => $lavado->precio,
+            ]);
+
+            return $factura;
+        } catch (\Exception $e) {
+            Log::error('❌ Error al crear factura legacy', [
+                'lavado_id' => $lavado->lavado_id,
+                'error' => $e->getMessage()
+            ]);
+            return null;
         }
     }
 }
