@@ -271,40 +271,65 @@
 **🎯 FLUJO AUTOMÁTICO IMPLEMENTADO:**
 `Venta → Factura Electrónica → Ingreso → Actualización Stock`
 
-#### Services Legacy Actualizados para Consistencia V2 ✅
+#### Services V2 Actualizados ✅
 - [x] `VehiculoService.php` ✅ **Actualizado para tipos dinámicos**
-- [x] `LavadoService.php` ✅ **Sistema de migración gradual implementado**
+- [x] `LavadoService.php` ✅ **Sistema de auditoría simple implementado**
 - [x] `VehiculoRepository.php` ✅ **Actualizado para usar tipo_vehiculo_id**  
-- [x] `LavadoRepository.php` ✅ **Soporte para migración V2 y logging mejorado**
+- [x] `LavadoRepository.php` ✅ **Repositorio de auditoría simplificado**
 
-**🔄 MIGRACIÓN GRADUAL IMPLEMENTADA:**
-- **LavadoService V2**: Migra automáticamente lavados legacy al sistema unificado
-- **Fallback inteligente**: Si falla nuevo sistema, usa legacy automáticamente
-- **Compatibilidad total**: Mantiene funcionalidad legacy durante transición
-- **Migración masiva**: Comando para migrar lavados en lotes
-- **Trazabilidad completa**: Tracking de migración con campos `migrado_a_venta_id` y `migrado_at`
+**🔄 SISTEMA DE AUDITORÍA IMPLEMENTADO:**
+- **LavadoService V2**: Sistema simple de auditoría para servicios ejecutados
+- **No migración**: BD nueva PostgreSQL sin datos legacy
+- **Auditoría automática**: Al vender servicio → crear lavado automáticamente  
+- **Trazabilidad**: Servicio + Empleado + Vehículo + Cliente + Fecha + Precio
 
 ---
 
-### **FASE 5: API CONTROLLERS** 🌐
-**Duración**: 3-4 días
+### **✅ FASE 5: API CONTROLLERS (COMPLETADA)** 🌐
+**Duración**: 3-4 días ⚡ **COMPLETADA EN TIEMPO**
 
 #### Request Validation
-- [ ] `CreateVentaRequest.php`
-- [ ] `UpdateVentaRequest.php`
-- [ ] `CreateServicioRequest.php`
-- [ ] `CreateTipoVehiculoRequest.php`
+- [x] `CreateVentaRequest.php` ✅
+- [x] `UpdateVentaRequest.php` ✅
+- [x] `CreateServicioRequest.php` ✅
+- [x] `CreateTipoVehiculoRequest.php` ✅
+- [x] `CreateLavadoRequest.php` ✅ **Sistema de auditoría**
+- [x] `UpdateLavadoRequest.php` ✅ **Sistema de auditoría**
 
-#### Controllers
-- [ ] `VentaController.php` ⭐ **PRINCIPAL**
-- [ ] `ServicioController.php`
-- [ ] `TipoVehiculoController.php`
-- [ ] `FacturaElectronicaController.php`
+#### Controllers Actualizados para V2
+- [x] `VentaController.php` ⭐ **PRINCIPAL** ✅ **Flujo automático completo**
+- [x] `ServicioController.php` ✅ **Catálogo de servicios**
+- [x] `TipoVehiculoController.php` ✅ **Gestión dinámica de tipos**
+- [x] `LavadoController.php` ✅ **Auditoría de servicios ejecutados**
 
 #### Routes API
-- [ ] CRUD nuevas entidades
-- [ ] Endpoints especializados ventas
-- [ ] Integración rutas existentes
+- [x] CRUD nuevas entidades ✅
+- [x] Sistema V2 unificado ✅
+- [x] **NO hay FacturaController** - Solo FacturaElectronica ✅
+- [x] Rutas API limpias sin legacy duplicado ✅
+
+**🔄 FLUJO AUTOMÁTICO CRÍTICO IMPLEMENTADO:**
+
+**VENTA CON SERVICIO:**
+```
+VENTA CREADA → FACTURA ELECTRÓNICA → INGRESO → LAVADO (auditoría)
+```
+
+**VENTA CON PRODUCTO:**
+```
+VENTA CREADA → FACTURA ELECTRÓNICA → ACTUALIZAR STOCK → INGRESO
+```
+
+**VENTA MIXTA (SERVICIO + PRODUCTO):**
+```
+VENTA CREADA → FACTURA ELECTRÓNICA → ACTUALIZAR STOCK → INGRESO → LAVADO
+```
+
+**✅ ARQUITECTURA CLARIFICADA:**
+- **Lavados = Auditoría**: Registra servicios ejecutados (no migración)
+- **Sin datos legacy**: BD nueva PostgreSQL sin migración de lavados
+- **Tabla lavados**: Solo para auditoría de servicios vendidos
+- **Un solo sistema**: No hay separación V2/legacy en controladores
 
 ---
 

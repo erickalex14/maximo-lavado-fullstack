@@ -108,6 +108,45 @@ class VentaRepository implements VentaRepositoryInterface
     }
 
     /**
+     * ⚡ MÉTODO CRÍTICO: Procesar venta completa con flujos automáticos
+     * Orquesta la creación de venta con todos los flujos integrados
+     * 
+     * @param array $ventaData Datos de la venta
+     * @param array $detallesData Detalles de la venta (productos/servicios)
+     * @return Venta La venta procesada con todas sus relaciones
+     */
+    public function procesarVentaCompleta(array $ventaData, array $detallesData): Venta
+    {
+        return DB::transaction(function () use ($ventaData, $detallesData) {
+            Log::info('🔄 Iniciando procesamiento de venta completa', [
+                'cliente_id' => $ventaData['cliente_id'],
+                'total_detalles' => count($detallesData)
+            ]);
+
+            // 1. Crear la venta base
+            $venta = $this->createVentaCompleta($ventaData, $detallesData);
+
+            // 2. Cargar todas las relaciones necesarias para los flujos automáticos
+            $venta = $venta->fresh([
+                'cliente',
+                'empleado', 
+                'detalles.vendible',
+                'facturaElectronica',
+                'ingresos'
+            ]);
+
+            Log::info('✅ Venta completa procesada exitosamente', [
+                'venta_id' => $venta->venta_id,
+                'cliente' => $venta->cliente->nombre,
+                'total' => $venta->total,
+                'detalles_count' => $venta->detalles->count()
+            ]);
+
+            return $venta;
+        });
+    }
+
+    /**
      * Crear venta completa con detalles
      */
     public function createVentaCompleta(array $ventaData, array $detallesData): Venta

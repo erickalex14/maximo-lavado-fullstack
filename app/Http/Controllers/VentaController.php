@@ -3,18 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Services\VentaService;
-use App\Http\Requests\CreateVentaProductoAutomotrizRequest;
-use App\Http\Requests\CreateVentaProductoDespensaRequest;
-use App\Http\Requests\UpdateVentaProductoAutomotrizRequest;
-use App\Http\Requests\UpdateVentaProductoDespensaRequest;
+use App\Http\Requests\Venta\CreateVentaRequest;
+use App\Http\Requests\Venta\UpdateVentaRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Controlador consolidado para gestión de ventas de productos automotrices y de despensa
+ * 🚗 VentaController V2 - Sistema unificado de ventas con flujo automático
+ * 
+ * FLUJOS AUTOMATIZADOS:
+ * 1. Solo productos: Venta → FacturaElectronica → Stock update → Ingreso
+ * 2. Solo servicios: Venta → FacturaElectronica → Ingreso → Lavado
+ * 3. Mixto: Venta → FacturaElectronica → Stock update → Ingreso → Lavado
  * 
  * Aplica principios SOLID:
- * - Single Responsibility: Solo maneja ventas
+ * - Single Responsibility: Solo maneja ventas con flujos automáticos
  * - Open/Closed: Extensible para nuevos tipos de venta
  * - Liskov Substitution: Usa interfaces consistentes
  * - Interface Segregation: Métodos específicos por tipo
@@ -113,19 +116,83 @@ class VentaController extends Controller
     }
 
     /**
-     * Crear una venta de producto automotriz
-     * POST /ventas/automotrices
+     * Crear nueva venta (UNIFICADO - maneja productos, servicios y mixtas)
+     * POST /ventas
      */
-    public function createVentaAutomotriz(CreateVentaProductoAutomotrizRequest $request): JsonResponse
+    public function store(CreateVentaRequest $request): JsonResponse
     {
         try {
-            $result = $this->ventaService->createVentaAutomotriz($request->validated());
+            $venta = $this->ventaService->crearVentaCompleta(
+                $request->only(['cliente_id', 'empleado_id', 'fecha', 'metodo_pago', 'observaciones']),
+                $request->input('detalles', [])
+            );
             
-            return $this->successResponse($result, 'data', 'Venta de producto automotriz registrada correctamente', 201);
+            return $this->successResponse($venta, 'venta', 'Venta creada correctamente', 201);
         } catch (\Exception $e) {
-            return $this->errorResponse('Error al registrar la venta', $e);
+            return $this->errorResponse('Error al crear la venta', $e);
         }
     }
+
+    /**
+     * Actualizar venta existente
+     * PUT /ventas/{id}
+     */
+    public function update(int $id, UpdateVentaRequest $request): JsonResponse
+    {
+        try {
+            $venta = $this->ventaService->actualizarVentaCompleta(
+                $id,
+                $request->only(['cliente_id', 'empleado_id', 'fecha', 'metodo_pago', 'observaciones']),
+                $request->input('detalles', [])
+            );
+            
+            return $this->successResponse($venta, 'venta', 'Venta actualizada correctamente');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Error al actualizar la venta', $e);
+        }
+    }
+
+    /**
+     * Obtener una venta específica
+     * GET /ventas/{id}
+     */
+    public function show(int $id): JsonResponse
+    {
+        try {
+            $venta = $this->ventaService->getById($id);
+            
+            if (!$venta) {
+                return $this->notFoundResponse('Venta no encontrada');
+            }
+
+            return $this->successResponse($venta, 'venta');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Error al obtener la venta', $e);
+        }
+    }
+
+    /**
+     * Eliminar venta (soft delete)
+     * DELETE /ventas/{id}
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        try {
+            $result = $this->ventaService->eliminarVenta($id);
+            
+            if (!$result) {
+                return $this->notFoundResponse('Venta no encontrada');
+            }
+
+            return $this->successResponse(null, null, 'Venta eliminada correctamente');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Error al eliminar la venta', $e);
+        }
+    }
+
+    // =======================================================
+    // MÉTODOS DE CONSULTA Y ESTADÍSTICAS  
+    // =======================================================
 
     /**
      * Obtener una venta automotriz específica

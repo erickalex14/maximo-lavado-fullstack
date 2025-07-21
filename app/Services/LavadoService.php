@@ -4,14 +4,16 @@ namespace App\Services;
 
 use App\Contracts\LavadoRepositoryInterface;
 use App\Contracts\ServicioRepositoryInterface;
+use App\Contracts\VentaRepositoryInterface;
 use App\Models\Lavado;
 use App\Models\Vehiculo;
-use App\Services\VentaService;
 use App\Services\ServicioService;
+use App\Services\VentaService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\App;
 
 /**
  * 🔄 LavadoService V2 - MIGRACIÓN GRADUAL AL SISTEMA UNIFICADO
@@ -23,18 +25,15 @@ class LavadoService
 {
     protected LavadoRepositoryInterface $lavadoRepository;
     protected ServicioRepositoryInterface $servicioRepository;
-    protected VentaService $ventaService;
     protected ServicioService $servicioService;
 
     public function __construct(
         LavadoRepositoryInterface $lavadoRepository,
         ServicioRepositoryInterface $servicioRepository,
-        VentaService $ventaService,
         ServicioService $servicioService
     ) {
         $this->lavadoRepository = $lavadoRepository;
         $this->servicioRepository = $servicioRepository;
-        $this->ventaService = $ventaService;
         $this->servicioService = $servicioService;
     }
 
@@ -72,7 +71,8 @@ class LavadoService
             ];
 
             // Crear venta completa usando el flujo automático
-            $venta = $this->ventaService->crearVentaCompleta($ventaData, $detallesVenta);
+            $ventaService = resolve(VentaService::class);
+            $venta = $ventaService->crearVentaCompleta($ventaData, $detallesVenta);
 
             // PASO 3: Crear registro legacy para compatibilidad
             $lavadoLegacy = null;
@@ -103,6 +103,98 @@ class LavadoService
             // 🔄 FALLBACK: Si falla el nuevo sistema, usar el legacy
             Log::warning('🔄 Fallback: Usando sistema legacy de lavados');
             return $this->crearLavadoLegacy($data);
+        }
+    }
+
+    /**
+     * ⚡ MÉTODO CRÍTICO: Crear lavados automáticos desde una venta con servicios
+     * Usado por VentaService para flujos automáticos
+     * 
+     * @param \App\Models\Venta $venta La venta que contiene servicios
+     * @return array Array de lavados creados
+     */
+    public function crearLavadosDesdeVenta($venta): array
+    {
+        try {
+            Log::info('⚡ Iniciando creación de lavados desde venta', [
+                'venta_id' => $venta->venta_id,
+                'cliente_id' => $venta->cliente_id,
+                'total_detalles' => $venta->detalles->count()
+            ]);
+
+            $lavadosCreados = [];
+            
+            // Filtrar solo los detalles que son servicios
+            $detallesServicios = $venta->detalles->where('vendible_type', 'App\Models\Servicio');
+            
+            if ($detallesServicios->isEmpty()) {
+                Log::info('No se encontraron servicios en la venta, no se crean lavados', [
+                    'venta_id' => $venta->venta_id
+                ]);
+                return $lavadosCreados;
+            }
+
+            // Crear un lavado por cada servicio en la venta
+            foreach ($detallesServicios as $detalle) {
+                $servicio = $detalle->vendible;
+                
+                // Datos del lavado basados en la venta y el servicio
+                $dataLavado = [
+                    'venta_id' => $venta->venta_id,
+                    'cliente_id' => $venta->cliente_id,
+                    'empleado_id' => $venta->empleado_id ?? null,
+                    'servicio_id' => $servicio->servicio_id,
+                    'vehiculo_id' => null, // Se puede obtener del cliente o asignar después
+                    'tipo_vehiculo_id' => null, // Se puede inferir del servicio
+                    'estado' => 'PENDIENTE', // Estado inicial
+                    'observaciones' => "Lavado creado automáticamente desde venta #{$venta->venta_id}",
+                    'fecha' => $venta->fecha ?? now(),
+                    'precio' => $detalle->precio_unitario,
+                    'cantidad_servicios' => $detalle->cantidad,
+                    
+                    // Auditoría
+                    'creado_desde_venta' => true,
+                    'sistema_origen' => 'V2_AUTOMATICO',
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ];
+
+                // Intentar obtener vehículo del cliente
+                if ($venta->cliente && $venta->cliente->vehiculos->isNotEmpty()) {
+                    $vehiculoPrincipal = $venta->cliente->vehiculos->first();
+                    $dataLavado['vehiculo_id'] = $vehiculoPrincipal->vehiculo_id;
+                    $dataLavado['tipo_vehiculo_id'] = $vehiculoPrincipal->tipo_vehiculo_id;
+                }
+
+                // Crear el registro de lavado
+                $lavado = $this->lavadoRepository->create($dataLavado);
+                $lavadosCreados[] = $lavado;
+
+                Log::info('Lavado creado desde venta', [
+                    'lavado_id' => $lavado->lavado_id,
+                    'venta_id' => $venta->venta_id,
+                    'servicio_id' => $servicio->servicio_id,
+                    'servicio_nombre' => $servicio->nombre,
+                    'estado' => $lavado->estado
+                ]);
+            }
+
+            Log::info('✅ Lavados creados exitosamente desde venta', [
+                'venta_id' => $venta->venta_id,
+                'lavados_creados' => count($lavadosCreados),
+                'servicios_procesados' => $detallesServicios->count()
+            ]);
+
+            return $lavadosCreados;
+
+        } catch (\Exception $e) {
+            Log::error('❌ Error al crear lavados desde venta', [
+                'venta_id' => $venta->venta_id ?? 'desconocido',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            throw new \Exception("Error al crear lavados automáticos: {$e->getMessage()}");
         }
     }
 
@@ -231,7 +323,8 @@ class LavadoService
                 'venta_id' => $lavado->migrado_a_venta_id
             ]);
 
-            $this->ventaService->eliminarVenta($lavado->migrado_a_venta_id);
+            $ventaService = resolve(VentaService::class);
+            $ventaService->eliminarVenta($lavado->migrado_a_venta_id);
         }
 
         return $this->lavadoRepository->delete($id);
@@ -502,7 +595,8 @@ class LavadoService
         $detallesVenta = [];
         if (isset($datosLavado['precio'])) {
             // Actualizar precio del servicio en el detalle
-            $venta = $this->ventaService->getById($ventaId);
+            $ventaService = resolve(VentaService::class);
+            $venta = $ventaService->getById($ventaId);
             if ($venta && $venta->detalles->isNotEmpty()) {
                 $detallesVenta = $venta->detalles->map(function ($detalle) use ($datosLavado) {
                     return [
@@ -517,7 +611,8 @@ class LavadoService
         }
 
         if (!empty($detallesVenta)) {
-            $this->ventaService->actualizarVentaCompleta($ventaId, $ventaData, $detallesVenta);
+            $ventaService = resolve(VentaService::class);
+            $ventaService->actualizarVentaCompleta($ventaId, $ventaData, $detallesVenta);
         }
     }
 }

@@ -7,6 +7,7 @@ use App\Contracts\VentaDetalleRepositoryInterface;
 use App\Contracts\IngresoRepositoryInterface;
 use App\Contracts\ProductoAutomotrizRepositoryInterface;
 use App\Contracts\ProductoDespensaRepositoryInterface;
+use App\Contracts\LavadoRepositoryInterface;
 use App\Models\Venta;
 use App\Models\VentaDetalle;
 use App\Services\FacturaElectronicaService;
@@ -22,6 +23,7 @@ class VentaService
     protected ProductoAutomotrizRepositoryInterface $productoAutomotrizRepository;
     protected ProductoDespensaRepositoryInterface $productoDespensaRepository;
     protected FacturaElectronicaService $facturaElectronicaService;
+    protected LavadoRepositoryInterface $lavadoRepository;
 
     public function __construct(
         VentaRepositoryInterface $ventaRepository,
@@ -29,7 +31,8 @@ class VentaService
         IngresoRepositoryInterface $ingresoRepository,
         ProductoAutomotrizRepositoryInterface $productoAutomotrizRepository,
         ProductoDespensaRepositoryInterface $productoDespensaRepository,
-        FacturaElectronicaService $facturaElectronicaService
+        FacturaElectronicaService $facturaElectronicaService,
+        LavadoRepositoryInterface $lavadoRepository
     ) {
         $this->ventaRepository = $ventaRepository;
         $this->detalleRepository = $detalleRepository;
@@ -37,6 +40,7 @@ class VentaService
         $this->productoAutomotrizRepository = $productoAutomotrizRepository;
         $this->productoDespensaRepository = $productoDespensaRepository;
         $this->facturaElectronicaService = $facturaElectronicaService;
+        $this->lavadoRepository = $lavadoRepository;
     }
 
     /**
@@ -77,7 +81,17 @@ class VentaService
                 // PASO 7: CREAR INGRESO FINANCIERO AUTOMÁTICO ⚡ CRÍTICO
                 $this->crearIngresoAutomatico($venta);
 
-                // PASO 8: PROCESAR FACTURA CON SRI (opcional, puede ser asíncrono)
+                // PASO 8: CREAR LAVADOS AUTOMÁTICOS SI HAY SERVICIOS ⚡ CRÍTICO
+                $lavadosCreados = [];
+                if ($this->tieneServicios($detallesVenta)) {
+                    $lavadosCreados = $this->crearLavadosDesdeVenta($venta->fresh(['detalles.vendible']));
+                    Log::info('Lavados automáticos creados', [
+                        'venta_id' => $venta->venta_id,
+                        'lavados_creados' => count($lavadosCreados)
+                    ]);
+                }
+
+                // PASO 9: PROCESAR FACTURA CON SRI (opcional, puede ser asíncrono)
                 try {
                     $this->facturaElectronicaService->procesarConSRI($facturaElectronica->factura_electronica_id);
                 } catch (\Exception $e) {
@@ -89,11 +103,14 @@ class VentaService
                     ]);
                 }
 
-                Log::info('Venta completa creada exitosamente', [
+                Log::info('✅ Venta completa creada exitosamente con flujo automático', [
                     'venta_id' => $venta->venta_id,
                     'factura_id' => $facturaElectronica->factura_electronica_id,
                     'total' => $venta->total,
-                    'items_procesados' => count($detallesVenta)
+                    'items_procesados' => count($detallesVenta),
+                    'lavados_creados' => count($lavadosCreados),
+                    'tiene_productos' => $this->tieneProductos($detallesVenta),
+                    'tiene_servicios' => $this->tieneServicios($detallesVenta)
                 ]);
 
                 // Recargar venta con todas las relaciones
@@ -464,6 +481,127 @@ class VentaService
             if (empty($detalle['precio_unitario']) || $detalle['precio_unitario'] <= 0) {
                 throw new \Exception("Detalle #{$index}: el precio unitario debe ser mayor a 0");
             }
+        }
+    }
+
+    /**
+     * Verificar si la venta contiene servicios
+     */
+    private function tieneServicios(array $detallesVenta): bool
+    {
+        foreach ($detallesVenta as $detalle) {
+            if ($detalle['vendible_type'] === 'App\Models\Servicio') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Verificar si la venta contiene productos
+     */
+    private function tieneProductos(array $detallesVenta): bool
+    {
+        foreach ($detallesVenta as $detalle) {
+            if (in_array($detalle['vendible_type'], [
+                'App\Models\ProductoAutomotriz', 
+                'App\Models\ProductoDespensa'
+            ])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * ⚡ MÉTODO CRÍTICO: Crear lavados automáticos desde una venta con servicios
+     * Usado internamente para flujos automáticos sin dependencia circular
+     * 
+     * @param \App\Models\Venta $venta La venta que contiene servicios
+     * @return array Array de lavados creados
+     */
+    private function crearLavadosDesdeVenta($venta): array
+    {
+        try {
+            Log::info('⚡ Iniciando creación de lavados desde venta', [
+                'venta_id' => $venta->venta_id,
+                'cliente_id' => $venta->cliente_id,
+                'total_detalles' => $venta->detalles->count()
+            ]);
+
+            $lavadosCreados = [];
+            
+            // Filtrar solo los detalles que son servicios
+            $detallesServicios = $venta->detalles->where('vendible_type', 'App\Models\Servicio');
+            
+            if ($detallesServicios->isEmpty()) {
+                Log::info('No se encontraron servicios en la venta, no se crean lavados', [
+                    'venta_id' => $venta->venta_id
+                ]);
+                return $lavadosCreados;
+            }
+
+            // Crear un lavado por cada servicio en la venta
+            foreach ($detallesServicios as $detalle) {
+                $servicio = $detalle->vendible;
+                
+                // Datos del lavado basados en la venta y el servicio
+                $dataLavado = [
+                    'venta_id' => $venta->venta_id,
+                    'cliente_id' => $venta->cliente_id,
+                    'empleado_id' => $venta->empleado_id ?? null,
+                    'servicio_id' => $servicio->servicio_id,
+                    'vehiculo_id' => null, // Se puede obtener del cliente o asignar después
+                    'tipo_vehiculo_id' => null, // Se puede inferir del servicio
+                    'estado' => 'PENDIENTE', // Estado inicial
+                    'observaciones' => "Lavado creado automáticamente desde venta #{$venta->venta_id}",
+                    'fecha' => $venta->fecha ?? now(),
+                    'precio' => $detalle->precio_unitario,
+                    'cantidad_servicios' => $detalle->cantidad,
+                    
+                    // Auditoría
+                    'creado_desde_venta' => true,
+                    'sistema_origen' => 'V2_AUTOMATICO',
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ];
+
+                // Intentar obtener vehículo del cliente
+                if ($venta->cliente && $venta->cliente->vehiculos->isNotEmpty()) {
+                    $vehiculoPrincipal = $venta->cliente->vehiculos->first();
+                    $dataLavado['vehiculo_id'] = $vehiculoPrincipal->vehiculo_id;
+                    $dataLavado['tipo_vehiculo_id'] = $vehiculoPrincipal->tipo_vehiculo_id;
+                }
+
+                // Crear el registro de lavado usando el repository
+                $lavado = $this->lavadoRepository->create($dataLavado);
+                $lavadosCreados[] = $lavado;
+
+                Log::info('Lavado creado desde venta', [
+                    'lavado_id' => $lavado->lavado_id,
+                    'venta_id' => $venta->venta_id,
+                    'servicio_id' => $servicio->servicio_id,
+                    'servicio_nombre' => $servicio->nombre,
+                    'estado' => $lavado->estado
+                ]);
+            }
+
+            Log::info('✅ Lavados creados exitosamente desde venta', [
+                'venta_id' => $venta->venta_id,
+                'lavados_creados' => count($lavadosCreados),
+                'servicios_procesados' => $detallesServicios->count()
+            ]);
+
+            return $lavadosCreados;
+
+        } catch (\Exception $e) {
+            Log::error('❌ Error al crear lavados desde venta', [
+                'venta_id' => $venta->venta_id ?? 'desconocido',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            throw new \Exception("Error al crear lavados automáticos: {$e->getMessage()}");
         }
     }
 }
