@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Services\TipoVehiculoService;
-use App\Http\Requests\CreateTipoVehiculoRequest;
-use App\Http\Requests\UpdateTipoVehiculoRequest;
+use App\Http\Requests\TipoVehiculo\CreateTipoVehiculoRequest;
+use App\Http\Requests\TipoVehiculo\UpdateTipoVehiculoRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -115,7 +115,7 @@ class TipoVehiculoController extends Controller
     public function store(CreateTipoVehiculoRequest $request): JsonResponse
     {
         try {
-            $tipoVehiculo = $this->tipoVehiculoService->createTipoVehiculo($request->validated());
+            $tipoVehiculo = $this->tipoVehiculoService->crear($request->validated());
 
             Log::info('✅ Tipo de vehículo creado exitosamente', [
                 'tipo_vehiculo_id' => $tipoVehiculo->tipo_vehiculo_id,
@@ -180,7 +180,7 @@ class TipoVehiculoController extends Controller
     public function update(UpdateTipoVehiculoRequest $request, int $id): JsonResponse
     {
         try {
-            $tipoVehiculo = $this->tipoVehiculoService->updateTipoVehiculo($id, $request->validated());
+            $tipoVehiculo = $this->tipoVehiculoService->actualizar($id, $request->validated());
 
             Log::info('✅ Tipo de vehículo actualizado exitosamente', [
                 'tipo_vehiculo_id' => $id
@@ -246,7 +246,7 @@ class TipoVehiculoController extends Controller
     public function destroy(int $id): JsonResponse
     {
         try {
-            $resultado = $this->tipoVehiculoService->deleteTipoVehiculo($id);
+            $resultado = $this->tipoVehiculoService->eliminar($id);
 
             Log::info('✅ Tipo de vehículo eliminado exitosamente', [
                 'tipo_vehiculo_id' => $id
@@ -276,7 +276,7 @@ class TipoVehiculoController extends Controller
     public function restore(int $id): JsonResponse
     {
         try {
-            $resultado = $this->tipoVehiculoService->restoreTipoVehiculo($id);
+            $resultado = $this->tipoVehiculoService->restaurar($id);
 
             Log::info('✅ Tipo de vehículo restaurado exitosamente', [
                 'tipo_vehiculo_id' => $id

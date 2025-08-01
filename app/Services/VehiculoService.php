@@ -141,7 +141,7 @@ class VehiculoService
     {
         // Verificar matrícula única (si se proporciona)
         if (isset($data['matricula']) && !empty($data['matricula'])) {
-            if ($this->vehiculoRepository->existsByMatricula($data['matricula'], $excludeId)) {
+            if ($this->vehiculoRepository->existsByPlaca($data['matricula'], $excludeId)) {
                 throw new \Exception('Ya existe un vehículo con esta matrícula');
             }
         }

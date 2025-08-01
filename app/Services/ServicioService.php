@@ -31,6 +31,14 @@ class ServicioService
     }
 
     /**
+     * Obtener servicios paginados
+     */
+    public function getAllPaginated(int $perPage = 15, array $filters = []): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        return $this->servicioRepository->getAllPaginated($perPage, $filters);
+    }
+
+    /**
      * Obtener servicio por ID
      */
     public function getById(int $id): ?Servicio
@@ -39,7 +47,7 @@ class ServicioService
     }
 
     /**
-     * Crear nuevo servicio con precios por tipo de vehículo
+     * Crear nuevo servicio
      */
     public function crear(array $data): Servicio
     {
@@ -48,23 +56,17 @@ class ServicioService
 
         try {
             return DB::transaction(function () use ($data) {
-                // Extraer precios por tipo de vehículo
-                $preciosPorTipo = $data['precios_por_tipo'] ?? [];
-                unset($data['precios_por_tipo']);
-
-                // Crear el servicio
+                // Crear el servicio directamente
                 $servicio = $this->servicioRepository->create($data);
-
-                // Crear precios por tipo de vehículo
-                $this->crearPreciosPorTipo($servicio, $preciosPorTipo);
                 
                 Log::info('Servicio creado', [
                     'servicio_id' => $servicio->servicio_id,
                     'nombre' => $servicio->nombre,
-                    'precios_configurados' => count($preciosPorTipo)
+                    'tipo_vehiculo_id' => $servicio->tipo_vehiculo_id,
+                    'precio_base' => $servicio->precio_base
                 ]);
 
-                return $servicio->fresh(['precios.tipoVehiculo']);
+                return $servicio->fresh(['tipoVehiculo']);
             });
         } catch (\Exception $e) {
             Log::error('Error al crear servicio', [
@@ -91,21 +93,16 @@ class ServicioService
 
         try {
             return DB::transaction(function () use ($id, $data, $servicio) {
-                // Extraer precios por tipo de vehículo
-                $preciosPorTipo = $data['precios_por_tipo'] ?? [];
-                unset($data['precios_por_tipo']);
-
                 // Actualizar el servicio
-                $this->servicioRepository->update($id, $data);
-
-                // Actualizar precios por tipo de vehículo si se proporcionan
-                if (!empty($preciosPorTipo)) {
-                    $this->actualizarPreciosPorTipo($servicio, $preciosPorTipo);
+                $updated = $this->servicioRepository->update($id, $data);
+                
+                if (!$updated) {
+                    throw new \Exception('No se pudo actualizar el servicio');
                 }
                 
                 Log::info('Servicio actualizado', [
                     'servicio_id' => $id,
-                    'cambios' => array_diff($data, $servicio->toArray())
+                    'cambios' => $data
                 ]);
 
                 return $this->servicioRepository->findById($id);
@@ -364,33 +361,6 @@ class ServicioService
     }
 
     /**
-     * Crear precios por tipo de vehículo
-     */
-    private function crearPreciosPorTipo(Servicio $servicio, array $preciosPorTipo): void
-    {
-        foreach ($preciosPorTipo as $tipoVehiculoId => $precio) {
-            if ($precio > 0) {
-                $servicio->precios()->create([
-                    'tipo_vehiculo_id' => $tipoVehiculoId,
-                    'precio' => $precio
-                ]);
-            }
-        }
-    }
-
-    /**
-     * Actualizar precios por tipo de vehículo
-     */
-    private function actualizarPreciosPorTipo(Servicio $servicio, array $preciosPorTipo): void
-    {
-        foreach ($preciosPorTipo as $tipoVehiculoId => $precio) {
-            if ($precio > 0) {
-                $this->servicioRepository->updatePrecio($servicio->servicio_id, $tipoVehiculoId, $precio);
-            }
-        }
-    }
-
-    /**
      * Validar datos del servicio
      */
     private function validarDatosServicio(array $data, ?int $excludeId = null): void
@@ -399,8 +369,6 @@ class ServicioService
         if (empty($data['nombre'])) {
             throw new \Exception("El nombre del servicio es obligatorio");
         }
-
-        // Validar que el nombre no exista ya
         if ($this->servicioRepository->existsByNombre($data['nombre'], $excludeId)) {
             throw new \Exception("Ya existe un servicio con el nombre: {$data['nombre']}");
         }

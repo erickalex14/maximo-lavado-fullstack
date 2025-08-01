@@ -62,7 +62,7 @@ class VehiculoRepository implements VehiculoRepositoryInterface
         return \DB::transaction(function () use ($data) {
             // Validar matrícula única (si se proporciona)
             if (isset($data['matricula']) && !empty($data['matricula'])) {
-                if ($this->existsByMatricula($data['matricula'])) {
+                if ($this->existsByPlaca($data['matricula'])) {
                     throw new \Exception('Ya existe un vehículo con esta matrícula');
                 }
             }
@@ -78,7 +78,7 @@ class VehiculoRepository implements VehiculoRepositoryInterface
             
             // Validar matrícula única si se está actualizando y es diferente
             if (isset($data['matricula']) && !empty($data['matricula']) && $data['matricula'] !== $vehiculo->matricula) {
-                if ($this->existsByMatricula($data['matricula'], $id)) {
+                if ($this->existsByPlaca($data['matricula'], $id)) {
                     throw new \Exception('Ya existe un vehículo con esta matrícula');
                 }
             }
@@ -125,15 +125,20 @@ class VehiculoRepository implements VehiculoRepositoryInterface
                       ->get();
     }
 
-    public function existsByMatricula(string $matricula, ?int $excludeId = null): bool
+    public function existsByPlaca(string $placa, ?int $excludeId = null): bool
     {
-        $query = Vehiculo::where('matricula', $matricula);
+        $query = Vehiculo::where('matricula', $placa);
         
         if ($excludeId) {
             $query->where('vehiculo_id', '!=', $excludeId);
         }
 
         return $query->exists();
+    }
+
+    public function existsByMatricula(string $matricula, ?int $excludeId = null): bool
+    {
+        return $this->existsByPlaca($matricula, $excludeId);
     }
 
     public function getStats(): array

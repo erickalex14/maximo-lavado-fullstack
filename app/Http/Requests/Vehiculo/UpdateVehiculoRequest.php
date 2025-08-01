@@ -18,7 +18,7 @@ class UpdateVehiculoRequest extends FormRequest
 
         return [
             'cliente_id' => 'sometimes|exists:clientes,cliente_id',
-            'tipo' => 'sometimes|string|in:moto,camioneta,auto_pequeno,auto_mediano',
+            'tipo_vehiculo_id' => 'sometimes|exists:tipos_vehiculos,tipo_vehiculo_id',
             'matricula' => [
                 'nullable',
                 'string',
@@ -33,7 +33,7 @@ class UpdateVehiculoRequest extends FormRequest
     {
         return [
             'cliente_id.exists' => 'El cliente seleccionado no existe.',
-            'tipo.in' => 'El tipo de vehículo debe ser: moto, camioneta, auto pequeño o auto mediano.',
+            'tipo_vehiculo_id.exists' => 'El tipo de vehículo seleccionado no existe.',
             'matricula.unique' => 'Ya existe otro vehículo con esta matrícula.',
             'matricula.max' => 'La matrícula no puede exceder 20 caracteres.',
             'descripcion.max' => 'La descripción no puede exceder 500 caracteres.'

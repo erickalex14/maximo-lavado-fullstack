@@ -34,6 +34,20 @@ return new class extends Migration
             $table->string('ambiente', 1)->default('1'); // 1: Pruebas, 2: Producción
             $table->string('tipo_emision', 1)->default('1'); // 1: Emisión normal
             
+            // Clave de acceso y autenticación SRI
+            $table->string('clave_acceso', 49)->unique()->nullable();
+            $table->string('numero_autorizacion', 37)->nullable();
+            $table->dateTime('fecha_autorizacion')->nullable();
+            
+            // Estado del proceso SRI
+            $table->enum('estado_sri', ['GENERADA', 'ENVIADA', 'AUTORIZADA', 'RECHAZADA', 'ANULADA'])->default('GENERADA');
+            
+            // Valores monetarios (para reportes rápidos)
+            $table->decimal('subtotal', 12, 2);
+            $table->decimal('descuento', 12, 2)->default(0);
+            $table->decimal('iva', 12, 2)->default(0);
+            $table->decimal('total', 12, 2);
+            
             // XML y respuesta del SRI
             $table->longText('xml_documento')->nullable();
             $table->longText('xml_autorizado')->nullable();
@@ -47,6 +61,8 @@ return new class extends Migration
             $table->unique(['establecimiento', 'punto_emision', 'secuencial']);
             $table->index(['ruc_emisor', 'fecha_autorizacion']);
             $table->index('identificacion_comprador');
+            $table->index(['estado_sri', 'fecha_autorizacion']);
+            $table->index('clave_acceso');
         });
     }
 

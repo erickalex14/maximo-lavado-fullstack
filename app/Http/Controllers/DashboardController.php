@@ -31,7 +31,7 @@ class DashboardController extends Controller
      * Obtener datos principales del dashboard
      * GET /api/dashboard/data
      */
-    public function getData(DashboardRequest $request): JsonResponse
+    public function getData(Request $request): JsonResponse
     {
         try {
             $data = $this->dashboardService->getDashboardData();

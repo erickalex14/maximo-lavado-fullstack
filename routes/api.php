@@ -34,7 +34,7 @@ Route::middleware('auth:sanctum')->get('/usuario', [AuthController::class, 'user
 
 Route::middleware('auth:sanctum')->group(function () {
     // Dashboard
-    Route::get('/dashboard/data', [DashboardController::class, 'getData']);
+    Route::get('/dashboard/datos', [DashboardController::class, 'getData']);
     Route::get('/dashboard/metricas', [DashboardController::class, 'getMetricas']);
     Route::get('/dashboard/actividad', [DashboardController::class, 'getActividadReciente']);
     Route::get('/dashboard/citas', [DashboardController::class, 'getProximasCitas']);

@@ -92,6 +92,28 @@ class AppServiceProvider extends ServiceProvider
             \App\Contracts\DashboardRepositoryInterface::class,
             \App\Repositories\DashboardRepository::class
         );
+
+        // 🚗 Tipos de Vehículos y Servicios (FALTABAN ESTOS)
+        $this->app->bind(
+            \App\Contracts\TipoVehiculoRepositoryInterface::class,
+            \App\Repositories\TipoVehiculoRepository::class
+        );
+
+        $this->app->bind(
+            \App\Contracts\ServicioRepositoryInterface::class,
+            \App\Repositories\ServicioRepository::class
+        );
+
+        // 🧾 Facturación Electrónica SRI
+        $this->app->bind(
+            \App\Contracts\FacturaElectronicaRepositoryInterface::class,
+            \App\Repositories\FacturaElectronicaRepository::class
+        );
+
+        $this->app->bind(
+            \App\Contracts\FacturaDetalleRepositoryInterface::class,
+            \App\Repositories\FacturaDetalleRepository::class
+        );
     }
 
     //Bootstrap los servicios de la aplicación

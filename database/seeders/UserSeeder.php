@@ -15,21 +15,18 @@ class UserSeeder extends Seeder
     public function run(): void
     {
         // Crear usuario administrador para testing
-        User::create([
-            'name' => 'Admin Test',
-            'email' => 'admin@test.com',
-            'password' => Hash::make('password123'),
-        ]);
+        User::firstOrCreate(
+            ['email' => 'admin@lavado.com'],
+            [
+                'name' => 'Administrador',
+                'email' => 'admin@lavado.com',
+                'password' => Hash::make('password123'),
+                'email_verified_at' => now(),
+            ]
+        );
 
-        // Crear usuario normal para testing
-        User::create([
-            'name' => 'Usuario Test',
-            'email' => 'user@test.com',
-            'password' => Hash::make('password123'),
-        ]);
-
-        echo "Usuarios de prueba creados:\n";
-        echo "- admin@test.com / password123\n";
-        echo "- user@test.com / password123\n";
+        $this->command->info('✅ Usuario administrador creado:');
+        $this->command->line('� Email: admin@lavado.com');
+        $this->command->line('🔒 Password: password123');
     }
 }

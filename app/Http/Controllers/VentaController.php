@@ -123,7 +123,7 @@ class VentaController extends Controller
     {
         try {
             $venta = $this->ventaService->crearVentaCompleta(
-                $request->only(['cliente_id', 'empleado_id', 'fecha', 'metodo_pago', 'observaciones']),
+                $request->only(['cliente_id', 'fecha', 'descuento', 'estado', 'observaciones', 'usuario_id']),
                 $request->input('detalles', [])
             );
             
@@ -142,7 +142,7 @@ class VentaController extends Controller
         try {
             $venta = $this->ventaService->actualizarVentaCompleta(
                 $id,
-                $request->only(['cliente_id', 'empleado_id', 'fecha', 'metodo_pago', 'observaciones']),
+                $request->only(['cliente_id', 'fecha', 'descuento', 'estado', 'observaciones', 'usuario_id']),
                 $request->input('detalles', [])
             );
             

@@ -14,28 +14,27 @@ class UpdateLavadoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'cliente_id' => 'sometimes|exists:clientes,id',
-            'vehiculo_id' => 'sometimes|exists:vehiculos,id',
-            'empleado_id' => 'sometimes|exists:empleados,id',
-            'tipo_lavado' => 'sometimes|string|in:basico,completo,premium,encerado',
+            'vehiculo_id' => 'sometimes|exists:vehiculos,vehiculo_id',
+            'empleado_id' => 'sometimes|exists:empleados,empleado_id',
+            'servicio_id' => 'nullable|exists:servicios,servicio_id',
+            'fecha' => 'sometimes|date',
+            'tipo_lavado' => 'sometimes|string|in:completo,solo_fuera,solo_por_dentro',
             'precio' => 'sometimes|numeric|min:0',
-            'fecha_lavado' => 'sometimes|date',
-            'observaciones' => 'nullable|string|max:1000',
-            'estado' => 'sometimes|string|in:pendiente,en_proceso,completado,cancelado'
+            'pulverizado' => 'sometimes|boolean'
         ];
     }
 
     public function messages(): array
     {
         return [
-            'cliente_id.exists' => 'El cliente seleccionado no existe.',
             'vehiculo_id.exists' => 'El vehículo seleccionado no existe.',
             'empleado_id.exists' => 'El empleado seleccionado no existe.',
-            'tipo_lavado.in' => 'El tipo de lavado debe ser: básico, completo, premium o encerado.',
+            'servicio_id.exists' => 'El servicio seleccionado no existe.',
+            'fecha.date' => 'La fecha del lavado debe ser válida.',
+            'tipo_lavado.in' => 'El tipo de lavado debe ser: completo, solo fuera o solo por dentro.',
             'precio.numeric' => 'El precio debe ser un número.',
             'precio.min' => 'El precio debe ser mayor a 0.',
-            'fecha_lavado.date' => 'La fecha del lavado debe ser válida.',
-            'estado.in' => 'El estado debe ser: pendiente, en proceso, completado o cancelado.'
+            'pulverizado.boolean' => 'El campo pulverizado debe ser verdadero o falso.'
         ];
     }
 }

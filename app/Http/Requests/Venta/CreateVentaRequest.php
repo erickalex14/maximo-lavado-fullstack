@@ -24,27 +24,31 @@ class CreateVentaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Datos básicos de la venta
+            // Datos básicos de la venta (según migración)
             'cliente_id' => 'required|integer|exists:clientes,cliente_id',
-            'empleado_id' => 'nullable|integer|exists:empleados,empleado_id',
             'fecha' => 'nullable|date|before_or_equal:today',
-            'metodo_pago' => 'nullable|string|in:efectivo,tarjeta,transferencia,credito',
-            'observaciones' => 'nullable|string|max:500',
+            'descuento' => 'nullable|numeric|min:0|max:999999.99',
+            'estado' => 'nullable|string|in:pendiente,completada,cancelada',
+            'observaciones' => 'nullable|string|max:1000',
+            'usuario_id' => 'nullable|integer|exists:users,id',
             
             // Detalles de la venta (productos/servicios)
             'detalles' => 'required|array|min:1',
-            'detalles.*.vendible_type' => [
+            'detalles.*.tipo_item' => [
                 'required',
                 'string',
-                'in:App\Models\ProductoAutomotriz,App\Models\ProductoDespensa,App\Models\Servicio'
+                'in:producto_automotriz,producto_despensa,servicio'
             ],
-            'detalles.*.vendible_id' => 'required|integer|min:1',
-            'detalles.*.cantidad' => 'required|numeric|min:0.01|max:999999.99',
+            'detalles.*.item_id' => 'required|integer|min:1',
+            'detalles.*.item_nombre' => 'required|string|max:255',
+            'detalles.*.item_descripcion' => 'nullable|string|max:1000',
+            'detalles.*.cantidad' => 'required|integer|min:1|max:999999',
             'detalles.*.precio_unitario' => 'required|numeric|min:0.01|max:999999.99',
-            'detalles.*.descripcion' => 'nullable|string|max:255',
+            'detalles.*.descuento' => 'nullable|numeric|min:0|max:999999.99',
             
-            // Para servicios específicamente
+            // Para servicios específicamente (campos en venta_detalles)
             'detalles.*.vehiculo_id' => 'nullable|integer|exists:vehiculos,vehiculo_id',
+            'detalles.*.empleado_id' => 'nullable|integer|exists:empleados,empleado_id',
         ];
     }
 
@@ -54,21 +58,32 @@ class CreateVentaRequest extends FormRequest
             'cliente_id.required' => 'El cliente es obligatorio',
             'cliente_id.exists' => 'El cliente seleccionado no existe',
             
-            'empleado_id.exists' => 'El empleado seleccionado no existe',
-            
             'fecha.date' => 'La fecha debe ser válida',
             'fecha.before_or_equal' => 'La fecha no puede ser posterior a hoy',
             
-            'metodo_pago.in' => 'El método de pago debe ser: efectivo, tarjeta, transferencia o crédito',
+            'descuento.numeric' => 'El descuento debe ser un número válido',
+            'descuento.min' => 'El descuento no puede ser negativo',
+            'descuento.max' => 'El descuento es demasiado alto',
+            
+            'estado.in' => 'El estado debe ser: pendiente, completada o cancelada',
+            
+            'observaciones.max' => 'Las observaciones no pueden exceder 1000 caracteres',
+            
+            'usuario_id.exists' => 'El usuario seleccionado no existe',
             
             'detalles.required' => 'La venta debe tener al menos un producto o servicio',
             'detalles.min' => 'La venta debe tener al menos un detalle',
             
-            'detalles.*.vendible_type.required' => 'El tipo de producto/servicio es obligatorio',
-            'detalles.*.vendible_type.in' => 'Tipo de vendible inválido',
+            'detalles.*.tipo_item.required' => 'El tipo de producto/servicio es obligatorio',
+            'detalles.*.tipo_item.in' => 'Tipo de item inválido. Debe ser: producto_automotriz, producto_despensa o servicio',
             
-            'detalles.*.vendible_id.required' => 'El ID del producto/servicio es obligatorio',
-            'detalles.*.vendible_id.min' => 'ID de producto/servicio inválido',
+            'detalles.*.item_id.required' => 'El ID del producto/servicio es obligatorio',
+            'detalles.*.item_id.min' => 'ID de producto/servicio inválido',
+            
+            'detalles.*.item_nombre.required' => 'El nombre del producto/servicio es obligatorio',
+            'detalles.*.item_nombre.max' => 'El nombre no puede exceder 255 caracteres',
+            
+            'detalles.*.item_descripcion.max' => 'La descripción no puede exceder 1000 caracteres',
             
             'detalles.*.cantidad.required' => 'La cantidad es obligatoria',
             'detalles.*.cantidad.min' => 'La cantidad debe ser mayor a 0',
@@ -78,9 +93,12 @@ class CreateVentaRequest extends FormRequest
             'detalles.*.precio_unitario.min' => 'El precio debe ser mayor a 0',
             'detalles.*.precio_unitario.max' => 'El precio es demasiado alto',
             
-            'detalles.*.descripcion.max' => 'La descripción no puede exceder 255 caracteres',
+            'detalles.*.descuento.numeric' => 'El descuento debe ser un número válido',
+            'detalles.*.descuento.min' => 'El descuento no puede ser negativo',
+            'detalles.*.descuento.max' => 'El descuento es demasiado alto',
             
             'detalles.*.vehiculo_id.exists' => 'El vehículo seleccionado no existe',
+            'detalles.*.empleado_id.exists' => 'El empleado seleccionado no existe',
         ];
     }
 
@@ -94,55 +112,77 @@ class CreateVentaRequest extends FormRequest
             
             foreach ($detalles as $index => $detalle) {
                 // Validar que servicios tengan vehículo si es requerido
-                if ($detalle['vendible_type'] === 'App\Models\Servicio') {
-                    // Para servicios de lavado, el vehículo es importante
-                    // Pero puede ser opcional si se asigna después
+                if ($detalle['tipo_item'] === 'servicio') {
+                    // Para servicios de lavado, el vehículo es importante pero puede ser opcional
+                    // si se asigna después desde el cliente
                 }
                 
                 // Validar que los IDs existan según el tipo
-                $this->validateVendibleExists($detalle, $index, $validator);
+                $this->validateItemExists($detalle, $index, $validator);
+                
+                // Calcular subtotal y total si no se proporcionan
+                $this->calculateTotals($detalle, $index);
             }
         });
     }
 
     /**
-     * Validar que el vendible existe según su tipo
+     * Validar que el item existe según su tipo
      */
-    private function validateVendibleExists(array $detalle, int $index, $validator)
+    private function validateItemExists(array $detalle, int $index, $validator)
     {
-        $type = $detalle['vendible_type'] ?? null;
-        $id = $detalle['vendible_id'] ?? null;
+        $type = $detalle['tipo_item'] ?? null;
+        $id = $detalle['item_id'] ?? null;
         
         if (!$type || !$id) return;
         
         switch ($type) {
-            case 'App\Models\ProductoAutomotriz':
+            case 'producto_automotriz':
                 if (!\App\Models\ProductoAutomotriz::where('producto_automotriz_id', $id)->where('activo', true)->exists()) {
                     $validator->errors()->add(
-                        "detalles.{$index}.vendible_id",
+                        "detalles.{$index}.item_id",
                         'El producto automotriz no existe o no está activo'
                     );
                 }
                 break;
                 
-            case 'App\Models\ProductoDespensa':
+            case 'producto_despensa':
                 if (!\App\Models\ProductoDespensa::where('producto_despensa_id', $id)->where('activo', true)->exists()) {
                     $validator->errors()->add(
-                        "detalles.{$index}.vendible_id",
+                        "detalles.{$index}.item_id",
                         'El producto de despensa no existe o no está activo'
                     );
                 }
                 break;
                 
-            case 'App\Models\Servicio':
+            case 'servicio':
                 if (!\App\Models\Servicio::where('servicio_id', $id)->where('activo', true)->exists()) {
                     $validator->errors()->add(
-                        "detalles.{$index}.vendible_id",
+                        "detalles.{$index}.item_id",
                         'El servicio no existe o no está activo'
                     );
                 }
                 break;
         }
+    }
+
+    /**
+     * Calcular totales automáticamente
+     */
+    private function calculateTotals(array $detalle, int $index)
+    {
+        $cantidad = $detalle['cantidad'] ?? 0;
+        $precioUnitario = $detalle['precio_unitario'] ?? 0;
+        $descuento = $detalle['descuento'] ?? 0;
+        
+        $subtotal = $cantidad * $precioUnitario;
+        $total = $subtotal - $descuento;
+        
+        // Agregar los campos calculados al request
+        $this->merge([
+            "detalles.{$index}.subtotal" => round($subtotal, 2),
+            "detalles.{$index}.total" => round($total, 2)
+        ]);
     }
 
     /**
@@ -155,9 +195,28 @@ class CreateVentaRequest extends FormRequest
             $this->merge(['fecha' => now()->format('Y-m-d')]);
         }
         
-        // Asegurar que método de pago tenga un valor por defecto
-        if (!$this->filled('metodo_pago')) {
-            $this->merge(['metodo_pago' => 'efectivo']);
+        // Establecer estado por defecto
+        if (!$this->filled('estado')) {
+            $this->merge(['estado' => 'pendiente']);
         }
+        
+        // Establecer descuento por defecto
+        if (!$this->filled('descuento')) {
+            $this->merge(['descuento' => 0]);
+        }
+        
+        // Establecer usuario_id si está autenticado y no se proporciona
+        if (!$this->filled('usuario_id') && auth()->check()) {
+            $this->merge(['usuario_id' => auth()->id()]);
+        }
+        
+        // Procesar detalles para establecer valores por defecto
+        $detalles = $this->input('detalles', []);
+        foreach ($detalles as $index => $detalle) {
+            if (!isset($detalle['descuento'])) {
+                $detalles[$index]['descuento'] = 0;
+            }
+        }
+        $this->merge(['detalles' => $detalles]);
     }
 }

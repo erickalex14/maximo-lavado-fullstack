@@ -26,6 +26,22 @@ class TipoVehiculoService
     }
 
     /**
+     * Obtener todos los tipos de vehículo (alias para compatibilidad)
+     */
+    public function getAll(): Collection
+    {
+        return $this->getAllActivos();
+    }
+
+    /**
+     * Obtener tipos de vehículo paginados
+     */
+    public function getAllPaginated(int $perPage = 15, array $filters = []): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        return $this->tipoVehiculoRepository->getPaginated($perPage, $filters);
+    }
+
+    /**
      * Obtener tipo de vehículo por ID
      */
     public function getById(int $id): ?TipoVehiculo
@@ -265,5 +281,46 @@ class TipoVehiculoService
                     return $tipo->servicios()->count() > 0;
                 })->count(),
         ];
+    }
+
+    /**
+     * Alternar estado activo/inactivo
+     */
+    public function toggleActivo(int $id): TipoVehiculo
+    {
+        $tipoVehiculo = $this->tipoVehiculoRepository->findById($id);
+        
+        if (!$tipoVehiculo) {
+            throw new \Exception("Tipo de vehículo no encontrado con ID: {$id}");
+        }
+
+        try {
+            return DB::transaction(function () use ($id, $tipoVehiculo) {
+                $nuevoEstado = !$tipoVehiculo->activo;
+                $this->tipoVehiculoRepository->update($id, ['activo' => $nuevoEstado]);
+                
+                Log::info('Estado de tipo de vehículo cambiado', [
+                    'tipo_vehiculo_id' => $id,
+                    'estado_anterior' => $tipoVehiculo->activo,
+                    'estado_nuevo' => $nuevoEstado
+                ]);
+
+                return $this->tipoVehiculoRepository->findById($id);
+            });
+        } catch (\Exception $e) {
+            Log::error('Error al cambiar estado del tipo de vehículo', [
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Obtener tipos de vehículo eliminados
+     */
+    public function getTrashed(): Collection
+    {
+        return $this->tipoVehiculoRepository->getOnlyTrashed();
     }
 }

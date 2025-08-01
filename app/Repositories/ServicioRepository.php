@@ -62,15 +62,14 @@ class ServicioRepository implements ServicioRepositoryInterface
     /**
      * Actualizar servicio
      */
-    public function update(int $id, array $data): ?Servicio
+    public function update(int $id, array $data): bool
     {
         return DB::transaction(function () use ($id, $data) {
             $servicio = Servicio::find($id);
             if ($servicio) {
-                $servicio->update($data);
-                return $servicio->fresh();
+                return $servicio->update($data);
             }
-            return null;
+            return false;
         });
     }
 
@@ -124,6 +123,14 @@ class ServicioRepository implements ServicioRepositoryInterface
     }
 
     /**
+     * Buscar servicios por nombre
+     */
+    public function findByName(string $nombre): Collection
+    {
+        return Servicio::where('nombre', 'ILIKE', "%{$nombre}%")->get();
+    }
+
+    /**
      * Buscar servicio por nombre
      */
     public function findByNombre(string $nombre): ?Servicio
@@ -150,9 +157,40 @@ class ServicioRepository implements ServicioRepositoryInterface
      */
     public function getByTipoVehiculo(int $tipoVehiculoId): Collection
     {
-        return Servicio::whereHas('precios', function ($query) use ($tipoVehiculoId) {
-            $query->where('tipo_vehiculo_id', $tipoVehiculoId);
-        })->get();
+        return Servicio::where('tipo_vehiculo_id', $tipoVehiculoId)
+                      ->where('activo', true)
+                      ->get();
+    }
+
+    /**
+     * Obtener servicios activos para ventas
+     */
+    public function getActivosParaVentas(): Collection
+    {
+        return Servicio::where('activo', true)
+                      ->with(['tipoVehiculo'])
+                      ->orderBy('nombre')
+                      ->get();
+    }
+
+    /**
+     * Obtener servicios con precios por tipo de vehículo
+     */
+    public function getServiciosConPrecios(): Collection
+    {
+        return Servicio::with(['tipoVehiculo'])
+                      ->where('activo', true)
+                      ->orderBy('tipo_vehiculo_id')
+                      ->orderBy('nombre')
+                      ->get();
+    }
+
+    /**
+     * Buscar servicios por tipo de vehículo
+     */
+    public function findByTipoVehiculo(int $tipoVehiculoId): Collection
+    {
+        return $this->getByTipoVehiculo($tipoVehiculoId);
     }
 
     /**
@@ -160,26 +198,13 @@ class ServicioRepository implements ServicioRepositoryInterface
      */
     public function updatePrecio(int $servicioId, int $tipoVehiculoId, float $precio): bool
     {
-        return DB::transaction(function () use ($servicioId, $tipoVehiculoId, $precio) {
+        return DB::transaction(function () use ($servicioId, $precio) {
             $servicio = Servicio::find($servicioId);
             if (!$servicio) {
                 return false;
             }
 
-            // Buscar o crear el precio para este tipo de vehículo
-            $precioExistente = $servicio->precios()
-                ->where('tipo_vehiculo_id', $tipoVehiculoId)
-                ->first();
-
-            if ($precioExistente) {
-                return $precioExistente->update(['precio' => $precio]);
-            } else {
-                $servicio->precios()->create([
-                    'tipo_vehiculo_id' => $tipoVehiculoId,
-                    'precio' => $precio
-                ]);
-                return true;
-            }
+            return $servicio->update(['precio_base' => $precio]);
         });
     }
 
@@ -220,5 +245,44 @@ class ServicioRepository implements ServicioRepositoryInterface
             $query->where('nombre', 'ILIKE', "%{$term}%")
                   ->orWhere('descripcion', 'ILIKE', "%{$term}%");
         })->get();
+    }
+
+    /**
+     * Obtener servicios paginados
+     */
+    public function getAllPaginated(int $perPage = 15, array $filters = []): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        $query = Servicio::with(['tipoVehiculo']);
+
+        // Aplicar filtros
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('nombre', 'ILIKE', "%{$search}%")
+                  ->orWhere('descripcion', 'ILIKE', "%{$search}%");
+            });
+        }
+
+        if (isset($filters['activo']) && $filters['activo'] !== null) {
+            $query->where('activo', (bool) $filters['activo']);
+        }
+
+        if (!empty($filters['tipo_vehiculo_id'])) {
+            $query->where('tipo_vehiculo_id', $filters['tipo_vehiculo_id']);
+        }
+
+        return $query->orderBy('tipo_vehiculo_id')->orderBy('nombre')->paginate($perPage);
+    }
+
+    /**
+     * Obtener precio de servicio para tipo de vehículo específico
+     */
+    public function getPrecioParaTipoVehiculo(int $servicioId, int $tipoVehiculoId): ?float
+    {
+        $servicio = Servicio::where('servicio_id', $servicioId)
+                           ->where('tipo_vehiculo_id', $tipoVehiculoId)
+                           ->first();
+
+        return $servicio ? $servicio->precio_base : null;
     }
 }

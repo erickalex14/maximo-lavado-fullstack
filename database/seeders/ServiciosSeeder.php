@@ -3,7 +3,8 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
+use App\Models\Servicio;
+use App\Models\TipoVehiculo;
 
 class ServiciosSeeder extends Seeder
 {
@@ -12,132 +13,117 @@ class ServiciosSeeder extends Seeder
      */
     public function run(): void
     {
-        // Obtener los IDs de tipos de vehículos
-        $tipoMoto = DB::table('tipos_vehiculos')->where('nombre', 'moto')->first();
-        $tipoAutoPequeno = DB::table('tipos_vehiculos')->where('nombre', 'auto_pequeno')->first();
-        $tipoAutoMediano = DB::table('tipos_vehiculos')->where('nombre', 'auto_mediano')->first();
-        $tipoCamioneta = DB::table('tipos_vehiculos')->where('nombre', 'camioneta')->first();
+        // Primero obtener los tipos de vehículo (flexible con nombres)
+        $tipos = TipoVehiculo::all();
+        
+        if ($tipos->isEmpty()) {
+            $this->command->error('Error: No hay tipos de vehículo. Crea algunos desde los endpoints primero.');
+            return;
+        }
 
-        $servicios = [
-            // Servicios para MOTOS
-            [
+        $this->command->info('Tipos de vehículo encontrados:');
+        foreach ($tipos as $tipo) {
+            $this->command->info("- {$tipo->tipo_vehiculo_id}: {$tipo->nombre}");
+        }
+
+        // Buscar tipos específicos por nombre (case insensitive)
+        $moto = $tipos->first(function($tipo) {
+            return stripos($tipo->nombre, 'moto') !== false;
+        });
+        
+        $autoPequeno = $tipos->first(function($tipo) {
+            return stripos($tipo->nombre, 'pequeño') !== false || stripos($tipo->nombre, 'pequeno') !== false;
+        });
+        
+        $autoMediano = $tipos->first(function($tipo) {
+            return stripos($tipo->nombre, 'mediano') !== false;
+        });
+        
+        $camioneta = $tipos->first(function($tipo) {
+            return stripos($tipo->nombre, 'camioneta') !== false;
+        });
+
+        $serviciosCreados = 0;
+
+        $serviciosCreados = 0;
+
+        // Servicios para Motocicleta
+        if ($moto) {
+            Servicio::create([
                 'nombre' => 'Lavado Completo',
-                'descripcion' => 'Lavado completo interior y exterior para motocicletas',
-                'tipo_vehiculo_id' => $tipoMoto->tipo_vehiculo_id,
+                'descripcion' => 'Lavado completo interior y exterior para motocicleta',
+                'tipo_vehiculo_id' => $moto->tipo_vehiculo_id,
                 'precio_base' => 3.00,
-                'activo' => true,
-                'configuracion' => json_encode(['incluye_interior' => true, 'incluye_exterior' => true]),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'nombre' => 'Pulverizado',
-                'descripcion' => 'Aplicación de pulverizado protector para motocicletas',
-                'tipo_vehiculo_id' => $tipoMoto->tipo_vehiculo_id,
-                'precio_base' => 2.00,
-                'activo' => true,
-                'configuracion' => json_encode(['tipo' => 'protector']),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
+                'activo' => true
+            ]);
+            $serviciosCreados++;
+            $this->command->info("✅ Creado: Lavado Completo para {$moto->nombre}");
+        }
 
-            // Servicios para AUTO PEQUEÑO
-            [
+        // Servicios para Auto Pequeño
+        if ($autoPequeno) {
+            Servicio::create([
                 'nombre' => 'Lavado Completo',
-                'descripcion' => 'Lavado completo interior y exterior para autos pequeños',
-                'tipo_vehiculo_id' => $tipoAutoPequeno->tipo_vehiculo_id,
+                'descripcion' => 'Lavado completo interior y exterior para auto pequeño',
+                'tipo_vehiculo_id' => $autoPequeno->tipo_vehiculo_id,
                 'precio_base' => 8.00,
-                'activo' => true,
-                'configuracion' => json_encode(['incluye_interior' => true, 'incluye_exterior' => true]),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'nombre' => 'Solo Exterior',
-                'descripcion' => 'Lavado únicamente exterior para autos pequeños',
-                'tipo_vehiculo_id' => $tipoAutoPequeno->tipo_vehiculo_id,
+                'activo' => true
+            ]);
+
+            Servicio::create([
+                'nombre' => 'Lavado Solo Exterior',
+                'descripcion' => 'Lavado solo por fuera para auto pequeño',
+                'tipo_vehiculo_id' => $autoPequeno->tipo_vehiculo_id,
                 'precio_base' => 4.50,
-                'activo' => true,
-                'configuracion' => json_encode(['incluye_interior' => false, 'incluye_exterior' => true]),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'nombre' => 'Pulverizado',
-                'descripcion' => 'Aplicación de pulverizado protector para autos pequeños',
-                'tipo_vehiculo_id' => $tipoAutoPequeno->tipo_vehiculo_id,
-                'precio_base' => 2.00,
-                'activo' => true,
-                'configuracion' => json_encode(['tipo' => 'protector']),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
+                'activo' => true
+            ]);
+            $serviciosCreados += 2;
+            $this->command->info("✅ Creados: 2 servicios para {$autoPequeno->nombre}");
+        }
 
-            // Servicios para AUTO MEDIANO
-            [
+        // Servicios para Auto Mediano
+        if ($autoMediano) {
+            Servicio::create([
                 'nombre' => 'Lavado Completo',
-                'descripcion' => 'Lavado completo interior y exterior para autos medianos',
-                'tipo_vehiculo_id' => $tipoAutoMediano->tipo_vehiculo_id,
+                'descripcion' => 'Lavado completo interior y exterior para auto mediano',
+                'tipo_vehiculo_id' => $autoMediano->tipo_vehiculo_id,
                 'precio_base' => 10.00,
-                'activo' => true,
-                'configuracion' => json_encode(['incluye_interior' => true, 'incluye_exterior' => true]),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'nombre' => 'Solo Exterior',
-                'descripcion' => 'Lavado únicamente exterior para autos medianos',
-                'tipo_vehiculo_id' => $tipoAutoMediano->tipo_vehiculo_id,
+                'activo' => true
+            ]);
+
+            Servicio::create([
+                'nombre' => 'Lavado Solo Exterior',
+                'descripcion' => 'Lavado solo por fuera para auto mediano',
+                'tipo_vehiculo_id' => $autoMediano->tipo_vehiculo_id,
                 'precio_base' => 5.00,
-                'activo' => true,
-                'configuracion' => json_encode(['incluye_interior' => false, 'incluye_exterior' => true]),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'nombre' => 'Pulverizado',
-                'descripcion' => 'Aplicación de pulverizado protector para autos medianos',
-                'tipo_vehiculo_id' => $tipoAutoMediano->tipo_vehiculo_id,
-                'precio_base' => 2.00,
-                'activo' => true,
-                'configuracion' => json_encode(['tipo' => 'protector']),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
+                'activo' => true
+            ]);
+            $serviciosCreados += 2;
+            $this->command->info("✅ Creados: 2 servicios para {$autoMediano->nombre}");
+        }
 
-            // Servicios para CAMIONETAS
-            [
+        // Servicios para Camioneta
+        if ($camioneta) {
+            Servicio::create([
                 'nombre' => 'Lavado Completo',
-                'descripcion' => 'Lavado completo interior y exterior para camionetas',
-                'tipo_vehiculo_id' => $tipoCamioneta->tipo_vehiculo_id,
+                'descripcion' => 'Lavado completo interior y exterior para camioneta',
+                'tipo_vehiculo_id' => $camioneta->tipo_vehiculo_id,
                 'precio_base' => 10.00,
-                'activo' => true,
-                'configuracion' => json_encode(['incluye_interior' => true, 'incluye_exterior' => true]),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'nombre' => 'Solo Exterior',
-                'descripcion' => 'Lavado únicamente exterior para camionetas',
-                'tipo_vehiculo_id' => $tipoCamioneta->tipo_vehiculo_id,
-                'precio_base' => 7.50,
-                'activo' => true,
-                'configuracion' => json_encode(['incluye_interior' => false, 'incluye_exterior' => true]),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'nombre' => 'Pulverizado',
-                'descripcion' => 'Aplicación de pulverizado protector para camionetas',
-                'tipo_vehiculo_id' => $tipoCamioneta->tipo_vehiculo_id,
-                'precio_base' => 2.00,
-                'activo' => true,
-                'configuracion' => json_encode(['tipo' => 'protector']),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ];
+                'activo' => true
+            ]);
 
-        DB::table('servicios')->insert($servicios);
+            Servicio::create([
+                'nombre' => 'Lavado Solo Exterior',
+                'descripcion' => 'Lavado solo por fuera para camioneta',
+                'tipo_vehiculo_id' => $camioneta->tipo_vehiculo_id,
+                'precio_base' => 7.50,
+                'activo' => true
+            ]);
+            $serviciosCreados += 2;
+            $this->command->info("✅ Creados: 2 servicios para {$camioneta->nombre}");
+        }
+
+        $this->command->info("✅ Total: {$serviciosCreados} servicios creados exitosamente");
+        $this->command->info('📋 Nota: El pulverizado (+$2) se añade dinámicamente en las ventas');
     }
 }

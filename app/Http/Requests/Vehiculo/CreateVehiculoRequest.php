@@ -15,7 +15,7 @@ class CreateVehiculoRequest extends FormRequest
     {
         return [
             'cliente_id' => 'required|exists:clientes,cliente_id',
-            'tipo' => 'required|string|in:moto,camioneta,auto_pequeno,auto_mediano',
+            'tipo_vehiculo_id' => 'required|exists:tipos_vehiculos,tipo_vehiculo_id',
             'matricula' => 'nullable|string|unique:vehiculos,matricula|max:20',
             'descripcion' => 'nullable|string|max:500'
         ];
@@ -26,8 +26,8 @@ class CreateVehiculoRequest extends FormRequest
         return [
             'cliente_id.required' => 'El cliente es obligatorio.',
             'cliente_id.exists' => 'El cliente seleccionado no existe.',
-            'tipo.required' => 'El tipo de vehículo es obligatorio.',
-            'tipo.in' => 'El tipo de vehículo debe ser: moto, camioneta, auto pequeño o auto mediano.',
+            'tipo_vehiculo_id.required' => 'El tipo de vehículo es obligatorio.',
+            'tipo_vehiculo_id.exists' => 'El tipo de vehículo seleccionado no existe.',
             'matricula.unique' => 'Ya existe un vehículo con esta matrícula.',
             'matricula.max' => 'La matrícula no puede exceder 20 caracteres.',
             'descripcion.max' => 'La descripción no puede exceder 500 caracteres.'

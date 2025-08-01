@@ -16,6 +16,7 @@ class CreateLavadoRequest extends FormRequest
         return [
             'vehiculo_id' => 'required|exists:vehiculos,vehiculo_id',
             'empleado_id' => 'required|exists:empleados,empleado_id',
+            'servicio_id' => 'nullable|exists:servicios,servicio_id',
             'fecha' => 'required|date',
             'tipo_lavado' => 'required|string|in:completo,solo_fuera,solo_por_dentro',
             'precio' => 'required|numeric|min:0',
@@ -30,6 +31,7 @@ class CreateLavadoRequest extends FormRequest
             'vehiculo_id.exists' => 'El vehículo seleccionado no existe.',
             'empleado_id.required' => 'El empleado es obligatorio.',
             'empleado_id.exists' => 'El empleado seleccionado no existe.',
+            'servicio_id.exists' => 'El servicio seleccionado no existe.',
             'fecha.required' => 'La fecha del lavado es obligatoria.',
             'fecha.date' => 'La fecha del lavado debe ser válida.',
             'tipo_lavado.required' => 'El tipo de lavado es obligatorio.',

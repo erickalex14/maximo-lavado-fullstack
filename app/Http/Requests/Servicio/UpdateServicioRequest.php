@@ -25,17 +25,11 @@ class UpdateServicioRequest extends FormRequest
         $servicioId = $this->route('id');
         
         return [
-            'nombre' => [
-                'required',
-                'string',
-                'max:100',
-                Rule::unique('servicios', 'nombre')->ignore($servicioId, 'servicio_id')
-            ],
+            'nombre' => 'sometimes|required|string|max:100',
             'descripcion' => 'nullable|string|max:500',
-            'activo' => 'boolean',
-            'precios' => 'nullable|array',
-            'precios.*.tipo_vehiculo_id' => 'required|exists:tipos_vehiculos,tipo_vehiculo_id',
-            'precios.*.precio' => 'required|numeric|min:0|max:999999.99'
+            'tipo_vehiculo_id' => 'sometimes|required|exists:tipos_vehiculos,tipo_vehiculo_id',
+            'precio_base' => 'sometimes|required|numeric|min:0|max:999999.99',
+            'activo' => 'boolean'
         ];
     }
 
@@ -46,15 +40,15 @@ class UpdateServicioRequest extends FormRequest
     {
         return [
             'nombre.required' => 'El nombre del servicio es obligatorio.',
-            'nombre.unique' => 'Ya existe otro servicio con ese nombre.',
             'nombre.max' => 'El nombre no puede exceder los 100 caracteres.',
             'descripcion.max' => 'La descripción no puede exceder los 500 caracteres.',
-            'precios.*.tipo_vehiculo_id.required' => 'El tipo de vehículo es obligatorio para cada precio.',
-            'precios.*.tipo_vehiculo_id.exists' => 'El tipo de vehículo seleccionado no es válido.',
-            'precios.*.precio.required' => 'El precio es obligatorio.',
-            'precios.*.precio.numeric' => 'El precio debe ser un número válido.',
-            'precios.*.precio.min' => 'El precio debe ser mayor o igual a 0.',
-            'precios.*.precio.max' => 'El precio no puede exceder los 999,999.99.'
+            'tipo_vehiculo_id.required' => 'El tipo de vehículo es obligatorio.',
+            'tipo_vehiculo_id.exists' => 'El tipo de vehículo seleccionado no es válido.',
+            'precio_base.required' => 'El precio base es obligatorio.',
+            'precio_base.numeric' => 'El precio base debe ser un número válido.',
+            'precio_base.min' => 'El precio base debe ser mayor o igual a 0.',
+            'precio_base.max' => 'El precio base no puede exceder los 999,999.99.',
+            'activo.boolean' => 'El campo activo debe ser verdadero o falso.'
         ];
     }
 }

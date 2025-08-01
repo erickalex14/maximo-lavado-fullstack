@@ -40,12 +40,21 @@ class FacturaElectronica extends Model
         'xml_autorizado',          // XML autorizado por SRI
         'mensaje_sri',             // Mensaje del SRI
         'errores_sri',             // Errores del SRI (JSON)
+        // Campos monetarios
+        'subtotal',                // Subtotal de la factura
+        'descuento',               // Descuento aplicado
+        'iva',                     // IVA calculado
+        'total',                   // Total de la factura
     ];
 
     // Casting de tipos
     protected $casts = [
         'secuencial' => 'integer',
         'errores_sri' => 'array',
+        'subtotal' => 'decimal:2',
+        'descuento' => 'decimal:2',
+        'iva' => 'decimal:2',
+        'total' => 'decimal:2',
     ];
 
     // Constantes para ambiente SRI

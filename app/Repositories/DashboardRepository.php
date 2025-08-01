@@ -5,7 +5,7 @@ namespace App\Repositories;
 use App\Contracts\DashboardRepositoryInterface;
 use App\Models\Cliente;
 use App\Models\Empleado;
-use App\Models\Factura;
+use App\Models\FacturaElectronica;
 use App\Models\Lavado;
 use App\Models\ProductoAutomotriz;
 use App\Models\ProductoDespensa;
@@ -29,7 +29,7 @@ class DashboardRepository implements DashboardRepositoryInterface
         $ingresosHoy = Ingreso::whereDate('fecha', $today)->sum('monto');
         $egresosHoy = Egreso::whereDate('fecha', $today)->sum('monto');
         $lavadosHoy = Lavado::whereDate('fecha', $today)->count();
-        $facturasHoy = Factura::whereDate('fecha', $today)->count();
+        $facturasHoy = FacturaElectronica::whereDate('created_at', $today)->count();
 
         // Métricas del día anterior para comparación
         $ingresosAyer = Ingreso::whereDate('fecha', $yesterday)->sum('monto');
@@ -89,15 +89,15 @@ class DashboardRepository implements DashboardRepositoryInterface
 
         // Facturas recientes
         try {
-            $facturas = Factura::with('cliente')
+            $facturas = FacturaElectronica::with('venta.cliente')
                 ->orderBy('created_at', 'desc')
                 ->limit($limite)
                 ->get()
                 ->map(function($factura) {
                     return [
-                        'id' => $factura->id,
+                        'id' => $factura->factura_electronica_id,
                         'tipo' => 'factura',
-                        'descripcion' => 'Factura #' . $factura->numero_factura . ' - ' . ($factura->cliente->nombre ?? 'Cliente'),
+                        'descripcion' => 'Factura #' . $factura->numero_factura . ' - ' . ($factura->venta->cliente->nombre ?? 'Cliente'),
                         'monto' => $factura->total,
                         'fecha' => $factura->created_at,
                         'icono' => 'receipt'
@@ -269,7 +269,7 @@ class DashboardRepository implements DashboardRepositoryInterface
             'ingresos_mes_anterior' => Ingreso::whereBetween('fecha', [$lastMonth, $lastMonthEnd])->sum('monto'),
             'lavados_mes_actual' => Lavado::whereDate('fecha', '>=', $thisMonth)->count(),
             'lavados_mes_anterior' => Lavado::whereBetween('fecha', [$lastMonth, $lastMonthEnd])->count(),
-            'facturas_mes_actual' => Factura::whereDate('fecha', '>=', $thisMonth)->count(),
+            'facturas_mes_actual' => FacturaElectronica::whereDate('created_at', '>=', $thisMonth)->count(),
             'promedio_lavado' => Lavado::avg('precio') ?? 0
         ];
     }
@@ -338,7 +338,7 @@ class DashboardRepository implements DashboardRepositoryInterface
         $thisMonth = Carbon::now()->startOfMonth();
         $totalIngresos = Ingreso::whereDate('fecha', '>=', $thisMonth)->sum('monto');
         $totalEgresos = Egreso::whereDate('fecha', '>=', $thisMonth)->sum('monto');
-        $totalFacturas = Factura::whereDate('fecha', '>=', $thisMonth)->sum('total');
+        $totalFacturas = FacturaElectronica::whereDate('created_at', '>=', $thisMonth)->sum('total');
         $totalLavados = Lavado::whereDate('fecha', '>=', $thisMonth)->sum('precio');
 
         $ingresosTotales = $totalIngresos + $totalFacturas + $totalLavados;
@@ -369,7 +369,7 @@ class DashboardRepository implements DashboardRepositoryInterface
             'ventas_productos_despensa' => $ventasDespensa,
             'total_ventas_productos' => $ventasAutomotriz + $ventasDespensa,
             'servicios_lavado' => Lavado::whereDate('fecha', '>=', $thisMonth)->sum('precio'),
-            'facturacion_total' => Factura::whereDate('fecha', '>=', $thisMonth)->sum('total')
+            'facturacion_total' => FacturaElectronica::whereDate('created_at', '>=', $thisMonth)->sum('total')
         ];
     }
 

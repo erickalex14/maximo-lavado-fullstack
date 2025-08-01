@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Services\ServicioService;
-use App\Http\Requests\CreateServicioRequest;
-use App\Http\Requests\UpdateServicioRequest;
+use App\Http\Requests\Servicio\CreateServicioRequest;
+use App\Http\Requests\Servicio\UpdateServicioRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -140,7 +140,7 @@ class ServicioController extends Controller
     public function store(CreateServicioRequest $request): JsonResponse
     {
         try {
-            $servicio = $this->servicioService->createServicio($request->validated());
+            $servicio = $this->servicioService->crear($request->validated());
 
             Log::info('✅ Servicio creado exitosamente', [
                 'servicio_id' => $servicio->servicio_id,
@@ -205,7 +205,7 @@ class ServicioController extends Controller
     public function update(UpdateServicioRequest $request, int $id): JsonResponse
     {
         try {
-            $servicio = $this->servicioService->updateServicio($id, $request->validated());
+            $servicio = $this->servicioService->actualizar($id, $request->validated());
 
             Log::info('✅ Servicio actualizado exitosamente', [
                 'servicio_id' => $id
@@ -271,7 +271,7 @@ class ServicioController extends Controller
     public function destroy(int $id): JsonResponse
     {
         try {
-            $resultado = $this->servicioService->deleteServicio($id);
+            $resultado = $this->servicioService->eliminar($id);
 
             Log::info('✅ Servicio eliminado exitosamente', [
                 'servicio_id' => $id

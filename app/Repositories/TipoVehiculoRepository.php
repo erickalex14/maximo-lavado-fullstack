@@ -13,6 +13,22 @@ class TipoVehiculoRepository implements TipoVehiculoRepositoryInterface
         return TipoVehiculo::orderBy('nombre')->get();
     }
 
+    public function getPaginated(int $perPage = 15, array $filters = []): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        $query = TipoVehiculo::query();
+
+        // Aplicar filtros si existen
+        if (!empty($filters['nombre'])) {
+            $query->where('nombre', 'LIKE', "%{$filters['nombre']}%");
+        }
+
+        if (isset($filters['activo'])) {
+            $query->where('activo', $filters['activo']);
+        }
+
+        return $query->orderBy('nombre')->paginate($perPage);
+    }
+
     public function getAllWithTrashed(): Collection
     {
         return TipoVehiculo::withTrashed()->orderBy('nombre')->get();
@@ -94,5 +110,24 @@ class TipoVehiculoRepository implements TipoVehiculoRepositoryInterface
         return TipoVehiculo::where('activo', true)
             ->orderBy('nombre')
             ->get();
+    }
+
+    public function search(string $termino): Collection
+    {
+        return TipoVehiculo::where('nombre', 'LIKE', "%{$termino}%")
+            ->orWhere('descripcion', 'LIKE', "%{$termino}%")
+            ->orderBy('nombre')
+            ->get();
+    }
+
+    public function existsByNombre(string $nombre, ?int $excludeId = null): bool
+    {
+        $query = TipoVehiculo::where('nombre', $nombre);
+        
+        if ($excludeId) {
+            $query->where('tipo_vehiculo_id', '!=', $excludeId);
+        }
+        
+        return $query->exists();
     }
 }
