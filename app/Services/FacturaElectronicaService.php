@@ -19,6 +19,15 @@ class FacturaElectronicaService
     }
 
     /**
+     * Obtener todas las facturas electrónicas
+     */
+    public function getAll(array $filters = []): Collection
+    {
+        // Por ahora retornamos todas las facturas, en el futuro se pueden aplicar filtros
+        return $this->facturaRepository->getAll();
+    }
+
+    /**
      * Generar factura electrónica desde una venta
      */
     public function generarDesdeVenta(Venta $venta, array $datosEmisor = []): FacturaElectronica
@@ -47,11 +56,11 @@ class FacturaElectronicaService
                     'venta_id' => $venta->venta_id,
                     
                     // Datos del emisor
-                    'ruc_emisor' => $datosEmisor['ruc_emisor'] ?? config('facturacion.ruc_emisor'),
-                    'razon_social_emisor' => $datosEmisor['razon_social_emisor'] ?? config('facturacion.razon_social'),
-                    'direccion_emisor' => $datosEmisor['direccion_emisor'] ?? config('facturacion.direccion'),
-                    'establecimiento' => $datosEmisor['establecimiento'] ?? '001',
-                    'punto_emision' => $datosEmisor['punto_emision'] ?? '001',
+                    'ruc_emisor' => $datosEmisor['ruc_emisor'] ?? config('sri.ruc'),
+                    'razon_social_emisor' => $datosEmisor['razon_social_emisor'] ?? config('sri.razon_social'),
+                    'direccion_emisor' => $datosEmisor['direccion_emisor'] ?? config('sri.direccion_matriz'),
+                    'establecimiento' => $datosEmisor['establecimiento'] ?? config('sri.establecimiento', '001'),
+                    'punto_emision' => $datosEmisor['punto_emision'] ?? config('sri.punto_emision', '001'),
                     
                     // Datos del comprador (snapshot para inmutabilidad SRI)
                     'identificacion_comprador' => $cliente->cedula ?? '9999999999999',
@@ -62,11 +71,17 @@ class FacturaElectronicaService
                     // Información del documento
                     'tipo_documento' => '01', // 01: Factura
                     'secuencial' => $secuencial,
-                    'ambiente' => config('facturacion.ambiente', '1'), // 1: Pruebas, 2: Producción
+                    'ambiente' => config('sri.ambiente', '1'), // 1: Pruebas, 2: Producción
                     'tipo_emision' => '1', // 1: Emisión normal
                     
+                    // Valores monetarios (desde la venta)
+                    'subtotal' => $venta->subtotal ?? 0,
+                    'descuento' => $venta->descuento ?? 0,
+                    'iva' => $venta->iva ?? 0,
+                    'total' => $venta->total ?? 0,
+                    
                     // Estado inicial
-                    'estado_sri' => 'BORRADOR',
+                    'estado_sri' => 'GENERADA',
                 ];
 
                 // Crear la factura

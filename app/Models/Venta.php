@@ -22,17 +22,19 @@ class Venta extends Model
 
     // Permite asignación masiva en estos campos
     protected $fillable = [
+        'numero_venta',         // Número único de venta
         'cliente_id',           // FK al cliente
         'empleado_id',          // FK al empleado que realiza la venta
         'vehiculo_id',          // FK al vehículo (si es servicio de lavado)
         'tipo_venta',           // servicio, producto, mixto
+        'fecha',                // Fecha de la venta
         'subtotal',             // Suma de todos los detalles
         'descuento',            // Descuento aplicado
-        'impuesto',             // IVA calculado
-        'total',                // Subtotal - descuento + impuesto
+        'iva',                  // IVA calculado
+        'total',                // Subtotal - descuento + iva
         'estado',               // pendiente, procesando, completada, cancelada
-        'fecha_venta',          // Fecha de la venta
         'observaciones',        // Notas adicionales
+        'usuario_id',           // Usuario que registra la venta
         'metadatos',            // JSON con datos adicionales
     ];
 
@@ -40,9 +42,9 @@ class Venta extends Model
     protected $casts = [
         'subtotal' => 'decimal:2',
         'descuento' => 'decimal:2',
-        'impuesto' => 'decimal:2',
+        'iva' => 'decimal:2',
         'total' => 'decimal:2',
-        'fecha_venta' => 'datetime',
+        'fecha' => 'date',
         'metadatos' => 'array',
     ];
 
@@ -198,5 +200,39 @@ class Venta extends Model
         $this->estado = self::ESTADO_CANCELADA;
         $this->observaciones = $razon ? "Cancelada: {$razon}" : 'Cancelada';
         $this->save();
+    }
+
+    /**
+     * Evento boot para generar automáticamente el número de venta
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($venta) {
+            if (empty($venta->numero_venta)) {
+                $venta->numero_venta = self::generarNumeroVenta();
+            }
+        });
+    }
+
+    /**
+     * Generar número de venta único
+     */
+    public static function generarNumeroVenta(): string
+    {
+        $fecha = now()->format('Ymd');
+        $ultimaVenta = self::where('numero_venta', 'like', "V{$fecha}%")
+                          ->orderBy('numero_venta', 'desc')
+                          ->first();
+
+        if ($ultimaVenta) {
+            $ultimoNumero = intval(substr($ultimaVenta->numero_venta, -4));
+            $nuevoNumero = str_pad($ultimoNumero + 1, 4, '0', STR_PAD_LEFT);
+        } else {
+            $nuevoNumero = '0001';
+        }
+
+        return "V{$fecha}{$nuevoNumero}";
     }
 }

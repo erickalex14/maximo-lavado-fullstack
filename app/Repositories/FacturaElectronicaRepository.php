@@ -62,15 +62,14 @@ class FacturaElectronicaRepository implements FacturaElectronicaRepositoryInterf
     /**
      * Actualizar factura electrónica
      */
-    public function update(int $id, array $data): ?FacturaElectronica
+    public function update(int $id, array $data): bool
     {
         return DB::transaction(function () use ($id, $data) {
             $factura = FacturaElectronica::find($id);
             if ($factura) {
-                $factura->update($data);
-                return $factura->fresh();
+                return $factura->update($data);
             }
-            return null;
+            return false;
         });
     }
 
@@ -139,6 +138,14 @@ class FacturaElectronicaRepository implements FacturaElectronicaRepositoryInterf
     }
 
     /**
+     * Obtener próximo secuencial disponible (alias para compatibilidad con interface)
+     */
+    public function getProximoSecuencial(string $establecimiento = '001', string $puntoEmision = '001'): int
+    {
+        return $this->getNextSecuencial($establecimiento, $puntoEmision);
+    }
+
+    /**
      * Buscar por RUC emisor
      */
     public function findByRucEmisor(string $rucEmisor): Collection
@@ -170,6 +177,22 @@ class FacturaElectronicaRepository implements FacturaElectronicaRepositoryInterf
     public function getByEstadoSri(string $estado): Collection
     {
         return FacturaElectronica::where('estado_sri', $estado)->get();
+    }
+
+    /**
+     * Buscar por estado SRI (alias para compatibilidad con interface)
+     */
+    public function findByEstadoSri(string $estado): Collection
+    {
+        return $this->getByEstadoSri($estado);
+    }
+
+    /**
+     * Obtener facturas en rango de fechas (compatible con interface)
+     */
+    public function findByFechaRango(\DateTime $fechaInicio, \DateTime $fechaFin): Collection
+    {
+        return $this->getByDateRange($fechaInicio->format('Y-m-d'), $fechaFin->format('Y-m-d'));
     }
 
     /**
@@ -302,5 +325,57 @@ class FacturaElectronicaRepository implements FacturaElectronicaRepositoryInterf
         }
         
         return $query->exists();
+    }
+
+    /**
+     * Actualizar estado y respuesta SRI
+     */
+    public function actualizarRespuestaSri(int $id, array $dataSri): bool
+    {
+        return DB::transaction(function () use ($id, $dataSri) {
+            $factura = FacturaElectronica::find($id);
+            if ($factura) {
+                return $factura->update($dataSri);
+            }
+            return false;
+        });
+    }
+
+    /**
+     * Obtener facturas pendientes de autorización SRI
+     */
+    public function getPendientesAutorizacion(): Collection
+    {
+        return FacturaElectronica::whereIn('estado_sri', ['BORRADOR', 'RECIBIDA', 'DEVUELTA'])->get();
+    }
+
+    /**
+     * Generar XML para SRI
+     */
+    public function generarXmlSri(int $id): ?string
+    {
+        $factura = FacturaElectronica::find($id);
+        if ($factura && $factura->xml_generado) {
+            return $factura->xml_generado;
+        }
+        return null;
+    }
+
+    /**
+     * Marcar como autorizada por SRI
+     */
+    public function marcarComoAutorizada(int $id, string $xmlAutorizado, \DateTime $fechaAutorizacion): bool
+    {
+        return DB::transaction(function () use ($id, $xmlAutorizado, $fechaAutorizacion) {
+            $factura = FacturaElectronica::find($id);
+            if ($factura) {
+                return $factura->update([
+                    'estado_sri' => 'AUTORIZADA',
+                    'xml_autorizado' => $xmlAutorizado,
+                    'fecha_autorizacion' => $fechaAutorizacion,
+                ]);
+            }
+            return false;
+        });
     }
 }

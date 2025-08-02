@@ -8,6 +8,7 @@ use App\Contracts\IngresoRepositoryInterface;
 use App\Contracts\ProductoAutomotrizRepositoryInterface;
 use App\Contracts\ProductoDespensaRepositoryInterface;
 use App\Contracts\LavadoRepositoryInterface;
+use App\Contracts\ServicioRepositoryInterface;
 use App\Models\Venta;
 use App\Models\VentaDetalle;
 use App\Services\FacturaElectronicaService;
@@ -24,6 +25,7 @@ class VentaService
     protected ProductoDespensaRepositoryInterface $productoDespensaRepository;
     protected FacturaElectronicaService $facturaElectronicaService;
     protected LavadoRepositoryInterface $lavadoRepository;
+    protected ServicioRepositoryInterface $servicioRepository;
 
     public function __construct(
         VentaRepositoryInterface $ventaRepository,
@@ -32,7 +34,8 @@ class VentaService
         ProductoAutomotrizRepositoryInterface $productoAutomotrizRepository,
         ProductoDespensaRepositoryInterface $productoDespensaRepository,
         FacturaElectronicaService $facturaElectronicaService,
-        LavadoRepositoryInterface $lavadoRepository
+        LavadoRepositoryInterface $lavadoRepository,
+        ServicioRepositoryInterface $servicioRepository
     ) {
         $this->ventaRepository = $ventaRepository;
         $this->detalleRepository = $detalleRepository;
@@ -41,6 +44,7 @@ class VentaService
         $this->productoDespensaRepository = $productoDespensaRepository;
         $this->facturaElectronicaService = $facturaElectronicaService;
         $this->lavadoRepository = $lavadoRepository;
+        $this->servicioRepository = $servicioRepository;
     }
 
     /**
@@ -84,7 +88,7 @@ class VentaService
                 // PASO 8: CREAR LAVADOS AUTOMÁTICOS SI HAY SERVICIOS ⚡ CRÍTICO
                 $lavadosCreados = [];
                 if ($this->tieneServicios($detallesVenta)) {
-                    $lavadosCreados = $this->crearLavadosDesdeVenta($venta->fresh(['detalles.vendible']));
+                    $lavadosCreados = $this->crearLavadosDesdeVenta($venta->fresh(['detalles']));
                     Log::info('Lavados automáticos creados', [
                         'venta_id' => $venta->venta_id,
                         'lavados_creados' => count($lavadosCreados)
@@ -284,11 +288,11 @@ class VentaService
     private function validarStockDisponible(array $detallesVenta): void
     {
         foreach ($detallesVenta as $detalle) {
-            if ($detalle['vendible_type'] === 'App\Models\ProductoAutomotriz') {
-                $producto = $this->productoAutomotrizRepository->findById($detalle['vendible_id']);
+            if ($detalle['tipo_item'] === 'producto_automotriz') {
+                $producto = $this->productoAutomotrizRepository->findById($detalle['item_id']);
                 
                 if (!$producto) {
-                    throw new \Exception("Producto automotriz no encontrado con ID: {$detalle['vendible_id']}");
+                    throw new \Exception("Producto automotriz no encontrado con ID: {$detalle['item_id']}");
                 }
 
                 if (!$producto->activo) {
@@ -298,11 +302,11 @@ class VentaService
                 if ($producto->stock < $detalle['cantidad']) {
                     throw new \Exception("Stock insuficiente para '{$producto->nombre}'. Stock disponible: {$producto->stock}, solicitado: {$detalle['cantidad']}");
                 }
-            } elseif ($detalle['vendible_type'] === 'App\Models\ProductoDespensa') {
-                $producto = $this->productoDespensaRepository->findById($detalle['vendible_id']);
+            } elseif ($detalle['tipo_item'] === 'producto_despensa') {
+                $producto = $this->productoDespensaRepository->findById($detalle['item_id']);
                 
                 if (!$producto) {
-                    throw new \Exception("Producto de despensa no encontrado con ID: {$detalle['vendible_id']}");
+                    throw new \Exception("Producto de despensa no encontrado con ID: {$detalle['item_id']}");
                 }
 
                 if (!$producto->activo) {
@@ -323,27 +327,27 @@ class VentaService
     private function actualizarStockProductos(array $detallesVenta): void
     {
         foreach ($detallesVenta as $detalle) {
-            if ($detalle['vendible_type'] === 'App\Models\ProductoAutomotriz') {
-                $producto = $this->productoAutomotrizRepository->findById($detalle['vendible_id']);
+            if ($detalle['tipo_item'] === 'producto_automotriz') {
+                $producto = $this->productoAutomotrizRepository->findById($detalle['item_id']);
                 $nuevoStock = $producto->stock - $detalle['cantidad'];
                 
-                $this->productoAutomotrizRepository->updateStock($detalle['vendible_id'], $nuevoStock);
+                $this->productoAutomotrizRepository->updateStock($detalle['item_id'], $nuevoStock);
                 
                 Log::info('Stock producto automotriz actualizado', [
-                    'producto_id' => $detalle['vendible_id'],
+                    'producto_id' => $detalle['item_id'],
                     'producto_nombre' => $producto->nombre,
                     'stock_anterior' => $producto->stock,
                     'cantidad_vendida' => $detalle['cantidad'],
                     'stock_nuevo' => $nuevoStock
                 ]);
-            } elseif ($detalle['vendible_type'] === 'App\Models\ProductoDespensa') {
-                $producto = $this->productoDespensaRepository->findById($detalle['vendible_id']);
+            } elseif ($detalle['tipo_item'] === 'producto_despensa') {
+                $producto = $this->productoDespensaRepository->findById($detalle['item_id']);
                 $nuevoStock = $producto->stock - $detalle['cantidad'];
                 
-                $this->productoDespensaRepository->updateStock($detalle['vendible_id'], $nuevoStock);
+                $this->productoDespensaRepository->updateStock($detalle['item_id'], $nuevoStock);
                 
                 Log::info('Stock producto despensa actualizado', [
-                    'producto_id' => $detalle['vendible_id'],
+                    'producto_id' => $detalle['item_id'],
                     'producto_nombre' => $producto->nombre,
                     'stock_anterior' => $producto->stock,
                     'cantidad_vendida' => $detalle['cantidad'],
@@ -359,17 +363,17 @@ class VentaService
     private function revertirStockProductos(Collection $detalles): void
     {
         foreach ($detalles as $detalle) {
-            if ($detalle->vendible_type === 'App\Models\ProductoAutomotriz') {
-                $producto = $this->productoAutomotrizRepository->findById($detalle->vendible_id);
+            if ($detalle->tipo_item === 'producto_automotriz') {
+                $producto = $this->productoAutomotrizRepository->findById($detalle->item_id);
                 if ($producto) {
                     $nuevoStock = $producto->stock + $detalle->cantidad;
-                    $this->productoAutomotrizRepository->updateStock($detalle->vendible_id, $nuevoStock);
+                    $this->productoAutomotrizRepository->updateStock($detalle->item_id, $nuevoStock);
                 }
-            } elseif ($detalle->vendible_type === 'App\Models\ProductoDespensa') {
-                $producto = $this->productoDespensaRepository->findById($detalle->vendible_id);
+            } elseif ($detalle->tipo_item === 'producto_despensa') {
+                $producto = $this->productoDespensaRepository->findById($detalle->item_id);
                 if ($producto) {
                     $nuevoStock = $producto->stock + $detalle->cantidad;
-                    $this->productoDespensaRepository->updateStock($detalle->vendible_id, $nuevoStock);
+                    $this->productoDespensaRepository->updateStock($detalle->item_id, $nuevoStock);
                 }
             }
         }
@@ -426,7 +430,7 @@ class VentaService
             $subtotal += $subtotalLinea;
             
             // En Ecuador, generalmente los servicios tienen IVA del 12%
-            if ($detalle['vendible_type'] === 'App\Models\Servicio') {
+            if ($detalle['tipo_item'] === 'servicio') {
                 $iva += $subtotalLinea * 0.12;
             }
             // Los productos pueden tener IVA 0% o 12% según configuración
@@ -470,8 +474,8 @@ class VentaService
 
         // Validar que todos los detalles tengan los campos requeridos
         foreach ($detallesVenta as $index => $detalle) {
-            if (empty($detalle['vendible_type']) || empty($detalle['vendible_id'])) {
-                throw new \Exception("Detalle #{$index}: vendible_type y vendible_id son obligatorios");
+            if (empty($detalle['tipo_item']) || empty($detalle['item_id'])) {
+                throw new \Exception("Detalle #{$index}: tipo_item e item_id son obligatorios");
             }
             
             if (empty($detalle['cantidad']) || $detalle['cantidad'] <= 0) {
@@ -490,7 +494,7 @@ class VentaService
     private function tieneServicios(array $detallesVenta): bool
     {
         foreach ($detallesVenta as $detalle) {
-            if ($detalle['vendible_type'] === 'App\Models\Servicio') {
+            if ($detalle['tipo_item'] === 'servicio') {
                 return true;
             }
         }
@@ -503,9 +507,9 @@ class VentaService
     private function tieneProductos(array $detallesVenta): bool
     {
         foreach ($detallesVenta as $detalle) {
-            if (in_array($detalle['vendible_type'], [
-                'App\Models\ProductoAutomotriz', 
-                'App\Models\ProductoDespensa'
+            if (in_array($detalle['tipo_item'], [
+                'producto_automotriz', 
+                'producto_despensa'
             ])) {
                 return true;
             }
@@ -532,7 +536,7 @@ class VentaService
             $lavadosCreados = [];
             
             // Filtrar solo los detalles que son servicios
-            $detallesServicios = $venta->detalles->where('vendible_type', 'App\Models\Servicio');
+            $detallesServicios = $venta->detalles->where('tipo_item', 'servicio');
             
             if ($detallesServicios->isEmpty()) {
                 Log::info('No se encontraron servicios en la venta, no se crean lavados', [
@@ -543,7 +547,15 @@ class VentaService
 
             // Crear un lavado por cada servicio en la venta
             foreach ($detallesServicios as $detalle) {
-                $servicio = $detalle->vendible;
+                $servicio = $this->servicioRepository->findById($detalle->item_id);
+                
+                if (!$servicio) {
+                    Log::warning('Servicio no encontrado para crear lavado', [
+                        'servicio_id' => $detalle->item_id,
+                        'venta_id' => $venta->venta_id
+                    ]);
+                    continue;
+                }
                 
                 // Datos del lavado basados en la venta y el servicio
                 $dataLavado = [
@@ -573,16 +585,28 @@ class VentaService
                     $dataLavado['tipo_vehiculo_id'] = $vehiculoPrincipal->tipo_vehiculo_id;
                 }
 
-                // Crear el registro de lavado usando el repository
+                                // Crear el registro de lavado usando el repository
                 $lavado = $this->lavadoRepository->create($dataLavado);
                 $lavadosCreados[] = $lavado;
 
+                // Obtener el ID del lavado de forma más defensiva
+                $lavadoId = null;
+                $lavadoEstado = null;
+
+                if (is_array($lavado)) {
+                    $lavadoId = $lavado['lavado_id'] ?? $lavado['id'] ?? 'ID no encontrado';
+                    $lavadoEstado = $lavado['estado'] ?? 'Estado no encontrado';
+                } else if (is_object($lavado)) {
+                    $lavadoId = $lavado->lavado_id ?? $lavado->id ?? 'ID no encontrado';
+                    $lavadoEstado = $lavado->estado ?? 'Estado no encontrado';
+                }
+
                 Log::info('Lavado creado desde venta', [
-                    'lavado_id' => $lavado->lavado_id,
+                    'lavado_id' => $lavadoId,
                     'venta_id' => $venta->venta_id,
                     'servicio_id' => $servicio->servicio_id,
                     'servicio_nombre' => $servicio->nombre,
-                    'estado' => $lavado->estado
+                    'estado' => $lavadoEstado
                 ]);
             }
 

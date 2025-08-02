@@ -23,24 +23,26 @@ class VentaDetalle extends Model
     // Permite asignación masiva en estos campos
     protected $fillable = [
         'venta_id',             // FK a la venta
-        'tipo_item',            // servicio, producto
+        'tipo_item',            // servicio, producto_automotriz, producto_despensa
         'item_id',              // ID del servicio o producto
-        'nombre_item',          // Nombre del servicio/producto (snapshot)
-        'descripcion_item',     // Descripción del item (snapshot)
+        'item_nombre',          // Nombre del servicio/producto (snapshot)
+        'item_descripcion',     // Descripción del item (snapshot)
+        'vehiculo_id',          // FK al vehículo (para servicios)
+        'empleado_id',          // FK al empleado (para servicios)
         'cantidad',             // Cantidad vendida
         'precio_unitario',      // Precio por unidad al momento de la venta
-        'descuento_unitario',   // Descuento por unidad
-        'subtotal',             // cantidad * (precio_unitario - descuento_unitario)
-        'configuracion',        // JSON con configuraciones específicas
+        'subtotal',             // cantidad * precio_unitario
+        'descuento',            // Descuento aplicado
+        'total',                // subtotal - descuento
     ];
 
     // Casting de tipos
     protected $casts = [
         'cantidad' => 'integer',
         'precio_unitario' => 'decimal:2',
-        'descuento_unitario' => 'decimal:2',
         'subtotal' => 'decimal:2',
-        'configuracion' => 'array',
+        'descuento' => 'decimal:2',
+        'total' => 'decimal:2',
     ];
 
     // Constantes para tipos de item

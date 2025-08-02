@@ -6,6 +6,7 @@ use App\Contracts\VentaRepositoryInterface;
 use App\Models\Venta;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class VentaRepository implements VentaRepositoryInterface
 {
@@ -14,7 +15,7 @@ class VentaRepository implements VentaRepositoryInterface
      */
     public function getAll(): Collection
     {
-        return Venta::with(['cliente', 'detalles.vendible'])->orderBy('fecha', 'desc')->get();
+        return Venta::with(['cliente', 'detalles'])->orderBy('fecha', 'desc')->get();
     }
 
     /**
@@ -22,7 +23,7 @@ class VentaRepository implements VentaRepositoryInterface
      */
     public function getAllWithTrashed(): Collection
     {
-        return Venta::withTrashed()->with(['cliente', 'detalles.vendible'])->orderBy('fecha', 'desc')->get();
+        return Venta::withTrashed()->with(['cliente', 'detalles'])->orderBy('fecha', 'desc')->get();
     }
 
     /**
@@ -30,7 +31,7 @@ class VentaRepository implements VentaRepositoryInterface
      */
     public function getOnlyTrashed(): Collection
     {
-        return Venta::onlyTrashed()->with(['cliente', 'detalles.vendible'])->orderBy('fecha', 'desc')->get();
+        return Venta::onlyTrashed()->with(['cliente', 'detalles'])->orderBy('fecha', 'desc')->get();
     }
 
     /**
@@ -38,7 +39,7 @@ class VentaRepository implements VentaRepositoryInterface
      */
     public function findById(int $id): ?Venta
     {
-        return Venta::with(['cliente', 'detalles.vendible', 'facturaElectronica'])->find($id);
+        return Venta::with(['cliente', 'detalles', 'facturaElectronica'])->find($id);
     }
 
     /**
@@ -46,7 +47,7 @@ class VentaRepository implements VentaRepositoryInterface
      */
     public function findByIdWithTrashed(int $id): ?Venta
     {
-        return Venta::withTrashed()->with(['cliente', 'detalles.vendible', 'facturaElectronica'])->find($id);
+        return Venta::withTrashed()->with(['cliente', 'detalles', 'facturaElectronica'])->find($id);
     }
 
     /**
@@ -62,15 +63,14 @@ class VentaRepository implements VentaRepositoryInterface
     /**
      * Actualizar venta
      */
-    public function update(int $id, array $data): ?Venta
+    public function update(int $id, array $data): bool
     {
         return DB::transaction(function () use ($id, $data) {
             $venta = Venta::find($id);
             if ($venta) {
-                $venta->update($data);
-                return $venta->fresh();
+                return $venta->update($data);
             }
-            return null;
+            return false;
         });
     }
 
@@ -111,29 +111,24 @@ class VentaRepository implements VentaRepositoryInterface
      * ⚡ MÉTODO CRÍTICO: Procesar venta completa con flujos automáticos
      * Orquesta la creación de venta con todos los flujos integrados
      * 
-     * @param array $ventaData Datos de la venta
-     * @param array $detallesData Detalles de la venta (productos/servicios)
-     * @return Venta La venta procesada con todas sus relaciones
+     * @param array $data Datos completos de la venta (incluye venta y detalles)
+     * @return array Resultado del procesamiento con venta y metadatos
      */
-    public function procesarVentaCompleta(array $ventaData, array $detallesData): Venta
+    public function procesarVentaCompleta(array $data): array
     {
-        return DB::transaction(function () use ($ventaData, $detallesData) {
+        return DB::transaction(function () use ($data) {
             Log::info('🔄 Iniciando procesamiento de venta completa', [
-                'cliente_id' => $ventaData['cliente_id'],
-                'total_detalles' => count($detallesData)
+                'cliente_id' => $data['cliente_id'] ?? null,
+                'total_detalles' => count($data['detalles'] ?? [])
             ]);
 
-            // 1. Crear la venta base
+            // Separar datos de venta y detalles
+            $detallesData = $data['detalles'] ?? [];
+            unset($data['detalles']);
+            $ventaData = $data;
+
+            // 1. Crear la venta base con detalles (solo persistencia)
             $venta = $this->createVentaCompleta($ventaData, $detallesData);
-
-            // 2. Cargar todas las relaciones necesarias para los flujos automáticos
-            $venta = $venta->fresh([
-                'cliente',
-                'empleado', 
-                'detalles.vendible',
-                'facturaElectronica',
-                'ingresos'
-            ]);
 
             Log::info('✅ Venta completa procesada exitosamente', [
                 'venta_id' => $venta->venta_id,
@@ -142,26 +137,37 @@ class VentaRepository implements VentaRepositoryInterface
                 'detalles_count' => $venta->detalles->count()
             ]);
 
-            return $venta;
+            return [
+                'success' => true,
+                'venta' => $venta,
+                'message' => 'Venta procesada exitosamente'
+            ];
         });
     }
 
     /**
-     * Crear venta completa con detalles
+     * Crear venta completa con detalles (solo persistencia)
      */
     public function createVentaCompleta(array $ventaData, array $detallesData): Venta
     {
         return DB::transaction(function () use ($ventaData, $detallesData) {
-            // Crear la venta
+            Log::info('📦 Creando venta completa en repositorio', [
+                'cliente_id' => $ventaData['cliente_id'] ?? null,
+                'total_detalles' => count($detallesData)
+            ]);
+
+            // 1. Crear la venta base
             $venta = Venta::create($ventaData);
+            Log::info('✅ Venta base creada', ['venta_id' => $venta->venta_id]);
             
-            // Crear los detalles
+            // 2. Crear los detalles de venta
             foreach ($detallesData as $detalleData) {
                 $detalleData['venta_id'] = $venta->venta_id;
                 $venta->detalles()->create($detalleData);
             }
+            Log::info('✅ Detalles de venta creados', ['count' => count($detallesData)]);
             
-            return $venta->fresh(['cliente', 'detalles.vendible']);
+            return $venta->fresh(['cliente', 'detalles']);
         });
     }
 
@@ -188,7 +194,7 @@ class VentaRepository implements VentaRepositoryInterface
                 $venta->detalles()->create($detalleData);
             }
             
-            return $venta->fresh(['cliente', 'detalles.vendible']);
+            return $venta->fresh(['cliente', 'detalles']);
         });
     }
 
@@ -217,11 +223,11 @@ class VentaRepository implements VentaRepositoryInterface
     /**
      * Obtener ventas del día
      */
-    public function getVentasDelDia(?string $fecha = null): Collection
+    public function getVentasDelDia(?\DateTime $fecha = null): Collection
     {
-        $fecha = $fecha ?? now()->format('Y-m-d');
+        $fechaStr = $fecha ? $fecha->format('Y-m-d') : now()->format('Y-m-d');
         
-        return Venta::whereDate('fecha', $fecha)
+        return Venta::whereDate('fecha', $fechaStr)
                    ->with(['cliente', 'detalles.vendible'])
                    ->orderBy('fecha', 'desc')
                    ->get();
@@ -256,6 +262,15 @@ class VentaRepository implements VentaRepositoryInterface
         $fecha = $fecha ?? now()->format('Y-m-d');
         
         return Venta::whereDate('fecha', $fecha)->sum('total');
+    }
+
+    /**
+     * Obtener total de ventas del día por DateTime (para compatibilidad con interfaz)
+     */
+    private function getTotalVentasDelDiaDateTime(?\DateTime $fecha = null): float
+    {
+        $fechaStr = $fecha ? $fecha->format('Y-m-d') : now()->format('Y-m-d');
+        return $this->getTotalVentasDelDia($fechaStr);
     }
 
     /**
@@ -362,5 +377,114 @@ class VentaRepository implements VentaRepositoryInterface
                    ->groupBy('metodo_pago')
                    ->get()
                    ->toArray();
+    }
+
+    /**
+     * Validar stock disponible para los detalles de venta
+     */
+    public function validarStockDisponible(array $detalles): array
+    {
+        $resultado = ['valido' => true, 'errores' => []];
+        
+        foreach ($detalles as $detalle) {
+            if (str_contains($detalle['vendible_type'], 'Producto')) {
+                // Aquí se validaría el stock del producto
+                // Por ahora retornamos válido
+            }
+        }
+        
+        return $resultado;
+    }
+
+    /**
+     * Buscar ventas por cliente ID
+     */
+    public function findByClienteId(int $clienteId): Collection
+    {
+        return $this->getByClienteId($clienteId);
+    }
+
+    /**
+     * Buscar ventas por empleado ID
+     */
+    public function findByEmpleadoId(int $empleadoId): Collection
+    {
+        return Venta::where('empleado_id', $empleadoId)
+                   ->with(['cliente', 'detalles.vendible'])
+                   ->orderBy('fecha', 'desc')
+                   ->get();
+    }
+
+    /**
+     * Buscar ventas por vehículo ID
+     */
+    public function findByVehiculoId(int $vehiculoId): Collection
+    {
+        return Venta::whereHas('lavados', function ($query) use ($vehiculoId) {
+            $query->where('vehiculo_id', $vehiculoId);
+        })->with(['cliente', 'detalles.vendible'])
+          ->orderBy('fecha', 'desc')
+          ->get();
+    }
+
+    /**
+     * Buscar ventas en rango de fechas
+     */
+    public function findByFechaRango(\DateTime $fechaInicio, \DateTime $fechaFin): Collection
+    {
+        return $this->getByDateRange($fechaInicio->format('Y-m-d'), $fechaFin->format('Y-m-d'));
+    }
+
+    /**
+     * Obtener ventas con sus detalles
+     */
+    public function getVentasConDetalles(): Collection
+    {
+        return Venta::with(['cliente', 'detalles.vendible'])
+                   ->orderBy('fecha', 'desc')
+                   ->get();
+    }
+
+    /**
+     * Calcular total de una venta
+     */
+    public function calcularTotal(int $ventaId): float
+    {
+        $venta = Venta::find($ventaId);
+        return $venta ? $venta->total : 0.0;
+    }
+
+    /**
+     * Obtener métricas de ventas
+     */
+    public function getMetricas(array $filtros = []): array
+    {
+        return $this->getStats();
+    }
+
+    /**
+     * Obtener mejores clientes por volumen de ventas
+     */
+    public function getMejoresClientes(int $limite = 10): Collection
+    {
+        return Venta::select('cliente_id', DB::raw('COUNT(*) as total_ventas'), DB::raw('SUM(total) as total_facturado'))
+                   ->with('cliente')
+                   ->groupBy('cliente_id')
+                   ->orderByDesc('total_facturado')
+                   ->limit($limite)
+                   ->get();
+    }
+
+    /**
+     * Obtener productos/servicios más vendidos
+     */
+    public function getProductosMasVendidos(int $limite = 10): Collection
+    {
+        return DB::table('venta_detalles as vd')
+                 ->select('vd.vendible_type', 'vd.vendible_id', DB::raw('SUM(vd.cantidad) as total_vendido'), DB::raw('SUM(vd.precio_unitario * vd.cantidad) as total_facturado'))
+                 ->groupBy('vd.vendible_type', 'vd.vendible_id')
+                 ->orderByDesc('total_vendido')
+                 ->limit($limite)
+                 ->get();
     }
 }

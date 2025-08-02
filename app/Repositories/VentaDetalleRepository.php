@@ -62,15 +62,14 @@ class VentaDetalleRepository implements VentaDetalleRepositoryInterface
     /**
      * Actualizar detalle de venta
      */
-    public function update(int $id, array $data): ?VentaDetalle
+    public function update(int $id, array $data): bool
     {
         return DB::transaction(function () use ($id, $data) {
             $detalle = VentaDetalle::find($id);
             if ($detalle) {
-                $detalle->update($data);
-                return $detalle->fresh();
+                return $detalle->update($data);
             }
-            return null;
+            return false;
         });
     }
 
@@ -113,6 +112,57 @@ class VentaDetalleRepository implements VentaDetalleRepositoryInterface
     public function getByVentaId(int $ventaId): Collection
     {
         return VentaDetalle::where('venta_id', $ventaId)->get();
+    }
+
+    /**
+     * Obtener detalles por venta ID (alias para compatibilidad con interface)
+     */
+    public function findByVentaId(int $ventaId): Collection
+    {
+        return $this->getByVentaId($ventaId);
+    }
+
+    /**
+     * Obtener detalles por producto (polimórfico)
+     */
+    public function findByProducto(string $productoType, int $productoId): Collection
+    {
+        return VentaDetalle::where('vendible_type', $productoType)
+                          ->where('vendible_id', $productoId)
+                          ->with('vendible')
+                          ->get();
+    }
+
+    /**
+     * Crear múltiples detalles para una venta
+     */
+    public function createBatch(array $detalles): Collection
+    {
+        return $this->createMultiple($detalles);
+    }
+
+    /**
+     * Calcular subtotal de una venta
+     */
+    public function calcularSubtotalVenta(int $ventaId): float
+    {
+        return $this->getTotalByVentaId($ventaId);
+    }
+
+    /**
+     * Obtener detalles de productos de una venta
+     */
+    public function getProductosDeVenta(int $ventaId): Collection
+    {
+        return $this->getProductosByVentaId($ventaId);
+    }
+
+    /**
+     * Obtener detalles de servicios de una venta
+     */
+    public function getServiciosDeVenta(int $ventaId): Collection
+    {
+        return $this->getServiciosByVentaId($ventaId);
     }
 
     /**

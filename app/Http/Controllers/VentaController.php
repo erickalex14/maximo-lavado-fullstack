@@ -122,9 +122,12 @@ class VentaController extends Controller
     public function store(CreateVentaRequest $request): JsonResponse
     {
         try {
+            // Transformar detalles de formato request a formato servicio
+            $detalles = $this->transformDetallesFormat($request->input('detalles', []));
+            
             $venta = $this->ventaService->crearVentaCompleta(
                 $request->only(['cliente_id', 'fecha', 'descuento', 'estado', 'observaciones', 'usuario_id']),
-                $request->input('detalles', [])
+                $detalles
             );
             
             return $this->successResponse($venta, 'venta', 'Venta creada correctamente', 201);
@@ -140,10 +143,13 @@ class VentaController extends Controller
     public function update(int $id, UpdateVentaRequest $request): JsonResponse
     {
         try {
+            // Transformar detalles de formato request a formato servicio
+            $detalles = $this->transformDetallesFormat($request->input('detalles', []));
+            
             $venta = $this->ventaService->actualizarVentaCompleta(
                 $id,
                 $request->only(['cliente_id', 'fecha', 'descuento', 'estado', 'observaciones', 'usuario_id']),
-                $request->input('detalles', [])
+                $detalles
             );
             
             return $this->successResponse($venta, 'venta', 'Venta actualizada correctamente');
@@ -460,7 +466,7 @@ class VentaController extends Controller
             return $this->ventaService->getVentasByClienteId($request->cliente_id);
         }
 
-        return $this->ventaService->getAllVentas();
+        return $this->ventaService->getAll();
     }
 
     /**
@@ -475,7 +481,7 @@ class VentaController extends Controller
             );
         }
 
-        return $this->ventaService->getAllVentasAutomotrices();
+        return $this->ventaService->getAll();
     }
 
     /**
@@ -490,7 +496,7 @@ class VentaController extends Controller
             );
         }
 
-        return $this->ventaService->getAllVentasDespensa();
+        return $this->ventaService->getAll();
     }
 
     /**
@@ -535,5 +541,31 @@ class VentaController extends Controller
             'status' => 'error',
             'message' => $message
         ], 404);
+    }
+
+    /**
+     * Transformar detalles del formato request (tipo_item/item_id) al formato de base de datos
+     */
+    private function transformDetallesFormat(array $detalles): array
+    {
+        return array_map(function ($detalle) {
+            // Calcular subtotal si no está presente
+            if (!isset($detalle['subtotal']) && isset($detalle['cantidad']) && isset($detalle['precio_unitario'])) {
+                $detalle['subtotal'] = $detalle['cantidad'] * $detalle['precio_unitario'];
+            }
+            
+            // Calcular total si no está presente
+            if (!isset($detalle['total'])) {
+                $descuento = $detalle['descuento'] ?? 0;
+                $detalle['total'] = $detalle['subtotal'] - $descuento;
+            }
+            
+            // Asegurar que descuento esté presente
+            if (!isset($detalle['descuento'])) {
+                $detalle['descuento'] = 0;
+            }
+
+            return $detalle;
+        }, $detalles);
     }
 }

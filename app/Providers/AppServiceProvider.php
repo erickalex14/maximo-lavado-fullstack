@@ -74,6 +74,11 @@ class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->bind(
+            \App\Contracts\VentaDetalleRepositoryInterface::class,
+            \App\Repositories\VentaDetalleRepository::class
+        );
+
+        $this->app->bind(
             \App\Contracts\ReporteRepositoryInterface::class,
             \App\Repositories\ReporteRepository::class
         );
