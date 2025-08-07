@@ -23,6 +23,11 @@ interface TipoVehiculoRepositoryInterface
     public function getOnlyTrashed(): Collection;
 
     /**
+     * Obtener solo los eliminados (soft deletes) - Alias para consistencia
+     */
+    public function getTrashed(): Collection;
+
+    /**
      * Buscar tipo de vehículo por ID
      */
     public function findById(int $id): ?TipoVehiculo;

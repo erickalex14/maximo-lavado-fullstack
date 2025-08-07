@@ -34,4 +34,9 @@ interface ProductoDespensaRepositoryInterface
     public function updateStock(int $id, int $newStock): ?ProductoDespensa;
     
     public function toggleActive(int $id): ?ProductoDespensa;
+    
+    /**
+     * Get metrics for despensa products
+     */
+    public function getMetricas(): array;
 }

@@ -429,12 +429,14 @@ class VentaService
             $subtotalLinea = $detalle['precio_unitario'] * $detalle['cantidad'];
             $subtotal += $subtotalLinea;
             
-            // En Ecuador, generalmente los servicios tienen IVA del 12%
-            if ($detalle['tipo_item'] === 'servicio') {
+            // ⚡ CRÍTICO: IVA 12% para TODOS los tipos de items en Ecuador
+            // En Ecuador, la mayoría de productos y servicios tienen IVA del 12%
+            if (in_array($detalle['tipo_item'], ['servicio', 'producto_automotriz', 'producto_despensa'])) {
                 $iva += $subtotalLinea * 0.12;
             }
-            // Los productos pueden tener IVA 0% o 12% según configuración
-            // Por simplicidad, asumimos 0% para productos, pero esto debe ser configurable
+            
+            // TODO: Implementar configuración de IVA por producto individual si es necesario
+            // Algunos productos específicos podrían tener IVA 0% pero son excepciones
         }
         
         $total = $subtotal + $iva;
@@ -561,7 +563,7 @@ class VentaService
                 $dataLavado = [
                     'venta_id' => $venta->venta_id,
                     'cliente_id' => $venta->cliente_id,
-                    'empleado_id' => $venta->empleado_id ?? null,
+                    'empleado_id' => $venta->usuario_id ?? null, // Usar usuario_id en lugar de empleado_id
                     'servicio_id' => $servicio->servicio_id,
                     'vehiculo_id' => null, // Se puede obtener del cliente o asignar después
                     'tipo_vehiculo_id' => null, // Se puede inferir del servicio

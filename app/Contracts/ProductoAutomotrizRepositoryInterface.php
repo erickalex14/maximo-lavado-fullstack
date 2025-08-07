@@ -36,4 +36,9 @@ interface ProductoAutomotrizRepositoryInterface
     public function updateStock(int $id, int $newStock): ?ProductoAutomotriz;
     
     public function toggleActive(int $id): ?ProductoAutomotriz;
+    
+    /**
+     * Get metrics for automotriz products
+     */
+    public function getMetricas(): array;
 }

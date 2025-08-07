@@ -123,4 +123,28 @@ class ProductoAutomotrizRepository implements ProductoAutomotrizRepositoryInterf
         }
         return null;
     }
+
+    /**
+     * Get metrics for automotriz products
+     */
+    public function getMetricas(): array
+    {
+        $total = $this->model->count();
+        $activos = $this->model->where('activo', true)->count();
+        $inactivos = $total - $activos;
+        $stockBajo = $this->model->where('stock', '<=', 5)->count();
+        $sinStock = $this->model->where('stock', 0)->count();
+        $valorInventario = $this->model->sum(\DB::raw('precio_venta * stock'));
+        
+        return [
+            'productos_automotrices' => [
+                'total' => $total,
+                'activos' => $activos,
+                'inactivos' => $inactivos,
+                'stock_bajo' => $stockBajo,
+                'sin_stock' => $sinStock,
+                'valor_inventario' => round($valorInventario, 2)
+            ]
+        ];
+    }
 }

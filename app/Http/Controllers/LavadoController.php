@@ -26,9 +26,9 @@ class LavadoController extends Controller
             $filters = $this->extractFilters($request);
             $lavados = $this->lavadoService->getAllLavados($filters);
             
-            return $this->successResponse('Lavados obtenidos correctamente', $lavados);
+            return $this->successResponse($lavados, 'lavados', 'Lavados obtenidos correctamente');
         } catch (\Exception $e) {
-            return $this->errorResponse('Error al obtener los lavados: ' . $e->getMessage(), 500);
+            return $this->errorResponse('Error al obtener los lavados', $e);
         }
     }
 
@@ -41,9 +41,9 @@ class LavadoController extends Controller
             $filters = $this->extractFilters($request);
             $lavados = $this->lavadoService->getLavadosByEmpleado($empleadoId, $filters);
             
-            return $this->successResponse('Lavados por empleado obtenidos correctamente', $lavados);
+            return $this->successResponse($lavados, 'lavados', 'Lavados por empleado obtenidos correctamente');
         } catch (\Exception $e) {
-            return $this->errorResponse('Error al obtener lavados por empleado: ' . $e->getMessage(), 500);
+            return $this->errorResponse('Error al obtener lavados por empleado', $e);
         }
     }
 
@@ -56,9 +56,9 @@ class LavadoController extends Controller
             $filters = $this->extractFilters($request);
             $lavados = $this->lavadoService->getLavadosByVehiculo($vehiculoId, $filters);
             
-            return $this->successResponse('Lavados por vehículo obtenidos correctamente', $lavados);
+            return $this->successResponse($lavados, 'lavados', 'Lavados por vehículo obtenidos correctamente');
         } catch (\Exception $e) {
-            return $this->errorResponse('Error al obtener lavados por vehículo: ' . $e->getMessage(), 500);
+            return $this->errorResponse('Error al obtener lavados por vehículo', $e);
         }
     }
 
@@ -73,78 +73,9 @@ class LavadoController extends Controller
             $filters = $this->extractFilters($request);
             $lavados = $this->lavadoService->getLavadosByDay($request->fecha, $filters);
             
-            return $this->successResponse('Lavados del día obtenidos correctamente', $lavados);
+            return $this->successResponse($lavados, 'lavados', 'Lavados del día obtenidos correctamente');
         } catch (\Exception $e) {
-            return $this->errorResponse('Error al obtener lavados del día: ' . $e->getMessage(), 500);
-        }
-    }
-
-    /**
-     * Obtener lavados por semana
-     */
-    public function getByWeek(Request $request): JsonResponse
-    {
-        $request->validate(['fecha' => 'required|date']);
-        
-        try {
-            $filters = $this->extractFilters($request);
-            $lavados = $this->lavadoService->getLavadosByWeek($request->fecha, $filters);
-            
-            return $this->successResponse('Lavados de la semana obtenidos correctamente', $lavados);
-        } catch (\Exception $e) {
-            return $this->errorResponse('Error al obtener lavados de la semana: ' . $e->getMessage(), 500);
-        }
-    }
-
-    /**
-     * Obtener lavados por mes
-     */
-    public function getByMonth(Request $request): JsonResponse
-    {
-        $request->validate([
-            'anio' => 'required|integer|min:2020|max:2030',
-            'mes' => 'required|integer|min:1|max:12'
-        ]);
-        
-        try {
-            $filters = $this->extractFilters($request);
-            $lavados = $this->lavadoService->getLavadosByMonth($request->anio, $request->mes, $filters);
-            
-            return $this->successResponse('Lavados del mes obtenidos correctamente', $lavados);
-        } catch (\Exception $e) {
-            return $this->errorResponse('Error al obtener lavados del mes: ' . $e->getMessage(), 500);
-        }
-    }
-
-    /**
-     * Obtener lavados por año
-     */
-    public function getByYear(Request $request): JsonResponse
-    {
-        $request->validate(['anio' => 'required|integer|min:2020|max:2030']);
-        
-        try {
-            $filters = $this->extractFilters($request);
-            $lavados = $this->lavadoService->getLavadosByYear($request->anio, $filters);
-            
-            return $this->successResponse('Lavados del año obtenidos correctamente', $lavados);
-        } catch (\Exception $e) {
-            return $this->errorResponse('Error al obtener lavados del año: ' . $e->getMessage(), 500);
-        }
-    }
-
-    /**
-     * Obtener estadísticas de lavados
-     */
-    public function getStats(Request $request): JsonResponse
-    {
-        try {
-            $filters = $this->extractFilters($request);
-            $stats = $this->lavadoService->getEstadisticas($filters);
-            
-            return $this->successResponse('Estadísticas obtenidas correctamente', $stats);
-        } catch (\Exception $e) {
-            return $this->errorResponse('Error al obtener estadísticas: ' . $e->getMessage(), 500);
+            return $this->errorResponse('Error al obtener lavados del día', $e);
         }
     }
 
@@ -154,19 +85,20 @@ class LavadoController extends Controller
     public function store(CreateLavadoRequest $request): JsonResponse
     {
         try {
-            $result = $this->lavadoService->createLavado($request->validated());
+            $result = $this->lavadoService->crearLavado($request->validated());
             
             if (!$result['success']) {
-                return $this->errorResponse($result['message'], 400);
+                return $this->errorResponse($result['message']);
             }
 
             return $this->successResponse(
+                $result['data'] ?? $result,
+                'lavado',
                 'Lavado creado correctamente y registrado como ingreso',
-                $result['data'],
                 201
             );
         } catch (\Exception $e) {
-            return $this->errorResponse('Error al crear el lavado: ' . $e->getMessage(), 500);
+            return $this->errorResponse('Error al crear el lavado', $e);
         }
     }
 
@@ -176,15 +108,15 @@ class LavadoController extends Controller
     public function show(int $id): JsonResponse
     {
         try {
-            $lavado = $this->lavadoService->findLavadoById($id);
+            $lavado = $this->lavadoService->getLavadoById($id);
             
             if (!$lavado) {
-                return $this->errorResponse('Lavado no encontrado', 404);
+                return $this->notFoundResponse('Lavado no encontrado');
             }
 
-            return $this->successResponse('Lavado obtenido correctamente', $lavado);
+            return $this->successResponse($lavado, 'lavado', 'Lavado obtenido correctamente');
         } catch (\Exception $e) {
-            return $this->errorResponse('Error al obtener el lavado: ' . $e->getMessage(), 500);
+            return $this->errorResponse('Error al obtener el lavado', $e);
         }
     }
 
@@ -197,12 +129,12 @@ class LavadoController extends Controller
             $lavado = $this->lavadoService->updateLavado($id, $request->validated());
             
             if (!$lavado) {
-                return $this->errorResponse('Lavado no encontrado', 404);
+                return $this->notFoundResponse('Lavado no encontrado');
             }
 
-            return $this->successResponse('Lavado actualizado correctamente', $lavado);
+            return $this->successResponse($lavado, 'lavado', 'Lavado actualizado correctamente');
         } catch (\Exception $e) {
-            return $this->errorResponse('Error al actualizar el lavado: ' . $e->getMessage(), 500);
+            return $this->errorResponse('Error al actualizar el lavado', $e);
         }
     }
 
@@ -215,30 +147,27 @@ class LavadoController extends Controller
             $result = $this->lavadoService->deleteLavado($id);
             
             if (!$result) {
-                return $this->errorResponse('No se pudo eliminar el lavado', 400);
+                return $this->errorResponse('No se pudo eliminar el lavado');
             }
 
-            return $this->successResponse('Lavado eliminado correctamente');
+            return $this->successResponse(null, null, 'Lavado eliminado correctamente');
         } catch (\Exception $e) {
-            return $this->errorResponse('Error al eliminar el lavado: ' . $e->getMessage(), 500);
+            return $this->errorResponse('Error al eliminar el lavado', $e);
         }
     }
 
     /**
-     * Restaurar lavado eliminado lógicamente
+     * Obtener estadísticas de lavados
      */
-    public function restore(int $id): JsonResponse
+    public function getStats(Request $request): JsonResponse
     {
         try {
-            $result = $this->lavadoService->restoreLavado($id);
+            $filters = $this->extractFilters($request);
+            $stats = $this->lavadoService->getEstadisticas($filters);
             
-            if (!$result) {
-                return $this->errorResponse('No se pudo restaurar el lavado', 400);
-            }
-
-            return $this->successResponse('Lavado restaurado correctamente');
+            return $this->successResponse($stats, 'estadisticas', 'Estadísticas obtenidas correctamente');
         } catch (\Exception $e) {
-            return $this->errorResponse('Error al restaurar el lavado: ' . $e->getMessage(), 500);
+            return $this->errorResponse('Error al obtener estadísticas', $e);
         }
     }
 
@@ -250,9 +179,9 @@ class LavadoController extends Controller
         try {
             $lavados = $this->lavadoService->getTrashedLavados();
             
-            return $this->successResponse('Lavados eliminados obtenidos correctamente', $lavados);
+            return $this->successResponse($lavados, 'lavados_eliminados', 'Lavados eliminados obtenidos correctamente');
         } catch (\Exception $e) {
-            return $this->errorResponse('Error al obtener lavados eliminados: ' . $e->getMessage(), 500);
+            return $this->errorResponse('Error al obtener lavados eliminados', $e);
         }
     }
 
@@ -276,33 +205,5 @@ class LavadoController extends Controller
             'precio_min' => $request->input('precio_min'),
             'precio_max' => $request->input('precio_max')
         ]);
-    }
-
-    /**
-     * Respuesta de éxito estandarizada
-     */
-    private function successResponse(string $message, $data = null, int $status = 200): JsonResponse
-    {
-        $response = [
-            'status' => 'success',
-            'message' => $message
-        ];
-
-        if ($data !== null) {
-            $response['data'] = $data;
-        }
-
-        return response()->json($response, $status);
-    }
-
-    /**
-     * Respuesta de error estandarizada
-     */
-    private function errorResponse(string $message, int $status = 400): JsonResponse
-    {
-        return response()->json([
-            'status' => 'error',
-            'message' => $message
-        ], $status);
     }
 }

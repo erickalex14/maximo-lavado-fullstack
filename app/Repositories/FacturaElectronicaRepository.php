@@ -62,14 +62,15 @@ class FacturaElectronicaRepository implements FacturaElectronicaRepositoryInterf
     /**
      * Actualizar factura electrónica
      */
-    public function update(int $id, array $data): bool
+    public function update(int $id, array $data): ?FacturaElectronica
     {
         return DB::transaction(function () use ($id, $data) {
             $factura = FacturaElectronica::find($id);
             if ($factura) {
-                return $factura->update($data);
+                $factura->update($data);
+                return $factura->fresh(); // Retorna el modelo actualizado
             }
-            return false;
+            return null;
         });
     }
 

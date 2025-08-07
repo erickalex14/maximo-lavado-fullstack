@@ -40,7 +40,7 @@ interface FacturaElectronicaRepositoryInterface
     /**
      * Actualizar factura electrónica
      */
-    public function update(int $id, array $data): bool;
+    public function update(int $id, array $data): ?FacturaElectronica;
 
     /**
      * Eliminar factura electrónica (soft delete)

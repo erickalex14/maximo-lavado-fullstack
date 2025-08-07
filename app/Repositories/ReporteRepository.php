@@ -8,7 +8,7 @@ use App\Models\VentaProductoDespensa;
 use App\Models\Lavado;
 use App\Models\Ingreso;
 use App\Models\Egreso;
-use App\Models\Factura;
+use App\Models\FacturaElectronica;
 use App\Models\Empleado;
 use App\Models\ProductoAutomotriz;
 use App\Models\ProductoDespensa;
@@ -195,14 +195,16 @@ class ReporteRepository implements ReporteRepositoryInterface
 
     public function getReporteFacturas(string $fechaInicio, string $fechaFin): array
     {
-        $facturas = Factura::with(['cliente', 'detalles'])
-            ->whereBetween('fecha', [$fechaInicio, $fechaFin])
+        $facturas = FacturaElectronica::with(['cliente', 'venta'])
+            ->whereHas('venta', function($query) use ($fechaInicio, $fechaFin) {
+                $query->whereBetween('fecha', [$fechaInicio, $fechaFin]);
+            })
             ->get()
             ->map(function($factura) {
                 return [
-                    'numero_factura' => $factura->numero_factura,
-                    'fecha' => $factura->fecha,
-                    'cliente' => $factura->cliente->nombre,
+                    'numero_factura' => $factura->secuencial,
+                    'fecha' => $factura->venta->fecha,
+                    'cliente' => $factura->razon_social_comprador,
                     'total' => $factura->total,
                     'cantidad_detalles' => $factura->detalles->count(),
                     'descripcion' => $factura->descripcion
@@ -337,7 +339,9 @@ class ReporteRepository implements ReporteRepositoryInterface
         $ingresosVentasAuto = VentaProductoAutomotriz::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
         $ingresosVentasDespensa = VentaProductoDespensa::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
         $otrosIngresos = Ingreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
-        $ingresosFacturas = Factura::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
+        $ingresosFacturas = FacturaElectronica::whereHas('venta', function($query) use ($fechaInicio, $fechaFin) {
+            $query->whereBetween('fecha', [$fechaInicio, $fechaFin]);
+        })->sum('total');
 
         $totalIngresos = $ingresosLavados + $ingresosVentasAuto + $ingresosVentasDespensa + $otrosIngresos + $ingresosFacturas;
 

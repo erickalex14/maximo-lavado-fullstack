@@ -5,7 +5,7 @@ namespace App\Repositories;
 use App\Contracts\BalanceRepositoryInterface;
 use App\Models\Ingreso;
 use App\Models\Egreso;
-use App\Models\Factura;
+use App\Models\FacturaElectronica;
 use App\Models\Lavado;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +16,7 @@ class BalanceRepository implements BalanceRepositoryInterface
     {
         $totalIngresos = Ingreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
         $totalEgresos = Egreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
-        $totalFacturas = Factura::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
+        $totalFacturas = FacturaElectronica::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
         $totalLavados = Lavado::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('precio');
 
         return [
@@ -45,7 +45,7 @@ class BalanceRepository implements BalanceRepositoryInterface
             ->keyBy('tipo')
             ->map(fn($item) => $item->total);
 
-        $facturas = Factura::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
+        $facturas = FacturaElectronica::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
         $lavados = Lavado::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('precio');
 
         return [
@@ -68,7 +68,7 @@ class BalanceRepository implements BalanceRepositoryInterface
 
             $ingresos = Ingreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
             $egresos = Egreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
-            $facturas = Factura::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
+            $facturas = FacturaElectronica::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
             $lavados = Lavado::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('precio');
 
             $meses[$mes] = [
@@ -97,7 +97,7 @@ class BalanceRepository implements BalanceRepositoryInterface
 
             $ingresos = Ingreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
             $egresos = Egreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
-            $facturas = Factura::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
+            $facturas = FacturaElectronica::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
             $lavados = Lavado::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('precio');
 
             $trimestres[$trimestre] = [
@@ -121,7 +121,7 @@ class BalanceRepository implements BalanceRepositoryInterface
 
         $ingresos = Ingreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
         $egresos = Egreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
-        $facturas = Factura::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
+        $facturas = FacturaElectronica::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
         $lavados = Lavado::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('precio');
 
         return [

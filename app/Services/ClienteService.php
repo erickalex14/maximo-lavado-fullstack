@@ -133,6 +133,30 @@ class ClienteService
     }
 
     /**
+     * Obtener clientes eliminados (soft delete)
+     */
+    public function getTrashedClientes(): Collection
+    {
+        return $this->clienteRepository->getTrashed();
+    }
+
+    /**
+     * Restaurar cliente eliminado
+     */
+    public function restoreCliente(int $id): bool
+    {
+        $result = $this->clienteRepository->restore($id);
+
+        if ($result) {
+            Log::info('Cliente restaurado exitosamente', [
+                'cliente_id' => $id
+            ]);
+        }
+
+        return $result;
+    }
+
+    /**
      * Validaciones de reglas de negocio
      */
     protected function validateBusinessRules(array $data, ?int $excludeId = null): void

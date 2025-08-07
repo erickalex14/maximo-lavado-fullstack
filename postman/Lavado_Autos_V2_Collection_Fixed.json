@@ -1,0 +1,1072 @@
+{
+	"info": {
+		"_postman_id": "12345678-1234-1234-1234-123456789012",
+		"name": "Lavado Autos V2 - API Collection Fixed",
+		"description": "Colección completa de APIs para el sistema de lavado de autos V2 - Corregida para mantener consistencia con migraciones y rutas del proyecto",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000/api",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "01. Autenticación",
+			"item": [
+				{
+					"name": "POST Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('token', jsonData.token);",
+									"    pm.collectionVariables.set('token', jsonData.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"admin@lavadoautos.com\",\n    \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/login",
+							"host": ["{{base_url}}"],
+							"path": ["login"]
+						}
+					}
+				},
+				{
+					"name": "POST Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/logout",
+							"host": ["{{base_url}}"],
+							"path": ["logout"]
+						}
+					}
+				},
+				{
+					"name": "GET Usuario Autenticado",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/usuario",
+							"host": ["{{base_url}}"],
+							"path": ["usuario"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "02. Productos Automotrices",
+			"item": [
+				{
+					"name": "GET All Productos Automotrices",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/productos/automotrices",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "automotrices"]
+						}
+					}
+				},
+				{
+					"name": "POST Create Producto Automotriz",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"codigo\": \"AUTO001\",\n  \"nombre\": \"Aceite Motor 5W30\",\n  \"descripcion\": \"Aceite sintético para motor 5W30 - 1 litro\",\n  \"precio_venta\": 18.75,\n  \"stock\": 20,\n  \"activo\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/productos/automotrices",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "automotrices"]
+						}
+					}
+				},
+				{
+					"name": "GET Producto Automotriz by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/productos/automotrices/1",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "automotrices", "1"]
+						}
+					}
+				},
+				{
+					"name": "PUT Update Producto Automotriz",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"codigo\": \"AUTO001\",\n  \"nombre\": \"Aceite Motor 5W30 Premium\",\n  \"descripcion\": \"Aceite sintético premium para motor 5W30 - 1 litro\",\n  \"precio_venta\": 22.50,\n  \"stock\": 15,\n  \"activo\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/productos/automotrices/1",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "automotrices", "1"]
+						}
+					}
+				},
+				{
+					"name": "PUT Update Stock Automotriz",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"stock\": 25\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/productos/automotrices/1/stock",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "automotrices", "1", "stock"]
+						}
+					}
+				},
+				{
+					"name": "GET Productos Automotrices Eliminados",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/productos/automotrices/trashed",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "automotrices", "trashed"]
+						}
+					}
+				},
+				{
+					"name": "PUT Restore Producto Automotriz",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/productos/automotrices/1/restore",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "automotrices", "1", "restore"]
+						}
+					}
+				},
+				{
+					"name": "DELETE Producto Automotriz",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/productos/automotrices/1",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "automotrices", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "03. Productos de Despensa",
+			"item": [
+				{
+					"name": "GET All Productos Despensa",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/productos/despensa",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "despensa"]
+						}
+					}
+				},
+				{
+					"name": "POST Create Producto Despensa",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombre\": \"Coca Cola 500ml\",\n  \"descripcion\": \"Bebida gaseosa Coca Cola 500ml\",\n  \"precio_venta\": 1.25,\n  \"stock\": 50,\n  \"activo\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/productos/despensa",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "despensa"]
+						}
+					}
+				},
+				{
+					"name": "GET Producto Despensa by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/productos/despensa/1",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "despensa", "1"]
+						}
+					}
+				},
+				{
+					"name": "PUT Update Producto Despensa",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombre\": \"Coca Cola 500ml\",\n  \"descripcion\": \"Bebida gaseosa Coca Cola 500ml - Fría\",\n  \"precio_venta\": 1.50,\n  \"stock\": 40,\n  \"activo\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/productos/despensa/1",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "despensa", "1"]
+						}
+					}
+				},
+				{
+					"name": "PUT Update Stock Despensa",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"stock\": 60\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/productos/despensa/1/stock",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "despensa", "1", "stock"]
+						}
+					}
+				},
+				{
+					"name": "GET Productos Despensa Eliminados",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/productos/despensa/trashed",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "despensa", "trashed"]
+						}
+					}
+				},
+				{
+					"name": "PUT Restore Producto Despensa",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/productos/despensa/1/restore",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "despensa", "1", "restore"]
+						}
+					}
+				},
+				{
+					"name": "DELETE Producto Despensa",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/productos/despensa/1",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "despensa", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "04. Productos (Unificado)",
+			"item": [
+				{
+					"name": "GET All Productos",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/productos",
+							"host": ["{{base_url}}"],
+							"path": ["productos"]
+						}
+					}
+				},
+				{
+					"name": "GET Productos Métricas",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/productos/metricas",
+							"host": ["{{base_url}}"],
+							"path": ["productos", "metricas"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "05. Proveedores",
+			"item": [
+				{
+					"name": "GET All Proveedores",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/proveedores",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores"]
+						}
+					}
+				},
+				{
+					"name": "POST Create Proveedor",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombre\": \"Distribuidora Automotriz S.A.\",\n  \"email\": \"ventas@distribuidora.com\",\n  \"telefono\": \"0987654321\",\n  \"descripcion\": \"Proveedor de aceites y filtros automotrices\",\n  \"deuda_pendiente\": 0.00\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/proveedores",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores"]
+						}
+					}
+				},
+				{
+					"name": "GET Proveedor by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/proveedores/1",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores", "1"]
+						}
+					}
+				},
+				{
+					"name": "PUT Update Proveedor",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombre\": \"Distribuidora Automotriz Premium S.A.\",\n  \"email\": \"ventas@distribuidora.com\",\n  \"telefono\": \"0987654321\",\n  \"descripcion\": \"Proveedor premium de aceites y filtros automotrices\",\n  \"deuda_pendiente\": 150.00\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/proveedores/1",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores", "1"]
+						}
+					}
+				},
+				{
+					"name": "GET Deuda Proveedor",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/proveedores/1/deuda",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores", "1", "deuda"]
+						}
+					}
+				},
+				{
+					"name": "GET Pagos de Proveedor",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/proveedores/1/pagos",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores", "1", "pagos"]
+						}
+					}
+				},
+				{
+					"name": "GET Proveedores Eliminados",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/proveedores/trashed",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores", "trashed"]
+						}
+					}
+				},
+				{
+					"name": "PUT Restore Proveedor",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/proveedores/1/restore",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores", "1", "restore"]
+						}
+					}
+				},
+				{
+					"name": "DELETE Proveedor",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/proveedores/1",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "06. Pagos a Proveedores",
+			"item": [
+				{
+					"name": "GET All Pagos Proveedores",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/proveedores/pagos",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores", "pagos"]
+						}
+					}
+				},
+				{
+					"name": "POST Create Pago a Proveedor",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"proveedor_id\": 1,\n  \"monto\": 150.00,\n  \"fecha\": \"2025-08-06 10:30:00\",\n  \"descripcion\": \"Pago por productos automotrices entregados\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/proveedores/pagos",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores", "pagos"]
+						}
+					}
+				},
+				{
+					"name": "GET Pago by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/proveedores/pagos/1",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores", "pagos", "1"]
+						}
+					}
+				},
+				{
+					"name": "PUT Update Pago",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"proveedor_id\": 1,\n  \"monto\": 175.00,\n  \"fecha\": \"2025-08-06 10:30:00\",\n  \"descripcion\": \"Pago actualizado por productos automotrices entregados\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/proveedores/pagos/1",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores", "pagos", "1"]
+						}
+					}
+				},
+				{
+					"name": "GET Métricas Pagos",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/proveedores/pagos/metricas",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores", "pagos", "metricas"]
+						}
+					}
+				},
+				{
+					"name": "DELETE Pago",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/proveedores/pagos/1",
+							"host": ["{{base_url}}"],
+							"path": ["proveedores", "pagos", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "07. Gastos Generales",
+			"item": [
+				{
+					"name": "GET All Gastos Generales",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/gastos-generales",
+							"host": ["{{base_url}}"],
+							"path": ["gastos-generales"]
+						}
+					}
+				},
+				{
+					"name": "POST Create Gasto General",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombre\": \"Electricidad\",\n  \"descripcion\": \"Pago de factura eléctrica del mes\",\n  \"monto\": 85.50,\n  \"fecha\": \"2025-08-06\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/gastos-generales",
+							"host": ["{{base_url}}"],
+							"path": ["gastos-generales"]
+						}
+					}
+				},
+				{
+					"name": "GET Gasto General by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/gastos-generales/1",
+							"host": ["{{base_url}}"],
+							"path": ["gastos-generales", "1"]
+						}
+					}
+				},
+				{
+					"name": "PUT Update Gasto General",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombre\": \"Electricidad Comercial\",\n  \"descripcion\": \"Pago de factura eléctrica comercial del mes\",\n  \"monto\": 95.75,\n  \"fecha\": \"2025-08-06\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/gastos-generales/1",
+							"host": ["{{base_url}}"],
+							"path": ["gastos-generales", "1"]
+						}
+					}
+				},
+				{
+					"name": "GET Métricas Gastos Generales",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/gastos-generales/metricas",
+							"host": ["{{base_url}}"],
+							"path": ["gastos-generales", "metricas"]
+						}
+					}
+				},
+				{
+					"name": "GET Gastos Eliminados",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/gastos-generales/trashed",
+							"host": ["{{base_url}}"],
+							"path": ["gastos-generales", "trashed"]
+						}
+					}
+				},
+				{
+					"name": "PUT Restore Gasto General",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/gastos-generales/1/restore",
+							"host": ["{{base_url}}"],
+							"path": ["gastos-generales", "1", "restore"]
+						}
+					}
+				},
+				{
+					"name": "DELETE Gasto General",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/gastos-generales/1",
+							"host": ["{{base_url}}"],
+							"path": ["gastos-generales", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "08. Ventas Unificadas",
+			"item": [
+				{
+					"name": "GET All Ventas",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/ventas",
+							"host": ["{{base_url}}"],
+							"path": ["ventas"]
+						}
+					}
+				},
+				{
+					"name": "Venta Solo Servicios",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"cliente_id\": 1,\n  \"fecha\": \"2025-08-06\",\n  \"observaciones\": \"Lavado completo con creación automática\",\n  \"detalles\": [\n    {\n      \"tipo_item\": \"servicio\",\n      \"item_id\": 1,\n      \"item_nombre\": \"Lavado Completo\",\n      \"item_descripcion\": \"Lavado completo con encerado\",\n      \"vehiculo_id\": 1,\n      \"empleado_id\": 1,\n      \"cantidad\": 1,\n      \"precio_unitario\": 25.00\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/ventas",
+							"host": ["{{base_url}}"],
+							"path": ["ventas"]
+						}
+					}
+				},
+				{
+					"name": "Venta Solo Productos Automotrices",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"cliente_id\": 1,\n  \"fecha\": \"2025-08-06\",\n  \"observaciones\": \"Venta de productos automotrices\",\n  \"detalles\": [\n    {\n      \"tipo_item\": \"producto_automotriz\",\n      \"item_id\": 1,\n      \"item_nombre\": \"Aceite Motor 5W30\",\n      \"item_descripcion\": \"Aceite sintético para motor 5W30\",\n      \"cantidad\": 2,\n      \"precio_unitario\": 18.75\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/ventas",
+							"host": ["{{base_url}}"],
+							"path": ["ventas"]
+						}
+					}
+				},
+				{
+					"name": "Venta Solo Productos Despensa",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"cliente_id\": 1,\n  \"fecha\": \"2025-08-06\",\n  \"observaciones\": \"Venta de productos de despensa\",\n  \"detalles\": [\n    {\n      \"tipo_item\": \"producto_despensa\",\n      \"item_id\": 1,\n      \"item_nombre\": \"Coca Cola 500ml\",\n      \"item_descripcion\": \"Bebida gaseosa Coca Cola 500ml\",\n      \"cantidad\": 3,\n      \"precio_unitario\": 1.25\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/ventas",
+							"host": ["{{base_url}}"],
+							"path": ["ventas"]
+						}
+					}
+				},
+				{
+					"name": "Venta Mixta Completa (Servicios + Productos)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"cliente_id\": 1,\n  \"fecha\": \"2025-08-06\",\n  \"observaciones\": \"Venta completa: servicio + productos automotrices + despensa\",\n  \"detalles\": [\n    {\n      \"tipo_item\": \"servicio\",\n      \"item_id\": 1,\n      \"item_nombre\": \"Lavado Completo\",\n      \"item_descripcion\": \"Lavado completo con encerado\",\n      \"vehiculo_id\": 1,\n      \"empleado_id\": 1,\n      \"cantidad\": 1,\n      \"precio_unitario\": 25.00\n    },\n    {\n      \"tipo_item\": \"producto_automotriz\",\n      \"item_id\": 1,\n      \"item_nombre\": \"Aceite Motor 5W30\",\n      \"item_descripcion\": \"Aceite sintético para motor 5W30\",\n      \"cantidad\": 1,\n      \"precio_unitario\": 18.75\n    },\n    {\n      \"tipo_item\": \"producto_despensa\",\n      \"item_id\": 1,\n      \"item_nombre\": \"Coca Cola 500ml\",\n      \"item_descripcion\": \"Bebida gaseosa Coca Cola 500ml\",\n      \"cantidad\": 2,\n      \"precio_unitario\": 1.25\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/ventas",
+							"host": ["{{base_url}}"],
+							"path": ["ventas"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

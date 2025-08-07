@@ -39,6 +39,11 @@ class TipoVehiculoRepository implements TipoVehiculoRepositoryInterface
         return TipoVehiculo::onlyTrashed()->orderBy('nombre')->get();
     }
 
+    public function getTrashed(): Collection
+    {
+        return TipoVehiculo::onlyTrashed()->orderBy('nombre')->get();
+    }
+
     public function findById(int $id): ?TipoVehiculo
     {
         return TipoVehiculo::find($id);

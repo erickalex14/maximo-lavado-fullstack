@@ -118,4 +118,28 @@ class ProductoDespensaRepository implements ProductoDespensaRepositoryInterface
         }
         return null;
     }
+
+    /**
+     * Get metrics for despensa products
+     */
+    public function getMetricas(): array
+    {
+        $total = $this->model->count();
+        $activos = $this->model->where('activo', true)->count();
+        $inactivos = $total - $activos;
+        $stockBajo = $this->model->where('stock', '<=', 10)->count();
+        $sinStock = $this->model->where('stock', 0)->count();
+        $valorInventario = $this->model->sum(\DB::raw('precio_venta * stock'));
+        
+        return [
+            'productos_despensa' => [
+                'total' => $total,
+                'activos' => $activos,
+                'inactivos' => $inactivos,
+                'stock_bajo' => $stockBajo,
+                'sin_stock' => $sinStock,
+                'valor_inventario' => round($valorInventario, 2)
+            ]
+        ];
+    }
 }

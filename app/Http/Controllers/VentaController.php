@@ -500,50 +500,6 @@ class VentaController extends Controller
     }
 
     /**
-     * Respuesta exitosa estándar
-     */
-    private function successResponse($data, ?string $dataKey = null, ?string $message = null, int $status = 200): JsonResponse
-    {
-        $response = ['status' => 'success'];
-        
-        if ($message) {
-            $response['message'] = $message;
-        }
-        
-        if ($data !== null) {
-            if ($dataKey) {
-                $response[$dataKey] = $data;
-            } else {
-                $response = array_merge($response, $data);
-            }
-        }
-
-        return response()->json($response, $status);
-    }
-
-    /**
-     * Respuesta de error estándar
-     */
-    private function errorResponse(string $message, \Exception $e, int $status = 500): JsonResponse
-    {
-        return response()->json([
-            'status' => 'error',
-            'message' => $message . ': ' . $e->getMessage()
-        ], $status);
-    }
-
-    /**
-     * Respuesta para recursos no encontrados
-     */
-    private function notFoundResponse(string $message): JsonResponse
-    {
-        return response()->json([
-            'status' => 'error',
-            'message' => $message
-        ], 404);
-    }
-
-    /**
      * Transformar detalles del formato request (tipo_item/item_id) al formato de base de datos
      */
     private function transformDetallesFormat(array $detalles): array
@@ -567,5 +523,151 @@ class VentaController extends Controller
 
             return $detalle;
         }, $detalles);
+    }
+
+    /**
+     * Endpoint para debugear la creación de lavados automáticos
+     * POST /ventas/debug-lavados
+     */
+    public function debugLavados(Request $request): JsonResponse
+    {
+        try {
+            $data = $request->all();
+            
+            // Procesar detalles
+            if (isset($data['detalles'])) {
+                $data['detalles'] = $this->transformDetallesFormat($data['detalles']);
+            }
+            
+            // PASO 1: Verificar si detectamos servicios
+            $tieneServicios = false;
+            $servicios = [];
+            
+            if (isset($data['detalles']) && is_array($data['detalles'])) {
+                foreach ($data['detalles'] as $detalle) {
+                    if (isset($detalle['tipo_item']) && $detalle['tipo_item'] === 'servicio') {
+                        $tieneServicios = true;
+                        $servicios[] = $detalle;
+                    }
+                }
+            }
+            
+            // PASO 2: Verificar si el VentaService detecta servicios
+            $ventaTieneServicios = false;
+            try {
+                $reflection = new \ReflectionClass($this->ventaService);
+                $tieneServiciosMethod = $reflection->getMethod('tieneServicios');
+                $tieneServiciosMethod->setAccessible(true);
+                $ventaTieneServicios = $tieneServiciosMethod->invoke($this->ventaService, $data['detalles']);
+            } catch (\Exception $e) {
+                $ventaTieneServicios = 'Error: ' . $e->getMessage();
+            }
+            
+            // PASO 3: Verificar si los servicios existen en la base de datos
+            $serviciosDB = [];
+            $serviciosNoEncontrados = [];
+            
+            foreach ($servicios as $servicio) {
+                try {
+                    // Usar reflexión para acceder al repositorio de servicios
+                    $reflection = new \ReflectionClass($this->ventaService);
+                    $servicioRepositoryProperty = $reflection->getProperty('servicioRepository');
+                    $servicioRepositoryProperty->setAccessible(true);
+                    $servicioRepository = $servicioRepositoryProperty->getValue($this->ventaService);
+                    
+                    $servicioEnDB = $servicioRepository->findById($servicio['item_id']);
+                    
+                    if ($servicioEnDB) {
+                        $serviciosDB[] = [
+                            'id' => $servicioEnDB->servicio_id ?? $servicioEnDB['servicio_id'] ?? 'ID no encontrado',
+                            'nombre' => $servicioEnDB->nombre ?? $servicioEnDB['nombre'] ?? 'Nombre no encontrado',
+                            'activo' => $servicioEnDB->activo ?? $servicioEnDB['activo'] ?? 'Estado no encontrado'
+                        ];
+                    } else {
+                        $serviciosNoEncontrados[] = $servicio['item_id'];
+                    }
+                } catch (\Exception $e) {
+                    $serviciosNoEncontrados[] = $servicio['item_id'] . ' (Error: ' . $e->getMessage() . ')';
+                }
+            }
+            
+            // PASO 4: Simular creación de venta para probar el flujo completo
+            $simulacionVenta = null;
+            $errorCreacionVenta = null;
+            
+            try {
+                // Separar datos de venta y detalles como espera el método
+                $datosVenta = [
+                    'cliente_id' => $data['cliente_id'] ?? null,
+                    'usuario_id' => $data['empleado_id'] ?? $data['usuario_id'] ?? null, // Usar usuario_id en lugar de empleado_id
+                    // 'vehiculo_id' => NO EXISTE en la tabla ventas
+                    'fecha' => $data['fecha'] ?? date('Y-m-d'), // Agregar fecha requerida
+                    'metodo_pago' => $data['metodo_pago'] ?? 'efectivo',
+                    'observaciones' => $data['observaciones'] ?? 'Debug sin vehiculo_id',
+                    'total' => $data['total'] ?? 0,
+                    'descuento_total' => $data['descuento_total'] ?? 0,
+                    'subtotal' => $data['subtotal'] ?? 0,
+                ];
+                
+                $detallesVenta = $data['detalles'] ?? [];
+                
+                // Intentar crear la venta usando el servicio (2 parámetros separados)
+                $simulacionVenta = $this->ventaService->crearVentaCompleta($datosVenta, $detallesVenta);
+                
+                // Si se creó, verificar si se crearon lavados
+                if ($simulacionVenta) {
+                    $ventaId = null;
+                    
+                    // Obtener ID de venta de forma defensiva
+                    if (is_object($simulacionVenta)) {
+                        $ventaId = $simulacionVenta->venta_id ?? $simulacionVenta->id ?? 'ID no encontrado en objeto';
+                    } elseif (is_array($simulacionVenta) && isset($simulacionVenta['venta'])) {
+                        $venta = $simulacionVenta['venta'];
+                        if (is_object($venta)) {
+                            $ventaId = $venta->venta_id ?? $venta->id ?? 'ID no encontrado en venta objeto';
+                        } elseif (is_array($venta)) {
+                            $ventaId = $venta['venta_id'] ?? $venta['id'] ?? 'ID no encontrado en venta array';
+                        }
+                    } elseif (is_array($simulacionVenta)) {
+                        $ventaId = $simulacionVenta['venta_id'] ?? $simulacionVenta['id'] ?? 'ID no encontrado en array directo';
+                    }
+                    
+                    $simulacionVenta = [
+                        'venta_creada_exitosamente' => true,
+                        'venta_id' => $ventaId,
+                        'tipo_respuesta' => is_object($simulacionVenta) ? 'objeto' : 'array',
+                        'buscar_lavados_con' => "SELECT * FROM lavados WHERE venta_id = {$ventaId}",
+                        'respuesta_completa' => $simulacionVenta
+                    ];
+                }
+            } catch (\Exception $e) {
+                $errorCreacionVenta = $e->getMessage();
+                $simulacionVenta = ['error' => $errorCreacionVenta];
+            }
+
+            return $this->successResponse([
+                'paso_1_controlador' => [
+                    'detecta_servicios' => $tieneServicios,
+                    'servicios_encontrados' => $servicios,
+                    'cantidad_servicios' => count($servicios)
+                ],
+                'paso_2_ventaservice' => [
+                    'detecta_servicios' => $ventaTieneServicios
+                ],
+                'paso_3_base_datos' => [
+                    'servicios_encontrados_db' => $serviciosDB,
+                    'servicios_no_encontrados' => $serviciosNoEncontrados,
+                    'total_servicios_validos' => count($serviciosDB)
+                ],
+                'paso_4_simulacion_completa' => $simulacionVenta,
+                'error_creacion_venta' => $errorCreacionVenta,
+                'recomendacion' => count($serviciosNoEncontrados) > 0 ? 
+                    'Algunos servicios no existen en la BD. Crear servicios primero.' : 
+                    (count($serviciosDB) > 0 ? 'Los servicios existen. Problema puede estar en creación de lavados.' : 'No se encontraron servicios válidos.')
+            ], null, 'Debug completo paso a paso');
+            
+        } catch (\Exception $e) {
+            return $this->errorResponse('Error en debug completo', $e);
+        }
     }
 }

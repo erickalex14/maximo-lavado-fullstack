@@ -6,12 +6,20 @@ use App\Contracts\LavadoRepositoryInterface;
 use App\Models\Lavado;
 use App\Models\Ingreso;
 use App\Models\Vehiculo;
-use App\Models\Factura;
+use App\Models\FacturaElectronica;
 use App\Models\FacturaDetalle;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Illuminate\        // Buscar el último número de factura del mes actual
+        $lastFactura = FacturaElectronica::where('secuencial', 'like', $prefix . $year . $month . '%')
+            ->orderBy('secuencial', 'desc')
+            ->first();
+        
+        if ($lastFactura) {
+            // Extraer el número secuencial del último número de factura
+            $lastNumber = (int) substr($lastFactura->secuencial, -4);
+            $newNumber = $lastNumber + 1;acades\Log;
 use Carbon\Carbon;
 
 /**
@@ -230,7 +238,7 @@ class LavadoRepository implements LavadoRepositoryInterface
                     
                 if ($facturaDetalle) {
                     $facturaDetalle->restore();
-                    $factura = Factura::onlyTrashed()->find($facturaDetalle->factura_id);
+                    $factura = FacturaElectronica::onlyTrashed()->find($facturaDetalle->factura_id);
                     if ($factura) {
                         $factura->restore();
                     }
@@ -384,7 +392,7 @@ class LavadoRepository implements LavadoRepositoryInterface
         $month = now()->format('m');
         
         // Buscar el último número de factura del mes actual
-        $lastFactura = Factura::where('numero_factura', 'like', $prefix . $year . $month . '%')
+        $lastFactura = FacturaElectronica::where('numero_factura', 'like', $prefix . $year . $month . '%')
             ->orderBy('numero_factura', 'desc')
             ->first();
         
@@ -495,7 +503,9 @@ class LavadoRepository implements LavadoRepositoryInterface
             $numeroFactura = $this->generateNumeroFactura();
             $descripcionFactura = 'Factura por servicio de lavado ' . $lavado->tipo_lavado;
             
-            $factura = Factura::create([
+            // NOTA: Este método está obsoleto. Ahora se usa FacturaElectronica
+            // Mantenemos para compatibilidad pero se recomienda usar VentaService
+            $factura = FacturaElectronica::create([
                 'numero_factura' => $numeroFactura,
                 'cliente_id' => $vehiculo->cliente_id,
                 'fecha' => $lavado->fecha,

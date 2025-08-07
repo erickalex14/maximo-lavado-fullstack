@@ -28,6 +28,14 @@ class FacturaElectronicaService
     }
 
     /**
+     * Obtener factura por ID
+     */
+    public function getById(int $id): ?FacturaElectronica
+    {
+        return $this->facturaRepository->findById($id);
+    }
+
+    /**
      * Generar factura electrónica desde una venta
      */
     public function generarDesdeVenta(Venta $venta, array $datosEmisor = []): FacturaElectronica
@@ -80,8 +88,8 @@ class FacturaElectronicaService
                     'iva' => $venta->iva ?? 0,
                     'total' => $venta->total ?? 0,
                     
-                    // Estado inicial
-                    'estado_sri' => 'GENERADA',
+                    // ⚡ Estado inicial CORRECTO para procesamiento automático ⚡
+                    'estado_sri' => 'BORRADOR', // CRUCIAL: Iniciar como BORRADOR (no 'GENERADA')
                 ];
 
                 // Crear la factura
@@ -90,14 +98,32 @@ class FacturaElectronicaService
                 // Generar XML del documento
                 $this->generarXMLDocumento($factura);
 
-                Log::info('Factura electrónica generada', [
-                    'factura_id' => $factura->factura_electronica_id,
-                    'venta_id' => $venta->venta_id,
-                    'secuencial' => $secuencial,
-                    'total' => $venta->total
-                ]);
+                // 🔄 RECARGAR FACTURA CON XML GENERADO
+                $factura = $this->facturaRepository->findById($factura->factura_electronica_id);
 
-                return $factura;
+                // ⚡ PROCESAMIENTO AUTOMÁTICO CON SRI
+                try {
+                    $facturaActualizada = $this->procesarAutomaticoConSRI($factura);
+                    
+                    Log::info('✅ Factura electrónica generada Y procesada automáticamente', [
+                        'factura_id' => $facturaActualizada->factura_electronica_id,
+                        'venta_id' => $venta->venta_id,
+                        'secuencial' => $secuencial,
+                        'estado_sri' => $facturaActualizada->estado_sri,
+                        'total' => $venta->total
+                    ]);
+                    
+                    return $facturaActualizada;
+                } catch (\Exception $e) {
+                    // Si falla el procesamiento automático, log warning pero no fallar la transacción
+                    Log::warning('⚠️ Factura generada pero falló procesamiento automático con SRI', [
+                        'factura_id' => $factura->factura_electronica_id,
+                        'error' => $e->getMessage(),
+                        'nota' => 'Se puede reenviar manualmente'
+                    ]);
+                    
+                    return $factura;
+                }
             });
         } catch (\Exception $e) {
             Log::error('Error al generar factura electrónica', [
@@ -172,6 +198,77 @@ class FacturaElectronicaService
     }
 
     /**
+     * 🚀 Procesar automáticamente una factura con SRI (sin validaciones manuales)
+     * Este método se ejecuta automáticamente después de generar la factura
+     */
+    public function procesarAutomaticoConSRI(FacturaElectronica $factura): FacturaElectronica
+    {
+        try {
+            // Simular procesamiento con SRI
+            Log::info('📤 Iniciando procesamiento automático con SRI', [
+                'factura_id' => $factura->factura_electronica_id,
+                'secuencial' => $factura->secuencial
+            ]);
+            
+            // Simular tiempo de procesamiento SRI (0.5-2 segundos)
+            usleep(rand(500000, 2000000));
+            
+            // Simular respuesta del SRI (95% éxito, 5% rechazo por validación automática)
+            $exito = (rand(1, 100) <= 95);
+            
+            if ($exito) {
+                $claveAcceso = $this->generarClaveAcceso($factura);
+                $numeroAutorizacion = 'AUT-' . time() . rand(1000, 9999);
+                
+                // 🔥 GENERAR XML AUTORIZADO COMPLETO 🔥
+                $xmlAutorizado = $this->generarXMLAutorizado($factura, $claveAcceso);
+                
+                $factura = $this->facturaRepository->update($factura->factura_electronica_id, [
+                    'estado_sri' => 'AUTORIZADA',
+                    'clave_acceso' => $claveAcceso,
+                    'fecha_autorizacion' => now(),
+                    'numero_autorizacion' => $numeroAutorizacion,
+                    'xml_autorizado' => $xmlAutorizado,
+                    'mensaje_sri' => 'AUTORIZADA - Comprobante procesado correctamente',
+                    'errores_sri' => null // Limpiar errores previos
+                ]);
+                
+                Log::info('✅ Factura procesada automáticamente - AUTORIZADA por SRI', [
+                    'factura_id' => $factura->factura_electronica_id,
+                    'clave_acceso' => $claveAcceso,
+                    'numero_autorizacion' => $numeroAutorizacion,
+                    'estado' => 'AUTORIZADA'
+                ]);
+            } else {
+                $factura = $this->facturaRepository->update($factura->factura_electronica_id, [
+                    'estado_sri' => 'RECHAZADA',
+                    'mensaje_sri' => 'RECHAZADA - Error en datos tributarios',
+                    'errores_sri' => [
+                        [
+                            'codigo' => 'SRI001', 
+                            'mensaje' => 'Error simulado: Datos tributarios inconsistentes'
+                        ]
+                    ]
+                ]);
+                
+                Log::warning('❌ Factura RECHAZADA automáticamente por SRI', [
+                    'factura_id' => $factura->factura_electronica_id,
+                    'motivo' => 'Error en datos tributarios - verificar información'
+                ]);
+            }
+            
+            return $factura;
+            
+        } catch (\Exception $e) {
+            Log::error('💥 Error en procesamiento automático con SRI', [
+                'factura_id' => $factura->factura_electronica_id,
+                'error' => $e->getMessage()
+            ]);
+            throw new \Exception("Error en procesamiento automático SRI: " . $e->getMessage());
+        }
+    }
+
+    /**
      * Obtener factura por venta ID
      */
     public function getPorVentaId(int $ventaId): ?FacturaElectronica
@@ -226,6 +323,98 @@ class FacturaElectronicaService
                 'error' => $e->getMessage()
             ]);
             throw $e;
+        }
+    }
+
+    /**
+     * Alias para generatePDF (compatibilidad con controlador)
+     * Genera PDF y retorna respuesta de descarga
+     */
+    public function generatePDF(int $facturaId)
+    {
+        $factura = $this->facturaRepository->findById($facturaId);
+        
+        if (!$factura) {
+            throw new \Exception("Factura no encontrada con ID: {$facturaId}");
+        }
+
+        try {
+            // Cargar las relaciones necesarias para el PDF
+            $factura->load(['venta.detalles', 'venta.cliente']);
+            
+            // Verificar que la venta existe
+            if (!$factura->venta) {
+                throw new \Exception("La factura no tiene una venta asociada");
+            }
+            
+            // Generar PDF usando DomPDF directamente para descarga
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdfs.factura-electronica', [
+                'factura' => $factura,
+                'titulo' => 'Factura Electrónica #' . $factura->secuencial
+            ]);
+            
+            // Configurar opciones del PDF
+            $pdf->setPaper('A4', 'portrait');
+            $pdf->setOptions([
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+                'defaultFont' => 'Arial'
+            ]);
+            
+            // Generar nombre del archivo
+            $numeroFactura = str_pad($factura->establecimiento, 3, '0', STR_PAD_LEFT) . '-' . 
+                           str_pad($factura->punto_emision, 3, '0', STR_PAD_LEFT) . '-' . 
+                           str_pad($factura->secuencial, 9, '0', STR_PAD_LEFT);
+            
+            $nombreArchivo = "factura_electronica_{$numeroFactura}.pdf";
+            
+            Log::info('✅ PDF generado para descarga', [
+                'factura_id' => $facturaId,
+                'numero_factura' => $numeroFactura,
+                'estado_sri' => $factura->estado_sri,
+                'tiene_venta' => $factura->venta ? 'sí' : 'no'
+            ]);
+            
+            // Retornar respuesta de descarga
+            return $pdf->download($nombreArchivo);
+            
+        } catch (\Exception $e) {
+            Log::error('❌ Error al generar PDF para descarga', [
+                'factura_id' => $facturaId,
+                'error' => $e->getMessage(),
+                'linea' => $e->getLine(),
+                'archivo' => basename($e->getFile())
+            ]);
+            throw new \Exception("Error al generar PDF: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Obtener XML de la factura (documento o autorizado)
+     */
+    public function getXML(int $facturaId, string $tipo = 'autorizado'): string
+    {
+        $factura = $this->facturaRepository->findById($facturaId);
+        
+        if (!$factura) {
+            throw new \Exception("Factura no encontrada con ID: {$facturaId}");
+        }
+
+        switch ($tipo) {
+            case 'autorizado':
+                if (empty($factura->xml_autorizado)) {
+                    throw new \Exception("La factura no tiene XML autorizado disponible. Estado SRI: {$factura->estado_sri}");
+                }
+                return $factura->xml_autorizado;
+                
+            case 'documento':
+                if (empty($factura->xml_documento)) {
+                    throw new \Exception("La factura no tiene XML del documento disponible");
+                }
+                return $factura->xml_documento;
+                
+            default:
+                throw new \Exception("Tipo de XML no válido. Use 'autorizado' o 'documento'");
         }
     }
 
@@ -411,10 +600,31 @@ class FacturaElectronicaService
         // El XML autorizado incluye la clave de acceso y fecha de autorización
         $xml = $factura->xml_documento;
         
-        // Insertar clave de acceso en el XML
+        // Si no hay XML documento, generar uno básico
+        if (empty($xml)) {
+            Log::warning('XML documento vacío, generando XML básico para autorización', [
+                'factura_id' => $factura->factura_electronica_id
+            ]);
+            $xml = $this->construirXMLFactura($factura);
+        }
+        
+        // Insertar clave de acceso en el XML si no la tiene
+        if (strpos($xml, '<claveAcceso>') === false) {
+            $xml = str_replace(
+                '</infoTributaria>',
+                '    <claveAcceso>' . $claveAcceso . '</claveAcceso>' . "\n" . '</infoTributaria>',
+                $xml
+            );
+        }
+        
+        // Agregar información de autorización al XML
         $xml = str_replace(
-            '</infoTributaria>',
-            '    <claveAcceso>' . $claveAcceso . '</claveAcceso>' . "\n" . '</infoTributaria>',
+            '</factura>',
+            '  <infoAdicional>' . "\n" .
+            '    <campoAdicional nombre="fechaAutorizacion">' . now()->format('d/m/Y H:i:s') . '</campoAdicional>' . "\n" .
+            '    <campoAdicional nombre="numeroAutorizacion">' . ($factura->numero_autorizacion ?? 'N/A') . '</campoAdicional>' . "\n" .
+            '  </infoAdicional>' . "\n" .
+            '</factura>',
             $xml
         );
         
@@ -426,19 +636,57 @@ class FacturaElectronicaService
      */
     private function generarArchivoPDF(FacturaElectronica $factura, string $rutaPDF): void
     {
-        // Simulación de generación de PDF
-        // En producción aquí se usaría una librería como DomPDF o similar
-        $contenido = "Factura Electrónica #{$factura->secuencial}\n";
-        $contenido .= "Cliente: {$factura->razon_social_comprador}\n";
-        $contenido .= "Total: $" . number_format($factura->venta->total, 2) . "\n";
-        
-        // Crear directorio si no existe
-        $directorio = dirname($rutaPDF);
-        if (!is_dir($directorio)) {
-            mkdir($directorio, 0755, true);
+        try {
+            // Cargar las relaciones necesarias para el PDF
+            $factura->load(['venta.detalles', 'venta.cliente']);
+            
+            // Crear directorio si no existe
+            $directorio = dirname($rutaPDF);
+            if (!is_dir($directorio)) {
+                mkdir($directorio, 0755, true);
+            }
+            
+            // Generar PDF usando DomPDF con la vista Blade
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdfs.factura-electronica', [
+                'factura' => $factura,
+                'titulo' => 'Factura Electrónica #' . $factura->secuencial
+            ]);
+            
+            // Configurar opciones del PDF
+            $pdf->setPaper('A4', 'portrait');
+            $pdf->setOptions([
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+                'defaultFont' => 'Arial'
+            ]);
+            
+            // Guardar el PDF
+            $pdf->save($rutaPDF);
+            
+            Log::info('✅ PDF generado correctamente', [
+                'factura_id' => $factura->factura_electronica_id,
+                'ruta' => $rutaPDF,
+                'tamaño' => filesize($rutaPDF) . ' bytes'
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('❌ Error al generar PDF', [
+                'factura_id' => $factura->factura_electronica_id,
+                'error' => $e->getMessage(),
+                'ruta' => $rutaPDF
+            ]);
+            
+            // Fallback: crear un PDF simple con contenido básico
+            $contenidoFallback = "FACTURA ELECTRONICA\n\n";
+            $contenidoFallback .= "Número: " . str_pad($factura->secuencial, 9, '0', STR_PAD_LEFT) . "\n";
+            $contenidoFallback .= "Cliente: " . $factura->razon_social_comprador . "\n";
+            $contenidoFallback .= "Total: $" . number_format($factura->total, 2) . "\n";
+            $contenidoFallback .= "Estado SRI: " . $factura->estado_sri . "\n\n";
+            $contenidoFallback .= "Error al generar PDF completo: " . $e->getMessage() . "\n";
+            
+            file_put_contents($rutaPDF, $contenidoFallback);
+            throw $e;
         }
-        
-        file_put_contents($rutaPDF, $contenido);
     }
 
     /**

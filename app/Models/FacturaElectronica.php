@@ -40,6 +40,11 @@ class FacturaElectronica extends Model
         'xml_autorizado',          // XML autorizado por SRI
         'mensaje_sri',             // Mensaje del SRI
         'errores_sri',             // Errores del SRI (JSON)
+        // ⚡ CAMPOS CRÍTICOS PARA SRI ⚡
+        'estado_sri',              // Estado del procesamiento SRI
+        'clave_acceso',            // Clave de acceso SRI
+        'numero_autorizacion',     // Número de autorización SRI
+        'fecha_autorizacion',      // Fecha de autorización SRI
         // Campos monetarios
         'subtotal',                // Subtotal de la factura
         'descuento',               // Descuento aplicado
