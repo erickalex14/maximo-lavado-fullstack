@@ -16,7 +16,7 @@ class BalanceRepository implements BalanceRepositoryInterface
     {
         $totalIngresos = Ingreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
         $totalEgresos = Egreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
-        $totalFacturas = FacturaElectronica::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
+        $totalFacturas = FacturaElectronica::whereBetween(DB::raw('DATE(created_at)'), [$fechaInicio, $fechaFin])->sum('total');
         $totalLavados = Lavado::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('precio');
 
         return [
@@ -45,7 +45,7 @@ class BalanceRepository implements BalanceRepositoryInterface
             ->keyBy('tipo')
             ->map(fn($item) => $item->total);
 
-        $facturas = FacturaElectronica::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
+        $facturas = FacturaElectronica::whereBetween(DB::raw('DATE(created_at)'), [$fechaInicio, $fechaFin])->sum('total');
         $lavados = Lavado::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('precio');
 
         return [
@@ -68,7 +68,7 @@ class BalanceRepository implements BalanceRepositoryInterface
 
             $ingresos = Ingreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
             $egresos = Egreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
-            $facturas = FacturaElectronica::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
+            $facturas = FacturaElectronica::whereBetween(DB::raw('DATE(created_at)'), [$fechaInicio->format('Y-m-d'), $fechaFin->format('Y-m-d')])->sum('total');
             $lavados = Lavado::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('precio');
 
             $meses[$mes] = [
@@ -97,7 +97,7 @@ class BalanceRepository implements BalanceRepositoryInterface
 
             $ingresos = Ingreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
             $egresos = Egreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
-            $facturas = FacturaElectronica::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
+            $facturas = FacturaElectronica::whereBetween(DB::raw('DATE(created_at)'), [$fechaInicio->format('Y-m-d'), $fechaFin->format('Y-m-d')])->sum('total');
             $lavados = Lavado::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('precio');
 
             $trimestres[$trimestre] = [
@@ -121,7 +121,7 @@ class BalanceRepository implements BalanceRepositoryInterface
 
         $ingresos = Ingreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
         $egresos = Egreso::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('monto');
-        $facturas = FacturaElectronica::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('total');
+        $facturas = FacturaElectronica::whereBetween(DB::raw('DATE(created_at)'), [$fechaInicio, $fechaFin])->sum('total');
         $lavados = Lavado::whereBetween('fecha', [$fechaInicio, $fechaFin])->sum('precio');
 
         return [
@@ -149,13 +149,11 @@ class BalanceRepository implements BalanceRepositoryInterface
                 UNION ALL
                 SELECT fecha, monto, 'egreso' as tipo FROM egresos WHERE fecha BETWEEN ? AND ?
                 UNION ALL
-                SELECT fecha, total as monto, 'ingreso' as tipo FROM facturas WHERE fecha BETWEEN ? AND ?
-                UNION ALL
-                SELECT fecha, precio as monto, 'ingreso' as tipo FROM lavados WHERE fecha BETWEEN ? AND ?
+                SELECT DATE(created_at) as fecha, total as monto, 'ingreso' as tipo FROM facturas_electronicas WHERE DATE(created_at) BETWEEN ? AND ?
             ) as flujos
             GROUP BY fecha
             ORDER BY fecha
-        ", [$fechaInicio, $fechaFin, $fechaInicio, $fechaFin, $fechaInicio, $fechaFin, $fechaInicio, $fechaFin]);
+        ", [$fechaInicio, $fechaFin, $fechaInicio, $fechaFin, $fechaInicio, $fechaFin]);
 
         return array_map(function($flujo) {
             return [

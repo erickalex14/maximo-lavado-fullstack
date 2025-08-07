@@ -10,14 +10,14 @@ class IngresoRepository implements IngresoRepositoryInterface
 {
     public function getAll(): Collection
     {
-        return Ingreso::with(['lavado', 'ventaProductoAutomotriz', 'ventaProductoDespensa'])
+        return Ingreso::with(['lavado', 'venta'])
             ->orderBy('fecha', 'desc')
             ->get();
     }
     
     public function findById(int $id): ?Ingreso
     {
-        return Ingreso::with(['lavado', 'ventaProductoAutomotriz', 'ventaProductoDespensa'])
+        return Ingreso::with(['lavado', 'venta'])
             ->find($id);
     }
     
@@ -69,7 +69,7 @@ class IngresoRepository implements IngresoRepositoryInterface
     public function getByTipo(string $tipo): Collection
     {
         return Ingreso::where('tipo', $tipo)
-            ->with(['lavado', 'ventaProductoAutomotriz', 'ventaProductoDespensa'])
+            ->with(['lavado', 'venta'])
             ->orderBy('fecha', 'desc')
             ->get();
     }
@@ -77,7 +77,7 @@ class IngresoRepository implements IngresoRepositoryInterface
     public function getByFechaRange(string $fechaInicio, string $fechaFin): Collection
     {
         return Ingreso::whereBetween('fecha', [$fechaInicio, $fechaFin])
-            ->with(['lavado', 'ventaProductoAutomotriz', 'ventaProductoDespensa'])
+            ->with(['lavado', 'venta'])
             ->orderBy('fecha', 'desc')
             ->get();
     }
@@ -92,7 +92,7 @@ class IngresoRepository implements IngresoRepositoryInterface
     {
         return Ingreso::whereYear('fecha', $año)
             ->whereMonth('fecha', $mes)
-            ->with(['lavado', 'ventaProductoAutomotriz', 'ventaProductoDespensa'])
+            ->with(['lavado', 'venta'])
             ->orderBy('fecha', 'desc')
             ->get();
     }

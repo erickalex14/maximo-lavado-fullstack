@@ -26,9 +26,14 @@ class BalanceController extends Controller
                 'message' => 'Balance general obtenido exitosamente'
             ]);
         } catch (\Exception $e) {
+            \Log::error('Error en balance general: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Error al obtener el balance general: ' . $e->getMessage()
+                'message' => 'Error al obtener el balance general: ' . $e->getMessage(),
+                'error' => $e->getMessage()
             ], 500);
         }
     }

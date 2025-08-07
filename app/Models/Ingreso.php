@@ -45,8 +45,7 @@ class Ingreso extends Model
      */
     public function venta()
     {
-        return $this->belongsTo(Venta::class, 'referencia_id', 'venta_id')
-                    ->where('tipo', self::TIPO_VENTA);
+        return $this->belongsTo(Venta::class, 'referencia_id', 'venta_id');
     }
 
     /**
@@ -54,8 +53,7 @@ class Ingreso extends Model
      */
     public function lavado()
     {
-        return $this->belongsTo(Lavado::class, 'referencia_id', 'lavado_id')
-                    ->where('tipo', self::TIPO_LAVADO);
+        return $this->belongsTo(Lavado::class, 'referencia_id', 'lavado_id');
     }
 
     /**

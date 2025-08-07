@@ -36,7 +36,7 @@ class DashboardController extends Controller
         try {
             $data = $this->dashboardService->getDashboardData();
             
-            return $this->successResponse($data, 'Datos del dashboard obtenidos exitosamente');
+            return $this->successResponse($data, 'data', 'Datos del dashboard obtenidos exitosamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al obtener los datos del dashboard', $e);
         }
@@ -51,7 +51,7 @@ class DashboardController extends Controller
         try {
             $metricas = $this->dashboardService->getMetricas();
             
-            return $this->successResponse($metricas, 'Métricas obtenidas exitosamente');
+            return $this->successResponse($metricas, 'data', 'Métricas obtenidas exitosamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al obtener las métricas', $e);
         }
@@ -67,7 +67,7 @@ class DashboardController extends Controller
             $limite = $request->validated()['limite'] ?? 5;
             $actividad = $this->dashboardService->getActividadReciente($limite);
             
-            return $this->successResponse($actividad, 'Actividad reciente obtenida exitosamente');
+            return $this->successResponse($actividad, 'data', 'Actividad reciente obtenida exitosamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al obtener la actividad reciente', $e);
         }
@@ -83,7 +83,7 @@ class DashboardController extends Controller
             $limite = $request->validated()['limite'] ?? 5;
             $citas = $this->dashboardService->getProximasCitas($limite);
             
-            return $this->successResponse($citas, 'Próximas citas obtenidas exitosamente');
+            return $this->successResponse($citas, 'data', 'Próximas citas obtenidas exitosamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al obtener las próximas citas', $e);
         }
@@ -98,7 +98,7 @@ class DashboardController extends Controller
         try {
             $chartData = $this->dashboardService->getChartData();
             
-            return $this->successResponse($chartData, 'Datos de gráficos obtenidos exitosamente');
+            return $this->successResponse($chartData, 'data', 'Datos de gráficos obtenidos exitosamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al obtener los datos de gráficos', $e);
         }
@@ -113,7 +113,7 @@ class DashboardController extends Controller
         try {
             $alertas = $this->dashboardService->getAlertas();
             
-            return $this->successResponse($alertas, 'Alertas obtenidas exitosamente');
+            return $this->successResponse($alertas, 'data', 'Alertas obtenidas exitosamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al obtener las alertas', $e);
         }
@@ -128,7 +128,7 @@ class DashboardController extends Controller
         try {
             $estadisticas = $this->dashboardService->getEstadisticasGenerales();
             
-            return $this->successResponse($estadisticas, 'Estadísticas generales obtenidas exitosamente');
+            return $this->successResponse($estadisticas, 'data', 'Estadísticas generales obtenidas exitosamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al obtener las estadísticas', $e);
         }
@@ -143,7 +143,7 @@ class DashboardController extends Controller
         try {
             $analisis = $this->dashboardService->getAnalisisFinanciero();
             
-            return $this->successResponse($analisis, 'Análisis financiero obtenido exitosamente');
+            return $this->successResponse($analisis, 'data', 'Análisis financiero obtenido exitosamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al obtener el análisis financiero', $e);
         }
@@ -158,7 +158,7 @@ class DashboardController extends Controller
         try {
             $rendimiento = $this->dashboardService->getRendimientoOperativo();
             
-            return $this->successResponse($rendimiento, 'Rendimiento operativo obtenido exitosamente');
+            return $this->successResponse($rendimiento, 'data', 'Rendimiento operativo obtenido exitosamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al obtener el rendimiento operativo', $e);
         }
@@ -173,7 +173,7 @@ class DashboardController extends Controller
         try {
             $resumen = $this->dashboardService->getResumenCompleto();
             
-            return $this->successResponse($resumen, 'Resumen completo obtenido exitosamente');
+            return $this->successResponse($resumen, 'data', 'Resumen completo obtenido exitosamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al obtener el resumen completo', $e);
         }
@@ -186,29 +186,23 @@ class DashboardController extends Controller
     /**
      * Respuesta exitosa estándar
      */
-    private function successResponse($data, string $message): JsonResponse
+    protected function successResponse($data = null, ?string $dataKey = null, ?string $message = null, int $code = 200): JsonResponse
     {
-        return response()->json([
-            'success' => true,
-            'data' => $data,
-            'message' => $message
-        ]);
+        return parent::successResponse($data, $dataKey, $message, $code);
     }
 
-    /**
+        /**
      * Respuesta de error estándar con logging
      */
-    private function errorResponse(string $message, \Exception $e): JsonResponse
+    protected function errorResponse(string $message, ?\Exception $exception = null, int $code = 500): JsonResponse
     {
-        \Log::error($message . ': ' . $e->getMessage(), [
-            'exception' => $e,
-            'trace' => $e->getTraceAsString()
-        ]);
+        if ($exception) {
+            \Log::error($message . ': ' . $exception->getMessage(), [
+                'exception' => $exception,
+                'trace' => $exception->getTraceAsString()
+            ]);
+        }
         
-        return response()->json([
-            'success' => false,
-            'message' => $message,
-            'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
-        ], 500);
+        return parent::errorResponse($message, $exception, $code);
     }
 }

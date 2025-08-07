@@ -7,19 +7,10 @@ use App\Models\Lavado;
 use App\Models\Ingreso;
 use App\Models\Vehiculo;
 use App\Models\FacturaElectronica;
-use App\Models\FacturaDetalle;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\        // Buscar el último número de factura del mes actual
-        $lastFactura = FacturaElectronica::where('secuencial', 'like', $prefix . $year . $month . '%')
-            ->orderBy('secuencial', 'desc')
-            ->first();
-        
-        if ($lastFactura) {
-            // Extraer el número secuencial del último número de factura
-            $lastNumber = (int) substr($lastFactura->secuencial, -4);
-            $newNumber = $lastNumber + 1;acades\Log;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 /**
@@ -127,7 +118,7 @@ class LavadoRepository implements LavadoRepositoryInterface
                     'success' => true,
                     'lavado' => $lavado->load(['vehiculo.cliente', 'vehiculo.tipoVehiculo', 'empleado']),
                     'ingreso' => $ingreso,
-                    'factura' => $factura?->load(['cliente', 'detalles'])
+                    'factura' => $factura
                 ];
             });
         } catch (\Exception $e) {
@@ -171,19 +162,18 @@ class LavadoRepository implements LavadoRepositoryInterface
 
             $lavado = Lavado::findOrFail($id);
             
-            // Soft delete la factura relacionada si existe
-            $facturaDetalle = FacturaDetalle::where('lavado_id', $lavado->lavado_id)->first();
-            if ($facturaDetalle) {
-                $factura = $facturaDetalle->factura;
-                // Soft delete detalles de factura
-                $facturaDetalle->delete();
-                // Soft delete factura si no tiene más detalles activos
-                if ($factura->detalles()->count() == 0) {
-                    $factura->delete();
-                    Log::info('📄 Factura eliminada junto con lavado', [
-                        'factura_id' => $factura->factura_id
-                    ]);
-                }
+            // Buscar factura electrónica relacionada directamente con el lavado (si existe en datos legacy)
+            // Nota: En el nuevo sistema, los lavados se manejan a través de ventas
+            $factura = FacturaElectronica::whereHas('venta.detalles', function($query) use ($lavado) {
+                $query->where('referencia_id', $lavado->lavado_id)
+                      ->where('tipo_item', 'servicio');
+            })->first();
+            
+            if ($factura) {
+                $factura->delete();
+                Log::info('📄 Factura eliminada junto con lavado', [
+                    'factura_id' => $factura->factura_electronica_id
+                ]);
             }
             
             // Soft delete el ingreso relacionado si existe
@@ -232,16 +222,14 @@ class LavadoRepository implements LavadoRepositoryInterface
                 }
                 
                 // Restaurar la factura relacionada si existe
-                $facturaDetalle = FacturaDetalle::onlyTrashed()
-                    ->where('lavado_id', $lavado->lavado_id)
-                    ->first();
+                $factura = FacturaElectronica::onlyTrashed()
+                    ->whereHas('venta.detalles', function($query) use ($lavado) {
+                        $query->where('referencia_id', $lavado->lavado_id)
+                              ->where('tipo_item', 'servicio');
+                    })->first();
                     
-                if ($facturaDetalle) {
-                    $facturaDetalle->restore();
-                    $factura = FacturaElectronica::onlyTrashed()->find($facturaDetalle->factura_id);
-                    if ($factura) {
-                        $factura->restore();
-                    }
+                if ($factura) {
+                    $factura->restore();
                 }
             }
             
@@ -392,13 +380,13 @@ class LavadoRepository implements LavadoRepositoryInterface
         $month = now()->format('m');
         
         // Buscar el último número de factura del mes actual
-        $lastFactura = FacturaElectronica::where('numero_factura', 'like', $prefix . $year . $month . '%')
-            ->orderBy('numero_factura', 'desc')
+        $lastFactura = FacturaElectronica::where('secuencial', 'like', $prefix . $year . $month . '%')
+            ->orderBy('secuencial', 'desc')
             ->first();
         
         if ($lastFactura) {
             // Extraer el número secuencial del último número de factura
-            $lastNumber = (int) substr($lastFactura->numero_factura, -4);
+            $lastNumber = (int) substr($lastFactura->secuencial, -4);
             $newNumber = $lastNumber + 1;
         } else {
             $newNumber = 1;
@@ -496,30 +484,34 @@ class LavadoRepository implements LavadoRepositoryInterface
     /**
      * Crear factura legacy (solo cuando no es migración)
      */
-    private function crearFacturaLegacy(Lavado $lavado, $vehiculo): ?Factura
+    private function crearFacturaLegacy(Lavado $lavado, $vehiculo): ?FacturaElectronica
     {
         try {
-            // Generar factura automáticamente
-            $numeroFactura = $this->generateNumeroFactura();
+            // Generar factura automáticamente usando el nuevo sistema
+            $numeroSecuencial = $this->generateNextSecuencial();
             $descripcionFactura = 'Factura por servicio de lavado ' . $lavado->tipo_lavado;
             
-            // NOTA: Este método está obsoleto. Ahora se usa FacturaElectronica
-            // Mantenemos para compatibilidad pero se recomienda usar VentaService
+            // Crear factura electrónica
             $factura = FacturaElectronica::create([
-                'numero_factura' => $numeroFactura,
-                'cliente_id' => $vehiculo->cliente_id,
-                'fecha' => $lavado->fecha,
-                'descripcion' => $descripcionFactura,
+                'venta_id' => null, // Legacy, sin venta asociada
+                'ruc_emisor' => '1234567890001',
+                'razon_social_emisor' => 'Máximo Lavado',
+                'direccion_emisor' => 'Av. Principal 123, Quito',
+                'establecimiento' => 1,
+                'punto_emision' => 1,
+                'secuencial' => $numeroSecuencial,
+                'identificacion_comprador' => $vehiculo->cliente->cedula ?? '9999999999999',
+                'razon_social_comprador' => $vehiculo->cliente->nombre,
+                'direccion_comprador' => $vehiculo->cliente->direccion,
+                'email_comprador' => $vehiculo->cliente->email,
+                'tipo_documento' => 'factura',
+                'ambiente' => 'pruebas',
+                'tipo_emision' => 'normal',
+                'estado_sri' => 'BORRADOR',
+                'subtotal' => $lavado->precio / 1.12, // Sin IVA
+                'descuento' => 0,
+                'iva' => $lavado->precio - ($lavado->precio / 1.12), // 12% IVA
                 'total' => $lavado->precio,
-            ]);
-
-            // Crear detalle de factura
-            FacturaDetalle::create([
-                'factura_id' => $factura->factura_id,
-                'lavado_id' => $lavado->lavado_id,
-                'cantidad' => 1,
-                'precio_unitario' => $lavado->precio,
-                'subtotal' => $lavado->precio,
             ]);
 
             return $factura;
@@ -530,5 +522,14 @@ class LavadoRepository implements LavadoRepositoryInterface
             ]);
             return null;
         }
+    }
+
+    /**
+     * Generar siguiente secuencial para factura
+     */
+    private function generateNextSecuencial(): int
+    {
+        $lastFactura = FacturaElectronica::orderBy('secuencial', 'desc')->first();
+        return $lastFactura ? $lastFactura->secuencial + 1 : 1;
     }
 }
