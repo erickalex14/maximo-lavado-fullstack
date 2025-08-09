@@ -31,6 +31,7 @@ const Facturas = () => import('@/views/facturas/Facturas.vue');
 
 // Ventas
 const Ventas = () => import('@/views/ventas/Ventas.vue');
+const VentaCrear = () => import('@/views/ventas/VentaCrear.vue');
 
 // Reportes
 const Reportes = () => import('@/views/reportes/Reportes.vue');
@@ -127,6 +128,12 @@ const routes = [
         name: 'ventas.index',
         component: Ventas,
         meta: { title: 'Ventas' }
+      },
+      {
+        path: '/ventas/crear',
+        name: 'ventas.create',
+        component: VentaCrear,
+        meta: { title: 'Nueva Venta' }
       },
 
       // Reportes

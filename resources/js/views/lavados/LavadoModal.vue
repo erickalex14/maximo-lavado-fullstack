@@ -29,7 +29,7 @@
           >
             <option value="">Seleccionar vehículo</option>
             <option v-for="vehiculo in vehiculos" :key="vehiculo.vehiculo_id" :value="vehiculo.vehiculo_id">
-              {{ formatTipoVehiculo(vehiculo.tipo) }} - {{ vehiculo.cliente?.nombre }}
+              {{ vehiculo.tipo_vehiculo?.nombre || 'Tipo' }} - {{ vehiculo.cliente?.nombre }}
               <span v-if="vehiculo.matricula">({{ vehiculo.matricula }})</span>
               <span v-if="vehiculo.descripcion"> - {{ vehiculo.descripcion }}</span>
             </option>
@@ -284,15 +284,7 @@ const closeModal = () => {
   emit('close');
 };
 
-const formatTipoVehiculo = (tipo: string) => {
-  const tipos = {
-    'moto': 'Moto',
-    'camioneta': 'Camioneta',
-    'auto_pequeno': 'Auto Pequeño',
-    'auto_mediano': 'Auto Mediano'
-  };
-  return tipos[tipo as keyof typeof tipos] || tipo;
-};
+// Tipo de vehículo ya se muestra desde vehiculo.tipo_vehiculo?.nombre
 
 // Lifecycle
 onMounted(() => {

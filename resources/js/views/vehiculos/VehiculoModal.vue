@@ -10,18 +10,11 @@
       <form @submit.prevent="submitForm" class="px-6 py-4 space-y-4">
         <!-- Cliente -->
         <div>
-          <label for="cliente_id" class="block text-sm font-medium text-gray-700 mb-1">
-            Cliente *
-          </label>
-          <select
-            id="cliente_id"
-            v-model="form.cliente_id"
-            required
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">Seleccionar cliente</option>
-            <option v-for="cliente in clientes" :key="cliente.cliente_id" :value="cliente.cliente_id">
-              {{ cliente.nombre }} - {{ cliente.cedula }}
+          <label for="cliente_id" class="block text-sm font-medium text-gray-700 mb-1">Cliente *</label>
+          <select id="cliente_id" v-model.number="form.cliente_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+            <option :value="0">Seleccionar cliente</option>
+            <option v-for="c in clienteStore.clientesSelect" :key="c.cliente_id" :value="c.cliente_id">
+              {{ c.nombre }} - {{ c.cedula }}
             </option>
           </select>
           <span v-if="errors.cliente_id" class="text-red-500 text-sm">{{ errors.cliente_id[0] }}</span>
@@ -29,29 +22,18 @@
 
         <!-- Tipo de Vehículo -->
         <div>
-          <label for="tipo" class="block text-sm font-medium text-gray-700 mb-1">
-            Tipo de Vehículo *
-          </label>
-          <select
-            id="tipo"
-            v-model="form.tipo"
-            @change="onTipoChange"
-            required
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">Seleccionar tipo</option>
-            <option value="moto">Moto</option>
-            <option value="camioneta">Camioneta</option>
-            <option value="auto_pequeno">Auto Pequeño</option>
-            <option value="auto_mediano">Auto Mediano</option>
+          <label for="tipo_vehiculo_id" class="block text-sm font-medium text-gray-700 mb-1">Tipo de Vehículo *</label>
+          <select id="tipo_vehiculo_id" v-model.number="form.tipo_vehiculo_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+            <option :value="0">Seleccionar tipo</option>
+            <option v-for="t in tipoVehiculoStore.tipos" :key="t.tipo_vehiculo_id" :value="t.tipo_vehiculo_id">{{ t.nombre }}</option>
           </select>
-          <span v-if="errors.tipo" class="text-red-500 text-sm">{{ errors.tipo[0] }}</span>
+          <span v-if="errors.tipo_vehiculo_id" class="text-red-500 text-sm">{{ errors.tipo_vehiculo_id[0] }}</span>
         </div>
 
         <!-- Matrícula -->
         <div>
           <label for="matricula" class="block text-sm font-medium text-gray-700 mb-1">
-            Matrícula {{ matriculaRequired ? '*' : '(Opcional para motos)' }}
+            Matrícula {{ matriculaRequired ? '*' : '(Opcional si el tipo lo permite)' }}
           </label>
           <input
             id="matricula"
@@ -62,9 +44,7 @@
             :placeholder="matriculaRequired ? 'Matrícula del vehículo' : 'Matrícula (opcional)'"
           />
           <span v-if="errors.matricula" class="text-red-500 text-sm">{{ errors.matricula[0] }}</span>
-          <p v-if="!matriculaRequired" class="text-xs text-gray-500 mt-1">
-            Las motos no requieren matrícula obligatoriamente
-          </p>
+          <p v-if="!matriculaRequired" class="text-xs text-gray-500 mt-1">Este tipo de vehículo puede omitir matrícula.</p>
         </div>
 
         <!-- Descripción -->
@@ -107,7 +87,10 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, onMounted } from 'vue';
-import type { Vehiculo, CreateVehiculoRequest, Cliente } from '@/types';
+import type { Vehiculo } from '@/types';
+import { useVehiculoStore } from '@/stores/vehiculo';
+import { useClienteStore } from '@/stores/cliente';
+import { useTipoVehiculoStore } from '@/stores/tipoVehiculo';
 
 interface Props {
   isOpen: boolean;
@@ -121,61 +104,45 @@ const emit = defineEmits<{
 }>();
 
 // Estado del formulario
-const form = ref<CreateVehiculoRequest>({
+const form = ref<any>({
   cliente_id: 0,
-  tipo: 'moto',
+  tipo_vehiculo_id: 0,
   matricula: '',
   descripcion: ''
 });
 
 const loading = ref(false);
 const errors = ref<Record<string, string[]>>({});
-const clientes = ref<Cliente[]>([]);
+const vehiculoStore = useVehiculoStore();
+const clienteStore = useClienteStore();
+const tipoVehiculoStore = useTipoVehiculoStore();
 
 // Computed para determinar si la matrícula es requerida
 const matriculaRequired = computed(() => {
-  // Importar la función helper desde types
-  return form.value.tipo !== 'moto';
+  const t = tipoVehiculoStore.tipos.find(x => x.tipo_vehiculo_id === form.value.tipo_vehiculo_id);
+  if (!t) return true;
+  if (typeof t.requiere_matricula === 'boolean') return t.requiere_matricula;
+  return !/moto/i.test(t.nombre);
 });
 
-// Cargar clientes
-const loadClientes = async () => {
-  try {
-    // Temporalmente usar array vacío hasta implementar el store
-    clientes.value = [];
-  } catch (error) {
-    console.error('Error loading clientes:', error);
-  }
-};
-
-// Manejar cambio de tipo de vehículo
-const onTipoChange = () => {
-  // Si es moto, limpiar matrícula para que sea opcional
-  if (form.value.tipo === 'moto') {
+// Al cambiar tipo limpiar matrícula si deja de ser requerida
+watch(() => form.value.tipo_vehiculo_id, () => {
+  if (!matriculaRequired.value) {
     form.value.matricula = '';
   }
-  // Limpiar errores de validación
-  if (errors.value.matricula) {
-    delete errors.value.matricula;
-  }
-};
+});
 
 // Llenar formulario cuando se edita
 watch(() => props.vehiculo, (vehiculo) => {
   if (vehiculo) {
     form.value = {
       cliente_id: vehiculo.cliente_id,
-      tipo: vehiculo.tipo,
+      tipo_vehiculo_id: vehiculo.tipo_vehiculo_id,
       matricula: vehiculo.matricula || '',
       descripcion: vehiculo.descripcion || ''
     };
   } else {
-    form.value = {
-      cliente_id: 0,
-      tipo: 'moto',
-      matricula: '',
-      descripcion: ''
-    };
+    form.value = { cliente_id: 0, tipo_vehiculo_id: 0, matricula: '', descripcion: '' };
   }
   errors.value = {};
 }, { immediate: true });
@@ -194,14 +161,12 @@ const submitForm = async () => {
 
     // Limpiar matrícula si es moto y está vacía
     const formData = { ...form.value };
-    if (formData.tipo === 'moto' && !formData.matricula?.trim()) {
-      formData.matricula = undefined;
-    }
+    if (!matriculaRequired.value && !formData.matricula?.trim()) formData.matricula = undefined;
 
     if (props.vehiculo) {
-      // await vehiculoStore.updateVehiculo(props.vehiculo.vehiculo_id, formData);
+      await vehiculoStore.updateVehiculo(props.vehiculo.vehiculo_id, formData);
     } else {
-      // await vehiculoStore.createVehiculo(formData);
+      await vehiculoStore.createVehiculo(formData);
     }
 
     emit('success');
@@ -216,7 +181,8 @@ const submitForm = async () => {
 };
 
 // Cargar datos al montar
-onMounted(() => {
-  loadClientes();
+onMounted(async () => {
+  if (!clienteStore.clientesSelect.length) await clienteStore.fetchClientesForSelect();
+  if (!tipoVehiculoStore.tipos.length) await tipoVehiculoStore.fetchTipos();
 });
 </script>

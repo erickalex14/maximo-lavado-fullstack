@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed, readonly } from 'vue';
 import clienteService from '@/services/cliente.service';
-import type { Cliente, CreateClienteForm, FilterOptions, PaginatedResponse } from '@/types';
+import type { Cliente, CreateClienteRequest, FilterOptions, PaginatedResponse } from '@/types';
 
 export const useClienteStore = defineStore('cliente', () => {
   // Estado
@@ -11,6 +11,13 @@ export const useClienteStore = defineStore('cliente', () => {
   const clientesSelect = ref<Cliente[]>([]);
   const clientesEliminados = ref<Cliente[]>([]);
   const estadisticas = ref<any | null>(null);
+  // Métricas agregadas normalizadas para las cards
+  const metricas = ref({
+    total: 0,
+    activos: 0,
+    nuevos_este_mes: 0,
+    con_vehiculos: 0,
+  });
   
   const loading = ref(false);
   const loadingCreate = ref(false);
@@ -20,6 +27,9 @@ export const useClienteStore = defineStore('cliente', () => {
 
   // Getters
   const totalClientes = computed(() => clientesPaginados.value?.total || 0);
+  const totalActivos = computed(() => metricas.value.activos);
+  const nuevosEsteMes = computed(() => metricas.value.nuevos_este_mes);
+  const clientesConVehiculos = computed(() => metricas.value.con_vehiculos);
   const hasClientes = computed(() => clientes.value.length > 0);
   const clientesOptions = computed(() => 
     clientesSelect.value.map(cliente => ({
@@ -39,6 +49,8 @@ export const useClienteStore = defineStore('cliente', () => {
       if (response.success && response.data) {
         clientesPaginados.value = response.data;
         clientes.value = response.data.data;
+  // Recalcular métricas derivadas cuando tenemos la lista (al menos de la página actual)
+  recomputeDerivedMetrics();
       } else {
         error.value = response.message || 'Error al cargar clientes';
       }
@@ -55,6 +67,7 @@ export const useClienteStore = defineStore('cliente', () => {
       
       if (response.success && response.data) {
         clientesSelect.value = response.data;
+  recomputeDerivedMetrics();
       }
     } catch (err: any) {
       console.error('Error al cargar clientes para select:', err);
@@ -97,7 +110,7 @@ export const useClienteStore = defineStore('cliente', () => {
     }
   }
 
-  async function createCliente(data: CreateClienteForm): Promise<boolean> {
+  async function createCliente(data: CreateClienteRequest): Promise<boolean> {
     loadingCreate.value = true;
     error.value = null;
 
@@ -107,6 +120,11 @@ export const useClienteStore = defineStore('cliente', () => {
       if (response.success && response.data) {
         // Agregar el nuevo cliente a la lista
         clientes.value.unshift(response.data);
+  metricas.value.total += 1;
+  // Si backend no provee 'activo', asumimos true
+  const activo = (response.data as any).activo !== false;
+  if (activo) metricas.value.activos += 1;
+  metricas.value.nuevos_este_mes += 1; // asunción: recién creado este mes
         return true;
       } else {
         error.value = response.message || 'Error al crear cliente';
@@ -120,7 +138,7 @@ export const useClienteStore = defineStore('cliente', () => {
     }
   }
 
-  async function updateCliente(id: number, data: Partial<CreateClienteForm>): Promise<boolean> {
+  async function updateCliente(id: number, data: Partial<CreateClienteRequest>): Promise<boolean> {
     loadingUpdate.value = true;
     error.value = null;
 
@@ -160,6 +178,8 @@ export const useClienteStore = defineStore('cliente', () => {
         if (index !== -1) {
           clientes.value[index] = response.data;
         }
+  // Recalcular activos
+  recomputeDerivedMetrics();
         return true;
       }
       return false;
@@ -179,6 +199,8 @@ export const useClienteStore = defineStore('cliente', () => {
       if (response.success) {
         // Remover de la lista
         clientes.value = clientes.value.filter(c => c.cliente_id !== id);
+  metricas.value.total = Math.max(0, metricas.value.total - 1);
+  recomputeDerivedMetrics();
         return true;
       } else {
         error.value = response.message || 'Error al eliminar cliente';
@@ -200,6 +222,10 @@ export const useClienteStore = defineStore('cliente', () => {
         // Remover de eliminados y agregar a activos
         clientesEliminados.value = clientesEliminados.value.filter(c => c.cliente_id !== id);
         clientes.value.unshift(response.data);
+  metricas.value.total += 1;
+  const activo = (response.data as any).activo !== false;
+  if (activo) metricas.value.activos += 1;
+  recomputeDerivedMetrics();
         return true;
       }
       return false;
@@ -227,9 +253,23 @@ export const useClienteStore = defineStore('cliente', () => {
       
       if (response.success && response.data) {
         estadisticas.value = response.data;
+        // Normalizar claves y fusionar con métricas derivadas
+        metricas.value.total = response.data.total ?? response.data.total_clientes ?? metricas.value.total;
+        metricas.value.nuevos_este_mes = response.data.nuevos_este_mes ?? response.data.nuevos_mes ?? metricas.value.nuevos_este_mes;
+        // Activos / con vehículos quizá no vienen en stats => derivar si tenemos listas
+        recomputeDerivedMetrics();
       }
     } catch (err: any) {
       console.error('Error al cargar estadísticas de clientes:', err);
+    }
+  }
+
+  function recomputeDerivedMetrics(): void {
+    // Derivar activos y con vehículos si disponemos de algún listado (clientesSelect preferido, luego clientes)
+    const base = clientesSelect.value.length ? clientesSelect.value : clientes.value;
+    if (base.length) {
+      metricas.value.activos = base.filter((c: any) => c.activo !== false).length; // asumimos activo=true por defecto
+      metricas.value.con_vehiculos = base.filter((c: any) => Array.isArray(c.vehiculos) && c.vehiculos.length > 0).length;
     }
   }
 
@@ -263,6 +303,7 @@ export const useClienteStore = defineStore('cliente', () => {
     clientesSelect: readonly(clientesSelect),
     clientesEliminados: readonly(clientesEliminados),
     estadisticas: readonly(estadisticas),
+  metricas: readonly(metricas),
     loading: readonly(loading),
     loadingCreate: readonly(loadingCreate),
     loadingUpdate: readonly(loadingUpdate),
@@ -271,6 +312,9 @@ export const useClienteStore = defineStore('cliente', () => {
     
     // Getters
     totalClientes,
+  totalActivos,
+  nuevosEsteMes,
+  clientesConVehiculos,
     hasClientes,
     clientesOptions,
     

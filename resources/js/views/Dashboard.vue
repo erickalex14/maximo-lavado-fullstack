@@ -80,7 +80,7 @@
       </div>
 
       <!-- Charts Row -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Lavados por día chart -->
         <div class="card">
           <div class="card-header">
@@ -114,6 +114,22 @@
             <div v-else class="flex items-center justify-center h-64 text-surface-500">
               Sin datos disponibles
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Productos Más Vendidos (si existe información) -->
+      <div v-if="chartProductosVendidosData" class="grid grid-cols-1">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="text-lg font-semibold text-surface-900">Productos Más Vendidos</h3>
+          </div>
+          <div class="card-body">
+            <ChartComponent
+              type="bar"
+              :data="chartProductosVendidosData"
+              :options="{ ...chartOptions, scales: { y: { beginAtZero: true } } }"
+            />
           </div>
         </div>
       </div>
@@ -261,28 +277,47 @@ const lastUpdated = ref('');
 // Computed properties
 const chartLavadosData = computed(() => {
   if (!dashboardStore.chartData?.lavados_por_dia) return null;
-  
+  const labels = dashboardStore.chartData.lavados_por_dia.map(item => normalizeFechaLabel(item.fecha));
+  const data = dashboardStore.chartData.lavados_por_dia.map(item => item.cantidad ?? 0);
   return {
-    labels: dashboardStore.chartData.lavados_por_dia.map(item => item.fecha),
+    labels,
     datasets: [{
       label: 'Lavados',
-      data: dashboardStore.chartData.lavados_por_dia.map(item => item.cantidad),
-      borderColor: '#4caf50',
-      backgroundColor: 'rgba(76, 175, 80, 0.1)',
-      tension: 0.4,
+      data,
+      borderColor: '#2563eb',
+      backgroundColor: 'rgba(37, 99, 235, 0.15)',
+      pointBackgroundColor: '#2563eb',
+      fill: true,
+      tension: 0.35,
     }]
   };
 });
 
 const chartIngresosData = computed(() => {
   if (!dashboardStore.chartData?.ingresos_por_mes) return null;
-  
+  const labels = dashboardStore.chartData.ingresos_por_mes.map(item => normalizeMesLabel(item.mes));
+  const data = dashboardStore.chartData.ingresos_por_mes.map(item => item.monto ?? 0);
   return {
-    labels: dashboardStore.chartData.ingresos_por_mes.map(item => item.mes),
+    labels,
     datasets: [{
-      label: 'Ingresos',
-      data: dashboardStore.chartData.ingresos_por_mes.map(item => item.monto),
-      backgroundColor: '#2196f3',
+      label: 'Ingresos (USD)',
+      data,
+      backgroundColor: 'rgba(16, 185, 129, 0.6)',
+      borderRadius: 6,
+    }]
+  };
+});
+
+const chartProductosVendidosData = computed(() => {
+  if (!dashboardStore.chartData?.productos_mas_vendidos || dashboardStore.chartData.productos_mas_vendidos.length === 0) return null;
+  const labels = dashboardStore.chartData.productos_mas_vendidos.map(p => p.nombre);
+  const data = dashboardStore.chartData.productos_mas_vendidos.map(p => p.cantidad ?? 0);
+  return {
+    labels,
+    datasets: [{
+      label: 'Cantidad',
+      data,
+      backgroundColor: labels.map(() => randomColor()),
     }]
   };
 });
@@ -292,15 +327,61 @@ const chartOptions = {
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      display: false,
+      display: true,
     },
+    tooltip: {
+      mode: 'index' as const,
+      intersect: false,
+      callbacks: {
+        label: (ctx: any) => {
+          const label = ctx.dataset.label || '';
+          const v = ctx.parsed.y ?? ctx.parsed;
+          if (label.toLowerCase().includes('ingreso')) {
+            return `${label}: ${formatCurrency(v)}`;
+          }
+            return `${label}: ${v}`;
+        }
+      }
+    }
   },
   scales: {
     y: {
       beginAtZero: true,
+      ticks: {
+        callback: (val: any) => typeof val === 'number' ? (val >= 1000 ? `${(val/1000).toFixed(1)}k` : val) : val
+      }
     },
   },
 };
+
+// Helpers de formato para labels consistentes
+function normalizeFechaLabel(raw: string): string {
+  // Admite formatos tipo '2025-08-01', '01/08', 'ago 01'
+  try {
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('es-EC', { day: '2-digit', month: 'short' });
+    }
+  } catch (_) { /* ignore */ }
+  return raw;
+}
+
+function normalizeMesLabel(raw: string | number): string {
+  if (typeof raw === 'number') {
+    return new Date(2025, raw - 1, 1).toLocaleDateString('es-EC', { month: 'short' });
+  }
+  // Si viene '2025-08' o similar
+  if (/^\d{4}-\d{2}$/.test(raw)) {
+    const [y, m] = raw.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString('es-EC', { month: 'short' });
+  }
+  return raw.length <= 3 ? raw : raw.slice(0, 10);
+}
+
+function randomColor(): string {
+  const palette = ['#6366F1', '#F59E0B', '#10B981', '#EF4444', '#3B82F6', '#8B5CF6', '#EC4899'];
+  return palette[Math.floor(Math.random() * palette.length)];
+}
 
 // Methods
 const refreshData = async () => {

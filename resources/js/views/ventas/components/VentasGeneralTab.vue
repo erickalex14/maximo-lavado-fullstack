@@ -4,7 +4,7 @@
     <div class="filters-section mb-6">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
-          <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+          <label class="block text-sm font-medium text-surface-700 mb-2">
             Buscar
           </label>
           <input
@@ -17,18 +17,20 @@
         </div>
         
         <div>
-          <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+          <label class="block text-sm font-medium text-surface-700 mb-2">
             Tipo de Venta
           </label>
           <select v-model="selectedTipo" class="form-select" @change="applyFilters">
             <option value="">Todos</option>
             <option value="automotriz">Automotriz</option>
             <option value="despensa">Despensa</option>
+            <option value="servicio">Servicio</option>
+            <option value="mixta">Mixta</option>
           </select>
         </div>
         
         <div>
-          <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+          <label class="block text-sm font-medium text-surface-700 mb-2">
             Fecha Inicio
           </label>
           <input
@@ -40,7 +42,7 @@
         </div>
         
         <div>
-          <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+          <label class="block text-sm font-medium text-surface-700 mb-2">
             Fecha Fin
           </label>
           <input
@@ -76,7 +78,7 @@
       </div>
     </div>
 
-    <!-- Tabla de ventas unificadas -->
+  <!-- Tabla de ventas unificadas -->
     <div class="table-container">
       <div class="overflow-x-auto">
         <table class="data-table">
@@ -84,7 +86,7 @@
             <tr>
               <th>ID</th>
               <th>Tipo</th>
-              <th>Producto</th>
+              <th>Referencia</th>
               <th>Cliente</th>
               <th>Cantidad</th>
               <th>Precio Unit.</th>
@@ -122,50 +124,29 @@
               v-else
               v-for="venta in filteredVentas"
               :key="`${venta.tipo}-${venta.id}`"
-              class="hover:bg-surface-50 dark:hover:bg-surface-800"
+              class="hover:bg-surface-50"
             >
               <td>{{ venta.id }}</td>
               <td>
-                <span
-                  :class="[
-                    'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                    venta.tipo === 'automotriz'
-                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                      : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-                  ]"
-                >
-                  {{ venta.tipo === 'automotriz' ? 'Automotriz' : 'Despensa' }}
-                </span>
+                <span :class="badgeClass(venta.tipo)">{{ labelTipo(venta.tipo) }}</span>
               </td>
-              <td class="font-medium">{{ venta.producto_nombre }}</td>
-              <td>{{ venta.cliente_nombre }}</td>
-              <td>{{ venta.cantidad }}</td>
+              <td class="font-medium">{{ nombreReferencia(venta) }}</td>
+              <td>{{ venta.cliente?.nombre || '' }}</td>
+              <td>{{ safeCantidad(venta) }}</td>
               <td>${{ formatCurrency(venta.precio_unitario) }}</td>
               <td class="font-semibold">${{ formatCurrency(venta.total) }}</td>
               <td>{{ formatDate(venta.fecha) }}</td>
               <td>
                 <div class="flex items-center space-x-2">
                   <button
-                    @click="viewVenta(venta)"
-                    class="action-btn action-btn-view"
-                    title="Ver detalles"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  </button>
-                  
-                  <button
-                    @click="editVenta(venta)"
+                    @click="duplicarVenta(venta)"
                     class="action-btn action-btn-edit"
-                    title="Editar"
+                    title="Duplicar"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16h8M8 12h8m-6 8h6a2 2 0 002-2V8a2 2 0 00-2-2h-5l-2-2H8a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </button>
-                  
                   <button
                     @click="deleteVenta(venta)"
                     class="action-btn action-btn-delete"
@@ -181,49 +162,39 @@
           </tbody>
         </table>
       </div>
+      <!-- Paginación -->
+      <div v-if="pagination.total > 0" class="px-6 py-4 border-t border-surface-200">
+        <TablePagination :pagination="pagination" @changePage="handlePageChange" />
+      </div>
     </div>
 
     <!-- Modales de vista y edición -->
-    <VentaAutomotrizModal
-      v-if="selectedVenta && selectedVenta.tipo === 'automotriz'"
-      v-model:visible="showEditModal"
-      :mode="editMode"
-      :venta="selectedVenta.original_data as VentaProductoAutomotriz"
-      @saved="handleVentaSaved"
-    />
-
-    <VentaDespensaModal
-      v-if="selectedVenta && selectedVenta.tipo === 'despensa'"
-      v-model:visible="showEditModal"
-      :mode="editMode"
-      :venta="selectedVenta.original_data as VentaProductoDespensa"
-      @saved="handleVentaSaved"
-    />
+  <!-- Modales legacy eliminados en flujo unificado -->
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useToast } from '@/composables/useToast';
 import { useVentaStore } from '@/stores/venta';
-import VentaAutomotrizModal from '../VentaAutomotrizModal.vue';
-import VentaDespensaModal from '../VentaDespensaModal.vue';
-import type { VentaUnificada, VentaProductoAutomotriz, VentaProductoDespensa } from '@/types';
+import type { Venta } from '@/types';
+import TablePagination from '@/components/ui/TablePagination.vue';
 
 // Store
 const ventaStore = useVentaStore();
+const { push: toast } = useToast();
 
 // State
 const searchTerm = ref('');
 const selectedTipo = ref('');
 const fechaInicio = ref('');
 const fechaFin = ref('');
-const showEditModal = ref(false);
-const editMode = ref<'view' | 'edit'>('view');
-const selectedVenta = ref<VentaUnificada | null>(null);
+// Modales legacy eliminados: no se usan showEditModal/editMode/selectedVenta
 
 // Computed
 const loading = computed(() => ventaStore.loading);
 const ventasUnificadas = computed(() => ventaStore.ventasUnificadas);
+const pagination = computed(() => ventaStore.ventasPagination);
 
 // Filtros aplicados
 const filteredVentas = computed(() => {
@@ -231,16 +202,20 @@ const filteredVentas = computed(() => {
 
   // Filtro por tipo
   if (selectedTipo.value) {
-    ventas = ventas.filter(v => v.tipo === selectedTipo.value);
+    if (selectedTipo.value === 'automotriz') ventas = ventas.filter(v => v.tipo === 'producto_automotriz' || (v.tipo==='mixta' && v.detalles_tipos?.includes('producto_automotriz')));
+    else if (selectedTipo.value === 'despensa') ventas = ventas.filter(v => v.tipo === 'producto_despensa' || (v.tipo==='mixta' && v.detalles_tipos?.includes('producto_despensa')));
+    else if (selectedTipo.value === 'servicio') ventas = ventas.filter(v => v.tipo === 'servicio' || (v.tipo==='mixta' && v.detalles_tipos?.includes('servicio')));
+    else if (selectedTipo.value === 'mixta') ventas = ventas.filter(v => v.tipo === 'mixta');
   }
 
   // Filtro por búsqueda
   if (searchTerm.value) {
     const term = searchTerm.value.toLowerCase();
-    ventas = ventas.filter(v => 
-      v.producto_nombre.toLowerCase().includes(term) ||
-      v.cliente_nombre?.toLowerCase().includes(term)
-    );
+    ventas = ventas.filter(v => {
+      const nombre = nombreReferencia(v).toLowerCase();
+      const cliente = (v.cliente?.nombre || '').toLowerCase();
+      return nombre.includes(term) || cliente.includes(term);
+    });
   }
 
   // Filtro por fecha
@@ -256,11 +231,16 @@ const filteredVentas = computed(() => {
 });
 
 // Methods
-function formatCurrency(value: number): string {
+function formatCurrency(value: number | undefined | null): string {
+  const num = typeof value === 'number' && !isNaN(value) ? value : 0;
   return new Intl.NumberFormat('es-CO', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(num);
+}
+
+function safeCantidad(v: Venta) {
+  return (typeof v.cantidad === 'number' && !isNaN(v.cantidad)) ? v.cantidad : 0;
 }
 
 function formatDate(date: string): string {
@@ -288,45 +268,59 @@ async function refreshData() {
   await ventaStore.refreshAll();
 }
 
-function viewVenta(venta: VentaUnificada) {
-  selectedVenta.value = venta;
-  editMode.value = 'view';
-  showEditModal.value = true;
+function handlePageChange(page: number) {
+  ventaStore.fetchVentas({ page });
 }
 
-function editVenta(venta: VentaUnificada) {
-  selectedVenta.value = venta;
-  editMode.value = 'edit';
-  showEditModal.value = true;
+function badgeClass(tipo: Venta['tipo']) {
+  switch (tipo) {
+    case 'producto_automotriz': return 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800';
+    case 'producto_despensa': return 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800';
+  case 'servicio': return 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800';
+  case 'mixta': return 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800';
+  }
 }
 
-async function deleteVenta(venta: VentaUnificada) {
-  if (!confirm(`¿Estás seguro de que deseas eliminar esta venta de ${venta.producto_nombre}?`)) {
+function labelTipo(tipo: Venta['tipo']) {
+  if (tipo === 'producto_automotriz') return 'Automotriz';
+  if (tipo === 'producto_despensa') return 'Despensa';
+  if (tipo === 'servicio') return 'Servicio';
+  if (tipo === 'mixta') return 'Mixta';
+  return tipo;
+}
+
+function nombreReferencia(v: Venta) {
+  if (v.referencia_compuesta) return v.referencia_compuesta;
+  if (v.tipo === 'producto_automotriz') return v.producto_automotriz?.nombre || `#${v.referencia_id}`;
+  if (v.tipo === 'producto_despensa') return v.producto_despensa?.nombre || `#${v.referencia_id}`;
+  if (v.tipo === 'servicio') return v.servicio?.nombre || `Servicio ${v.referencia_id}`;
+  return `Ref ${v.referencia_id}`;
+}
+
+async function duplicarVenta(v: Venta) {
+  if (v.tipo === 'mixta') {
+    toast({ type: 'info', text: 'Duplicación rápida no soportada para ventas mixtas' });
     return;
   }
-
-  try {
-    if (venta.tipo === 'automotriz') {
-      await ventaStore.deleteVentaAutomotriz(venta.id);
-    } else {
-      await ventaStore.deleteVentaDespensa(venta.id);
-    }
-  } catch (error) {
-    console.error('Error al eliminar venta:', error);
-  }
+  const nueva = await ventaStore.createVentaGenerica({
+    tipo: v.tipo as any,
+    referencia_id: v.referencia_id,
+    cantidad: v.cantidad,
+    precio_unitario: v.precio_unitario,
+    cliente_id: v.cliente_id || undefined,
+  });
+  if (nueva) toast({ type: 'success', text: 'Venta duplicada' });
 }
 
-function handleVentaSaved() {
-  showEditModal.value = false;
-  selectedVenta.value = null;
+async function deleteVenta(v: Venta) {
+  if (!window.confirm('¿Eliminar esta venta?')) return;
+  const ok = await ventaStore.deleteVentaGenerica(v.id);
+  if (ok) toast({ type: 'success', text: 'Venta eliminada' }); else toast({ type: 'error', text: 'No se pudo eliminar' });
 }
 
 // Lifecycle
 onMounted(async () => {
-  await Promise.all([
-    ventaStore.fetchVentasAutomotrices(),
-    ventaStore.fetchVentasDespensa()
-  ]);
+  await ventaStore.fetchVentas();
 });
 </script>
 
@@ -468,45 +462,5 @@ onMounted(async () => {
   background-color: #fee2e2;
 }
 
-/* Dark mode styles - if needed */
-@media (prefers-color-scheme: dark) {
-  .filters-section,
-  .table-container {
-    background-color: #1f2937;
-    border-color: #374151;
-  }
-
-  .form-input, .form-select {
-    background-color: #1f2937;
-    border-color: #374151;
-    color: #f9fafb;
-  }
-
-  .btn-outline-secondary {
-    border-color: #374151;
-    color: #d1d5db;
-    background-color: #1f2937;
-  }
-
-  .btn-outline-secondary:hover {
-    background-color: #374151;
-  }
-
-  .data-table thead th {
-    background-color: #374151;
-    color: #9ca3af;
-  }
-
-  .data-table tbody tr:hover {
-    background-color: #374151;
-  }
-
-  .data-table tbody td {
-    color: #f9fafb;
-  }
-
-  .data-table tbody tr {
-    border-color: #374151;
-  }
-}
+/* Estilos dark eliminados para modo claro consistente */
 </style>

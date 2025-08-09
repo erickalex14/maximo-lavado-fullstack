@@ -35,7 +35,16 @@ export const useDashboardStore = defineStore('dashboard', () => {
       const response = await dashboardService.getMetricas();
       
       if (response.success && response.data) {
-        metricas.value = response.data;
+        // Normalización de claves heterogéneas entre backend y frontend
+        const raw: any = response.data;
+        metricas.value = {
+          total_lavados_hoy: raw.total_lavados_hoy ?? raw.lavados_hoy ?? 0,
+            ingresos_hoy: raw.ingresos_hoy ?? 0,
+            total_clientes: raw.total_clientes ?? raw.clientes_total ?? 0,
+            total_empleados: raw.total_empleados ?? raw.empleados_activos ?? 0,
+            lavados_pendientes: raw.lavados_pendientes ?? raw.lavados_en_proceso ?? 0,
+            facturas_pendientes: raw.facturas_pendientes ?? raw.facturas_hoy ?? 0,
+        };
       } else {
         error.value = response.message || 'Error al cargar métricas';
       }
@@ -51,7 +60,50 @@ export const useDashboardStore = defineStore('dashboard', () => {
       const response = await dashboardService.getChartData();
       
       if (response.success && response.data) {
-        chartData.value = response.data;
+        const raw: any = response.data;
+        // Si el backend ya envía el formato esperado, úsalo directamente
+        if (raw.lavados_por_dia || raw.ingresos_por_mes) {
+          // Asegurar que existan arrays no vacíos para que el componente pinte o muestre placeholder correctamente
+          const safe = { ...raw };
+          if (!Array.isArray(safe.lavados_por_dia) || safe.lavados_por_dia.length === 0) {
+            const today = new Date();
+            const days: any[] = [];
+            for (let i = 6; i >= 0; i--) {
+              const d = new Date(today);
+              d.setDate(d.getDate() - i);
+              days.push({ fecha: d.toLocaleDateString('es-EC', { month: 'short', day: 'numeric' }), cantidad: 0 });
+            }
+            safe.lavados_por_dia = days;
+          }
+          if (!Array.isArray(safe.ingresos_por_mes) || safe.ingresos_por_mes.length === 0) {
+            safe.ingresos_por_mes = safe.lavados_por_dia.map((d: any) => ({ mes: d.fecha, monto: 0 }));
+          }
+          chartData.value = safe;
+        } else {
+          // Adaptar formato semanal (labels/datasets/lavados) al esperado por la vista
+          const labels: string[] = raw.labels || [];
+          const lavadosSerie: number[] = raw.lavados?.data || [];
+          // Buscar dataset de ingresos
+            const ingresosDataset = Array.isArray(raw.datasets)
+              ? raw.datasets.find((d: any) => (d.label || '').toLowerCase().includes('ingreso'))
+              : null;
+          const ingresosSerie: number[] = ingresosDataset?.data || [];
+
+          const lavados_por_dia = labels.map((lbl, i) => ({ fecha: lbl, cantidad: lavadosSerie[i] ?? 0 }));
+          // Reutilizamos el nombre ingresos_por_mes aunque sean últimos días (mejora futura: renombrar vista)
+          const ingresos_por_mes = labels.map((lbl, i) => ({ mes: lbl, monto: ingresosSerie[i] ?? 0 }));
+
+          chartData.value = {
+            lavados_por_dia,
+            ingresos_por_mes,
+            productos_mas_vendidos: [] // placeholder hasta implementar
+          };
+        }
+        // Log de depuración opcional (desactivar en prod)
+        if (process?.env?.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.debug('[Dashboard] chartData normalizada:', chartData.value);
+        }
       }
     } catch (err: any) {
       console.error('Error al cargar datos de gráficos:', err);
@@ -75,7 +127,13 @@ export const useDashboardStore = defineStore('dashboard', () => {
       const response = await dashboardService.getProximasCitas(limite);
       
       if (response.success && response.data) {
-        proximasCitas.value = response.data;
+        // Adaptar a formato con descripcion usado en la vista
+        proximasCitas.value = response.data.map((cita: any) => ({
+          ...cita,
+          descripcion: cita.descripcion
+            ? cita.descripcion
+            : `${cita.cliente_nombre ?? 'Cliente'} - ${cita.vehiculo ?? ''} ${cita.hora ? '· ' + cita.hora : ''}`.trim()
+        }));
       }
     } catch (err: any) {
       console.error('Error al cargar próximas citas:', err);

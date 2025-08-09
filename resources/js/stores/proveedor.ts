@@ -47,11 +47,15 @@ export const useProveedorStore = defineStore('proveedor', () => {
     search: '',
   });
   
-  const filtersPagos = ref<{ page: number; per_page: number; search: string }>({
-    page: 1,
-    per_page: 15,
-    search: '',
-  });
+  const filtersPagos = ref<{ page: number; per_page: number; search: string; proveedor_id?: number | undefined; fecha_desde?: string; fecha_hasta?: string }>(
+    {
+      page: 1,
+      per_page: 15,
+      search: '',
+      proveedor_id: undefined,
+      fecha_desde: undefined,
+      fecha_hasta: undefined,
+    });
 
   // Getters
   const hasProveedores = computed(() => proveedores.value.length > 0);
@@ -193,28 +197,45 @@ export const useProveedorStore = defineStore('proveedor', () => {
   };
 
   // Gestión de pagos
-  const fetchPagos = async () => {
+  const fetchPagos = async (filters?: any) => {
     try {
       setLoading(true);
       clearError();
-      
-      const response = await proveedorService.getAllPagos();
-      pagos.value = Array.isArray(response.data) ? response.data : [];
-      // Actualizar paginación local (client-side)
-      paginationPagos.value = {
-        current_page: 1,
-        last_page: 1,
-        per_page: response.data ? response.data.length : 0,
-        total: response.data ? response.data.length : 0,
-        from: 0,
-        to: response.data ? response.data.length : 0,
-      };
+      const toUse = filters || filtersPagos.value;
+      const raw: any = await proveedorService.getPagos(toUse);
+      const candidate = raw?.data && Array.isArray(raw.data.data) && ('current_page' in raw.data) ? raw.data : (raw && 'current_page' in raw && Array.isArray(raw.data) ? raw : null);
+      if (candidate) {
+        pagos.value = candidate.data;
+        paginationPagos.value = {
+          current_page: candidate.current_page,
+          last_page: candidate.last_page,
+          per_page: candidate.per_page,
+          total: candidate.total,
+          from: candidate.from ?? ((candidate.current_page - 1) * candidate.per_page + 1),
+          to: candidate.to ?? Math.min(candidate.current_page * candidate.per_page, candidate.total),
+        };
+      } else {
+        const arr = Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw) ? raw : []);
+        pagos.value = arr;
+        paginationPagos.value = {
+          current_page: 1,
+          last_page: 1,
+          per_page: arr.length || 15,
+          total: arr.length,
+          from: arr.length ? 1 : 0,
+          to: arr.length,
+        };
+      }
     } catch (err: any) {
       setError(err.message || 'Error al cargar pagos');
       console.error('Error fetching pagos:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchPagosByProveedor = async (proveedorId: number) => {
+    return await fetchPagos({ ...filtersPagos.value, proveedor_id: proveedorId });
   };
 
   const createPago = async (data: CreatePagoProveedorRequest) => {
@@ -311,7 +332,8 @@ export const useProveedorStore = defineStore('proveedor', () => {
     createProveedor,
     updateProveedor,
     deleteProveedor,
-    fetchPagos,
+  fetchPagos,
+  fetchPagosByProveedor,
     createPago,
     deletePago,
     fetchMetricas,

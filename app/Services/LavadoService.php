@@ -268,7 +268,10 @@ class LavadoService
      */
     public function getAllLavados(array $filters = []): Collection
     {
-        return $this->lavadoRepository->getAll($filters);
+    // Aseguramos carga de relaciones necesarias para el frontend
+    $lavados = $this->lavadoRepository->getAll($filters);
+    $lavados->loadMissing(['vehiculo.cliente', 'vehiculo.tipoVehiculo', 'empleado']);
+    return $lavados;
     }
 
     /**

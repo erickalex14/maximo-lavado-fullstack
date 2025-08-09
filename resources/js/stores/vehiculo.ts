@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import vehiculoService from '@/services/vehiculo.service';
+import { useTipoVehiculoStore } from '@/stores/tipoVehiculo';
 import type { Vehiculo, PaginatedResponse, VehiculoFilters } from '@/types';
 
 export const useVehiculoStore = defineStore('vehiculo', () => {
@@ -113,6 +114,12 @@ export const useVehiculoStore = defineStore('vehiculo', () => {
       error.value = null;
       
       const response = await vehiculoService.createVehiculo(vehiculo);
+      // Enriquecer relación tipo_vehiculo si falta
+      if (response.data && !response.data.tipo_vehiculo) {
+        const tipoStore = useTipoVehiculoStore();
+  const tipo = tipoStore.tipos.find(t => t.tipo_vehiculo_id === response.data!.tipo_vehiculo_id);
+        if (tipo) (response.data as any).tipo_vehiculo = tipo;
+      }
       
       // Agregar a la lista local si existe
       if (vehiculos.value && response.data) {
@@ -134,6 +141,11 @@ export const useVehiculoStore = defineStore('vehiculo', () => {
       error.value = null;
       
       const response = await vehiculoService.updateVehiculo(id, vehiculo);
+      if (response.data && !response.data.tipo_vehiculo) {
+        const tipoStore = useTipoVehiculoStore();
+  const tipo = tipoStore.tipos.find(t => t.tipo_vehiculo_id === response.data!.tipo_vehiculo_id);
+        if (tipo) (response.data as any).tipo_vehiculo = tipo;
+      }
       
       // Actualizar en la lista local
       const index = vehiculos.value.findIndex(v => v.vehiculo_id === id);

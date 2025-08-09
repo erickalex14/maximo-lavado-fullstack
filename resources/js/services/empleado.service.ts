@@ -2,7 +2,6 @@ import apiService from './api';
 import type { 
   ApiResponse,
   Empleado, 
-  PaginatedResponse, 
   CreateEmpleadoRequest, 
   UpdateEmpleadoRequest,
   EmpleadoFilters
@@ -19,18 +18,23 @@ class EmpleadoService {
    * Obtener todos los empleados con paginación y filtros
    * GET /api/empleados
    */
-  async getEmpleados(filters: EmpleadoFilters = {}): Promise<PaginatedResponse<Empleado>> {
-    const params = new URLSearchParams();
-    
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, value.toString());
-      }
-    });
-
-    const url = `${this.BASE_URL}${params.toString() ? `?${params.toString()}` : ''}`;
-    const response = await apiService.get<PaginatedResponse<Empleado>>(url);
-    return response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
+  async getEmpleados(filters: EmpleadoFilters = {}): Promise<ApiResponse<Empleado[]>> {
+    const params: Record<string,string> = {};
+    Object.entries(filters).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== '') params[k] = String(v); });
+    const resp = await apiService.get<any>(this.BASE_URL, params);
+    // Backend usa 'status' en vez de 'success'
+    if (resp && typeof (resp as any).success === 'undefined' && typeof (resp as any).status !== 'undefined') {
+      resp.success = (resp as any).status === 'success';
+      if (!resp.message) resp.message = (resp as any).message || '';
+    }
+    // Forzar data como array
+    const rawData = Array.isArray(resp.data) ? resp.data : (resp.data?.data || []);
+    // Pequeña normalización (por si el backend usa nombres/apellidos separados y la vista espera algo)
+    resp.data = rawData.map((e: any) => ({
+      ...e,
+      nombre_completo: [e.nombres, e.apellidos].filter(Boolean).join(' ').trim()
+    }));
+    return resp as ApiResponse<Empleado[]>;
   }
 
   /**

@@ -300,9 +300,17 @@ export const useLavadoStore = defineStore('lavado', () => {
     try {
       setLoading(true);
       clearError();
-      
       const resp = await lavadoService.getStats();
-      return resp.data;
+      const raw = resp.data || {};
+      // Backend keys: total_hoy, total_mes, ingresos_mes, promedio_diario
+      return {
+        lavados_hoy: raw.total_hoy ?? raw.lavados_hoy ?? 0,
+        lavados_mes: raw.total_mes ?? raw.lavados_mes ?? 0,
+        ingresos_hoy: raw.ingresos_hoy ?? raw.total_ingresos_hoy ?? 0,
+        ingresos_mes: raw.ingresos_mes ?? raw.total_ingresos_mes ?? 0,
+        promedio_diario: raw.promedio_diario ?? 0,
+        migracion: raw.migracion
+      };
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al cargar las estadísticas');
       console.error('Error fetching lavado stats:', err);

@@ -1,10 +1,12 @@
 <template>
   <div id="app" class="min-h-screen bg-surface-50">
     <router-view />
+    <ToastContainer />
   </div>
 </template>
 
 <script setup lang="ts">
+import ToastContainer from '@/components/ui/ToastContainer.vue';
 import { onMounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 

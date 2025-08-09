@@ -23,19 +23,9 @@
 
         <!-- Tipo de Vehículo -->
         <div>
-          <label class="block text-sm font-medium text-gray-500 mb-1">
-            Tipo de Vehículo
-          </label>
-          <span
-            :class="{
-              'bg-blue-100 text-blue-800': vehiculo?.tipo === 'moto',
-              'bg-green-100 text-green-800': vehiculo?.tipo === 'camioneta',
-              'bg-purple-100 text-purple-800': vehiculo?.tipo === 'auto_pequeno',
-              'bg-yellow-100 text-yellow-800': vehiculo?.tipo === 'auto_mediano',
-            }"
-            class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
-          >
-            {{ formatTipoVehiculo(vehiculo?.tipo) }}
+          <label class="block text-sm font-medium text-gray-500 mb-1">Tipo de Vehículo</label>
+          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+            {{ vehiculo?.tipo_vehiculo?.nombre || 'N/A' }}
           </span>
         </div>
 
@@ -45,10 +35,7 @@
             Matrícula
           </label>
           <p class="text-gray-900">
-            {{ vehiculo?.matricula || (vehiculo?.tipo === 'moto' ? 'No aplica' : 'No registrada') }}
-          </p>
-          <p v-if="vehiculo?.tipo === 'moto' && !vehiculo?.matricula" class="text-xs text-gray-500">
-            Las motos no requieren matrícula obligatoriamente
+            {{ vehiculo?.matricula || 'No registrada' }}
           </p>
         </div>
 
@@ -134,19 +121,5 @@ defineEmits<{
   edit: [vehiculo: Vehiculo];
 }>();
 
-// Formatear tipo de vehículo
-const formatTipoVehiculo = (tipo?: string) => {
-  switch (tipo) {
-    case 'moto':
-      return 'Moto';
-    case 'camioneta':
-      return 'Camioneta';
-    case 'auto_pequeno':
-      return 'Auto Pequeño';
-    case 'auto_mediano':
-      return 'Auto Mediano';
-    default:
-      return 'N/A';
-  }
-};
+// (Badge simplificado usa nombre directo del tipo)
 </script>

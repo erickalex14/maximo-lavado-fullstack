@@ -112,28 +112,26 @@ Route::middleware('auth:sanctum')->group(function () {
     // 🧾 LAVADOS - Sistema de auditoría simple
     Route::prefix('lavados')->group(function () {
         Route::get('/', [LavadoController::class, 'index']);
-        Route::get('/all', [LavadoController::class, 'all']);
-        Route::get('/stats', [LavadoController::class, 'stats']);
-        Route::get('/recientes', [LavadoController::class, 'recientes']);
+        // Ajustar nombres a métodos reales del controlador
+        Route::get('/stats', [LavadoController::class, 'getStats']);
+        // Recientes (si se implementa en el controlador más tarde)
+        // Route::get('/recientes', [LavadoController::class, 'getRecientes']);
         Route::post('/', [LavadoController::class, 'store']);
         Route::get('/{id}', [LavadoController::class, 'show']);
         Route::put('/{id}', [LavadoController::class, 'update']);
         Route::delete('/{id}', [LavadoController::class, 'destroy']);
-        Route::put('/{id}/restore', [LavadoController::class, 'restore']);
+        // Route::put('/{id}/restore', [LavadoController::class, 'restore']); // no existe método restore actualmente
         Route::get('/trashed/list', [LavadoController::class, 'trashed']);
-        
-        // Consultas por entidad
-        Route::get('/cliente/{clienteId}', [LavadoController::class, 'porCliente']);
-        Route::get('/empleado/{empleadoId}', [LavadoController::class, 'porEmpleado']);
-        Route::get('/vehiculo/{vehiculoId}', [LavadoController::class, 'porVehiculo']);
-        Route::get('/servicio/{servicioId}', [LavadoController::class, 'porServicio']);
-        
+
+        // Consultas por entidad (ajustar a métodos existentes si se implementan)
+        // Route::get('/cliente/{clienteId}', [LavadoController::class, 'getByCliente']);
+        Route::get('/empleado/{empleadoId}', [LavadoController::class, 'getByEmpleado']);
+        Route::get('/vehiculo/{vehiculoId}', [LavadoController::class, 'getByVehiculo']);
+        // Route::get('/servicio/{servicioId}', [LavadoController::class, 'getByServicio']);
+
         // Consultas por fecha
-        Route::get('/dia/{fecha}', [LavadoController::class, 'porDia']);
-        Route::get('/semana/{fecha}', [LavadoController::class, 'porSemana']);
-        Route::get('/mes/{anio}/{mes}', [LavadoController::class, 'porMes']);
-        Route::get('/anio/{anio}', [LavadoController::class, 'porAnio']);
-        Route::get('/rango-fechas', [LavadoController::class, 'porRangoFechas']);
+        // Reemplazamos segment variable por query param en getByDay; mantener rutas legacy desactivadas si no existen
+        // Route::get('/dia/{fecha}', [LavadoController::class, 'getByDay']);
     });
 
     // 🧾 FACTURAS ELECTRÓNICAS - Sistema SRI Ecuador

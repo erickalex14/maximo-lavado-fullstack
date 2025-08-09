@@ -6,15 +6,26 @@
         <h1 class="text-2xl font-bold text-gray-900">Vehículos</h1>
         <p class="text-gray-600">Gestión de vehículos registrados</p>
       </div>
-      <button
-        @click="showCreateModal = true"
-        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-      >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        Nuevo Vehículo
-      </button>
+      <div class="flex gap-3">
+        <button
+          @click="showTipoVehiculoModal = true"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18" />
+          </svg>
+          Tipos de Vehículo
+        </button>
+        <button
+          @click="showCreateModal = true"
+          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Nuevo Vehículo
+        </button>
+      </div>
     </div>
 
     <!-- Filtros -->
@@ -29,17 +40,16 @@
             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
-        <div class="w-48">
+        <div class="w-56">
           <select
-            v-model="tipoFilter"
+            v-model.number="tipoVehiculoFilter"
             @change="loadVehiculos"
             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value="">Todos los tipos</option>
-            <option value="moto">Moto</option>
-            <option value="camioneta">Camioneta</option>
-            <option value="auto_pequeno">Auto Pequeño</option>
-            <option value="auto_mediano">Auto Mediano</option>
+            <option :value="0">Todos los tipos</option>
+            <option v-for="t in tipoVehiculoStore.tipos" :key="t.tipo_vehiculo_id" :value="t.tipo_vehiculo_id">
+              {{ t.nombre }}
+            </option>
           </select>
         </div>
       </div>
@@ -84,16 +94,8 @@
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span
-                  :class="{
-                    'bg-blue-100 text-blue-800': vehiculo.tipo === 'moto',
-                    'bg-green-100 text-green-800': vehiculo.tipo === 'camioneta',
-                    'bg-purple-100 text-purple-800': vehiculo.tipo === 'auto_pequeno',
-                    'bg-yellow-100 text-yellow-800': vehiculo.tipo === 'auto_mediano',
-                  }"
-                  class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
-                >
-                  {{ formatTipoVehiculo(vehiculo.tipo) }}
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                  {{ vehiculo.tipo_vehiculo?.nombre || 'N/A' }}
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-gray-900">
@@ -177,6 +179,13 @@
       @success="handleSuccess"
     />
 
+    <!-- Modal de Tipos de Vehículo -->
+    <TiposVehiculoModal
+      v-if="showTipoVehiculoModal"
+      :is-open="showTipoVehiculoModal"
+      @close="showTipoVehiculoModal = false"
+    />
+
     <!-- Modal de Ver -->
     <VehiculoViewModal
       v-if="showViewModal"
@@ -189,17 +198,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
 import VehiculoModal from './VehiculoModal.vue';
 import VehiculoViewModal from './VehiculoViewModal.vue';
+import TiposVehiculoModal from './components/TiposVehiculoModal.vue';
 import type { Vehiculo, PaginatedResponse } from '@/types';
+import { useVehiculoStore } from '@/stores/vehiculo';
+import { useTipoVehiculoStore } from '@/stores/tipoVehiculo';
 
 // Estado reactivo
 const vehiculos = ref<Vehiculo[]>([]);
 const loading = ref(false);
 const searchTerm = ref('');
-const tipoFilter = ref('');
+const tipoVehiculoFilter = ref<number>(0);
+// Stores
+const vehiculoStore = useVehiculoStore();
+const tipoVehiculoStore = useTipoVehiculoStore();
+
+// Modal tipos
+const showTipoVehiculoModal = ref(false);
 
 // Paginación
 const pagination = ref({
@@ -224,53 +242,32 @@ const debouncedSearch = () => {
   loadVehiculos();
 };
 
-// Formatear tipo de vehículo
-const formatTipoVehiculo = (tipo: string) => {
-  switch (tipo) {
-    case 'moto':
-      return 'Moto';
-    case 'camioneta':
-      return 'Camioneta';
-    case 'auto_pequeno':
-      return 'Auto Pequeño';
-    case 'auto_mediano':
-      return 'Auto Mediano';
-    default:
-      return 'N/A';
-  }
-};
+// Observa cambios en store vehiculo
+watch(() => vehiculoStore.vehiculos, (list) => {
+  vehiculos.value = list;
+}, { immediate: true, deep: true });
 
 // Cargar vehículos
 const loadVehiculos = async () => {
   try {
     loading.value = true;
     
-    const params = {
+    const filters: any = {
       page: pagination.value.current_page,
       per_page: pagination.value.per_page,
-      ...(searchTerm.value && { search: searchTerm.value }),
-      ...(tipoFilter.value && { tipo: tipoFilter.value })
+      search: searchTerm.value || undefined,
+      tipo_vehiculo_id: tipoVehiculoFilter.value || undefined
     };
 
-    // Temporalmente usar datos vacíos hasta que se implemente el store
-    const response = {
-      data: [],
-      current_page: 1,
-      last_page: 1,
-      per_page: 15,
-      total: 0,
-      from: 0,
-      to: 0
-    };
-    
-    vehiculos.value = response.data;
+    const resp = await vehiculoStore.fetchVehiculos(filters);
+    vehiculos.value = resp.data || [];
     pagination.value = {
-      current_page: response.current_page,
-      last_page: response.last_page,
-      per_page: response.per_page,
-      total: response.total,
-      from: response.from,
-      to: response.to
+      current_page: resp.current_page,
+      last_page: resp.last_page,
+      per_page: resp.per_page,
+      total: resp.total,
+      from: resp.from,
+      to: resp.to
     };
   } catch (error) {
     console.error('Error loading vehiculos:', error);
@@ -302,7 +299,7 @@ const viewVehiculo = (vehiculo: Vehiculo) => {
 const deleteVehiculo = async (vehiculo: Vehiculo) => {
   if (confirm(`¿Estás seguro de que deseas eliminar el vehículo ${vehiculo.descripcion || 'seleccionado'}?`)) {
     try {
-      // await vehiculoStore.deleteVehiculo(vehiculo.vehiculo_id);
+      await vehiculoStore.deleteVehiculo(vehiculo.vehiculo_id);
       await loadVehiculos();
     } catch (error) {
       console.error('Error deleting vehiculo:', error);
@@ -324,7 +321,10 @@ const handleSuccess = () => {
 };
 
 // Cargar datos al montar
-onMounted(() => {
-  loadVehiculos();
+onMounted(async () => {
+  await Promise.all([
+    tipoVehiculoStore.fetchTipos(),
+    loadVehiculos(),
+  ]);
 });
 </script>

@@ -93,7 +93,7 @@
           </div>
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-600">Total Lavados Hoy</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.lavados_hoy || 0 }}</p>
+            <p class="text-2xl font-bold text-gray-900">{{ stats.lavados_hoy ?? 0 }}</p>
           </div>
         </div>
       </div>
@@ -105,7 +105,7 @@
           </div>
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-600">Ingresos Hoy</p>
-            <p class="text-2xl font-bold text-gray-900">${{ stats.ingresos_hoy || 0 }}</p>
+            <p class="text-2xl font-bold text-gray-900">${{ stats.ingresos_hoy ?? 0 }}</p>
           </div>
         </div>
       </div>
@@ -117,7 +117,7 @@
           </div>
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-600">Lavados Este Mes</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.lavados_mes || 0 }}</p>
+            <p class="text-2xl font-bold text-gray-900">{{ stats.lavados_mes ?? 0 }}</p>
           </div>
         </div>
       </div>
@@ -129,7 +129,7 @@
           </div>
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-600">Promedio Diario</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.promedio_diario || 0 }}</p>
+            <p class="text-2xl font-bold text-gray-900">{{ stats.promedio_diario ?? 0 }}</p>
           </div>
         </div>
       </div>
@@ -214,7 +214,7 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm font-medium text-gray-900">
-                  {{ formatTipoVehiculo(lavado.vehiculo?.tipo || '') }}
+                  {{ lavado.vehiculo?.tipo_vehiculo?.nombre || 'Tipo' }}
                 </div>
                 <div class="text-sm text-gray-500">
                   <span v-if="lavado.vehiculo?.matricula">{{ lavado.vehiculo.matricula }}</span>
@@ -242,7 +242,7 @@
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                ${{ lavado.precio.toFixed(2) }}
+                ${{ formatPrecio(lavado.precio) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span v-if="lavado.pulverizado" class="text-green-600">
@@ -536,14 +536,11 @@ const getTipoLavadoClass = (tipo: string) => {
   return classes[tipo as keyof typeof classes] || 'bg-gray-100 text-gray-800';
 };
 
-const formatTipoVehiculo = (tipo: string) => {
-  const tipos = {
-    'moto': 'Moto',
-    'camioneta': 'Camioneta',
-    'auto_pequeno': 'Auto Pequeño',
-    'auto_mediano': 'Auto Mediano'
-  };
-  return tipos[tipo as keyof typeof tipos] || tipo;
+// Eliminado mapeo legacy de tipo de vehículo; ahora viene en vehiculo.tipo_vehiculo?.nombre
+
+const formatPrecio = (precio: any) => {
+  const num = typeof precio === 'number' ? precio : parseFloat(precio || '0');
+  return num.toFixed(2);
 };
 
 // Lifecycle

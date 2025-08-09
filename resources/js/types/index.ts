@@ -53,9 +53,10 @@ export interface Empleado extends BaseModel {
 
 // Tipo de Vehículo - Tabla: tipos_vehiculos (Sistema V2)
 export interface TipoVehiculo extends BaseModel {
-  id: number;
+  tipo_vehiculo_id: number;
   nombre: string;
   descripcion?: string | null;
+  requiere_matricula?: boolean | null;
   activo: boolean;
   // Relaciones
   vehiculos?: Vehiculo[];
@@ -240,13 +241,16 @@ export interface Venta extends BaseModel {
   cliente_id?: number | null;
   empleado_id?: number | null;
   vehiculo_id?: number | null;
-  tipo: 'servicio' | 'producto_automotriz' | 'producto_despensa';
+  tipo: 'servicio' | 'producto_automotriz' | 'producto_despensa' | 'mixta';
   referencia_id: number;
   cantidad: number;
   precio_unitario: number;
   total: number;
   fecha: string;
   descripcion?: string | null;
+  // Campos agregados para vistas agregadas
+  referencia_compuesta?: string;
+  detalles_tipos?: Array<'servicio' | 'producto_automotriz' | 'producto_despensa'>;
   // Relaciones
   cliente?: Cliente;
   empleado?: Empleado;
@@ -356,6 +360,7 @@ export interface UpdateVehiculoRequest extends Partial<CreateVehiculoRequest> {}
 export interface CreateTipoVehiculoRequest {
   nombre: string;
   descripcion?: string;
+  requiere_matricula?: boolean;
   activo?: boolean;
 }
 
@@ -479,6 +484,17 @@ export interface CreateVentaRequest {
 }
 
 export interface UpdateVentaRequest extends Partial<CreateVentaRequest> {}
+
+// Borrador para ventas mixtas (frontend only)
+export interface VentaDraftItem {
+  idTemp: string; // UUID temporal en frontend
+  tipo: 'servicio' | 'producto_automotriz' | 'producto_despensa';
+  referencia_id: number; // id del servicio o producto
+  nombre: string; // nombre mostrado
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number; // cantidad * precio_unitario
+}
 
 // Formularios para Facturas Electrónicas
 export interface CreateFacturaElectronicaRequest {

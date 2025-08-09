@@ -1,9 +1,9 @@
 import apiService from './api';
-import type { 
+import type {
   ApiResponse,
-  Lavado, 
-  PaginatedResponse, 
-  CreateLavadoRequest, 
+  Lavado,
+  PaginatedResponse,
+  CreateLavadoRequest,
   UpdateLavadoRequest,
   LavadoFilters
 } from '@/types';
@@ -27,7 +27,7 @@ class LavadoService {
    */
   async getLavados(filters: LavadoFilters = {}): Promise<PaginatedResponse<Lavado>> {
     const params = new URLSearchParams();
-    
+
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         params.append(key, value.toString());
@@ -35,8 +35,24 @@ class LavadoService {
     });
 
     const url = `${this.BASE_URL}${params.toString() ? `?${params.toString()}` : ''}`;
-    const response = await apiService.get<PaginatedResponse<Lavado>>(url);
-    return response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
+    const response: any = await apiService.get(url);
+
+    // Backend (LavadoController@index) devuelve { success, message, lavados: [...] }
+    const rawArray: Lavado[] = response?.lavados || response?.data?.data || response?.data || [];
+    // Cuando venga ya paginado en el futuro, intentamos detectar estructura
+    if (Array.isArray(rawArray)) {
+      return {
+        data: rawArray,
+        current_page: 1,
+        last_page: 1,
+        per_page: rawArray.length || 15,
+        total: rawArray.length || 0,
+        from: rawArray.length ? 1 : 0,
+        to: rawArray.length || 0
+      };
+    }
+    // Si ya es paginado (fallback)
+    return (rawArray as PaginatedResponse<Lavado>) || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
   }
 
   /**
@@ -52,7 +68,9 @@ class LavadoService {
    * GET /api/lavados/stats
    */
   async getStats(): Promise<ApiResponse<any>> {
-    return await apiService.get(`${this.BASE_URL}/stats`);
+    const resp: any = await apiService.get(`${this.BASE_URL}/stats`);
+    // Normalizar a { data: estadisticas }
+    return { ...resp, data: resp.estadisticas ?? resp.data };
   }
 
   /**
@@ -69,7 +87,8 @@ class LavadoService {
    * POST /api/lavados
    */
   async createLavado(data: CreateLavadoRequest): Promise<ApiResponse<Lavado>> {
-    return await apiService.post(this.BASE_URL, data);
+    const resp: any = await apiService.post(this.BASE_URL, data);
+    return { ...resp, data: resp.lavado ?? resp.data }; // backend usa clave 'lavado'
   }
 
   /**
@@ -77,7 +96,8 @@ class LavadoService {
    * GET /api/lavados/{id}
    */
   async getLavado(id: number): Promise<ApiResponse<Lavado>> {
-    return await apiService.get(`${this.BASE_URL}/${id}`);
+    const resp: any = await apiService.get(`${this.BASE_URL}/${id}`);
+    return { ...resp, data: resp.lavado ?? resp.data };
   }
 
   /**
@@ -85,7 +105,8 @@ class LavadoService {
    * PUT /api/lavados/{id}
    */
   async updateLavado(id: number, data: UpdateLavadoRequest): Promise<ApiResponse<Lavado>> {
-    return await apiService.put(`${this.BASE_URL}/${id}`, data);
+    const resp: any = await apiService.put(`${this.BASE_URL}/${id}`, data);
+    return { ...resp, data: resp.lavado ?? resp.data };
   }
 
   /**

@@ -90,7 +90,9 @@ class ServicioController extends Controller
     public function activos(): JsonResponse
     {
         try {
-            $servicios = $this->servicioService->getActivos();
+            $servicios = method_exists($this->servicioService, 'getActivos')
+                ? $this->servicioService->getActivos()
+                : (method_exists($this->servicioService, 'getAllActivos') ? $this->servicioService->getAllActivos() : collect());
 
             return response()->json([
                 'success' => true,
@@ -115,7 +117,9 @@ class ServicioController extends Controller
     public function stats(): JsonResponse
     {
         try {
-            $stats = $this->servicioService->getEstadisticas();
+            $stats = method_exists($this->servicioService, 'getEstadisticas')
+                ? $this->servicioService->getEstadisticas()
+                : (method_exists($this->servicioService, 'getConEstadisticas') ? $this->servicioService->getConEstadisticas() : []);
 
             return response()->json([
                 'success' => true,
@@ -301,7 +305,9 @@ class ServicioController extends Controller
     public function restore(int $id): JsonResponse
     {
         try {
-            $resultado = $this->servicioService->restoreServicio($id);
+            $resultado = method_exists($this->servicioService, 'restoreServicio')
+                ? $this->servicioService->restoreServicio($id)
+                : (method_exists($this->servicioService, 'restaurar') ? $this->servicioService->restaurar($id) : false);
 
             Log::info('✅ Servicio restaurado exitosamente', [
                 'servicio_id' => $id

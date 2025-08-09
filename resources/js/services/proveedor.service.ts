@@ -57,6 +57,21 @@ class ProveedorService {
   }
 
   /**
+   * Obtener pagos con filtros/paginación (si el backend lo soporta)
+   * GET /api/proveedores/pagos?proveedor_id=&search=&fecha_desde=&fecha_hasta=&page=&per_page=
+   */
+  async getPagos(filters?: Record<string, any>): Promise<any> { // retorno flexible (paginated o array)
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') params.append(k, v.toString());
+      });
+    }
+    const url = `${this.BASE_URL}/pagos${params.toString() ? `?${params.toString()}` : ''}`;
+    return await apiService.get(url);
+  }
+
+  /**
    * Obtener métricas de pagos
    * GET /api/proveedores/pagos/metricas
    */

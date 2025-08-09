@@ -46,8 +46,14 @@ class ProductoService {
     }
 
     const url = `${this.BASE_URL}/automotrices${params.toString() ? `?${params.toString()}` : ''}`;
-    const response = await apiService.get<PaginatedResponse<ProductoAutomotriz>>(url);
-    return response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
+    const raw: any = await apiService.get<any>(url);
+    const candidate =
+      (raw && 'current_page' in raw && Array.isArray(raw.data)) ? raw :
+      (raw && raw.data && 'current_page' in raw.data && Array.isArray(raw.data.data)) ? raw.data :
+      null;
+    if (candidate) return candidate as PaginatedResponse<ProductoAutomotriz>;
+    const arrayData: ProductoAutomotriz[] = Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw) ? raw : []);
+    return { data: arrayData, current_page: 1, last_page: 1, per_page: arrayData.length || 15, total: arrayData.length, from: arrayData.length ? 1 : 0, to: arrayData.length };
   }
 
   /**
@@ -124,8 +130,14 @@ class ProductoService {
     }
 
     const url = `${this.BASE_URL}/despensa${params.toString() ? `?${params.toString()}` : ''}`;
-    const response = await apiService.get<PaginatedResponse<ProductoDespensa>>(url);
-    return response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
+    const raw: any = await apiService.get<any>(url);
+    const candidate =
+      (raw && 'current_page' in raw && Array.isArray(raw.data)) ? raw :
+      (raw && raw.data && 'current_page' in raw.data && Array.isArray(raw.data.data)) ? raw.data :
+      null;
+    if (candidate) return candidate as PaginatedResponse<ProductoDespensa>;
+    const arrayData: ProductoDespensa[] = Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw) ? raw : []);
+    return { data: arrayData, current_page: 1, last_page: 1, per_page: arrayData.length || 15, total: arrayData.length, from: arrayData.length ? 1 : 0, to: arrayData.length };
   }
 
   /**

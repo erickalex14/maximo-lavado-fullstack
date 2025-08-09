@@ -32,7 +32,24 @@ class VehiculoService {
 
     const url = `${this.BASE_URL}${params.toString() ? `?${params.toString()}` : ''}`;
     const response = await apiService.get<PaginatedResponse<Vehiculo>>(url);
-    return response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
+    const base = response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
+    try {
+      // Intentar enriquecer con tipos si no vienen
+      const { useTipoVehiculoStore } = await import('@/stores/tipoVehiculo');
+      const tipoStore = useTipoVehiculoStore();
+  if (tipoStore.tipos.length) {
+        base.data = base.data.map(v => {
+          if (v && !v.tipo_vehiculo && v.tipo_vehiculo_id) {
+    const t = tipoStore.tipos.find(x => x.tipo_vehiculo_id === v.tipo_vehiculo_id);
+            if (t) (v as any).tipo_vehiculo = t;
+          }
+          return v;
+        });
+      }
+    } catch (e) {
+      // ignore if store not ready
+    }
+    return base;
   }
 
   /**
@@ -80,7 +97,17 @@ class VehiculoService {
    * GET /api/vehiculos/{id}
    */
   async getVehiculoById(id: number): Promise<ApiResponse<Vehiculo>> {
-    return await apiService.get(`${this.BASE_URL}/${id}`);
+    const resp = await apiService.get< ApiResponse<Vehiculo> >(`${this.BASE_URL}/${id}`);
+    const vehiculo: any = (resp as any).data; // ApiResponse payload
+    try {
+      if (vehiculo && !vehiculo.tipo_vehiculo && vehiculo.tipo_vehiculo_id) {
+        const { useTipoVehiculoStore } = await import('@/stores/tipoVehiculo');
+        const tipoStore = useTipoVehiculoStore();
+  const t = tipoStore.tipos.find(x => x.tipo_vehiculo_id === vehiculo.tipo_vehiculo_id);
+        if (t) vehiculo.tipo_vehiculo = t;
+      }
+    } catch {}
+    return resp as any;
   }
 
   /**

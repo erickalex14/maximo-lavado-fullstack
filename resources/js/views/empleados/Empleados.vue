@@ -203,10 +203,10 @@ import { ref, onMounted } from 'vue';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
 import EmpleadoModal from './EmpleadoModal.vue';
 import EmpleadoViewModal from './EmpleadoViewModal.vue';
-// import { useEmpleadoStore } from '@/stores/empleado';
-import type { Empleado, PaginatedResponse } from '@/types';
+import { useEmpleadoStore } from '@/stores/empleado';
+import type { Empleado } from '@/types';
 
-// const empleadoStore = useEmpleadoStore();
+const empleadoStore = useEmpleadoStore();
 
 // Estado reactivo
 const empleados = ref<Empleado[]>([]);
@@ -265,26 +265,16 @@ const loadEmpleados = async () => {
       ...(statusFilter.value && { estado: statusFilter.value })
     };
 
-    // const response = await empleadoStore.getEmpleados(params);
-    // Temporalmente usar datos vacíos hasta que se implemente el store
-    const response = {
-      data: [],
-      current_page: 1,
-      last_page: 1,
-      per_page: 15,
-      total: 0,
-      from: 0,
-      to: 0
-    };
-    
-    empleados.value = response.data;
+    await empleadoStore.fetchEmpleados(params as any);
+    empleados.value = empleadoStore.empleados;
+    // El store usa paginación simulada -> mapear
     pagination.value = {
-      current_page: response.current_page,
-      last_page: response.last_page,
-      per_page: response.per_page,
-      total: response.total,
-      from: response.from,
-      to: response.to
+      current_page: empleadoStore.pagination.current_page,
+      last_page: empleadoStore.pagination.last_page,
+      per_page: empleadoStore.pagination.per_page,
+      total: empleadoStore.pagination.total,
+      from: 1,
+      to: empleadoStore.pagination.total,
     };
   } catch (error) {
     console.error('Error loading empleados:', error);
@@ -316,8 +306,8 @@ const viewEmpleado = (empleado: Empleado) => {
 const deleteEmpleado = async (empleado: Empleado) => {
   if (confirm(`¿Estás seguro de que deseas eliminar al empleado ${empleado.nombres} ${empleado.apellidos}?`)) {
     try {
-      // await empleadoStore.deleteEmpleado(empleado.empleado_id);
-      await loadEmpleados();
+  await empleadoStore.deleteEmpleado(empleado.empleado_id);
+  await loadEmpleados();
     } catch (error) {
       console.error('Error deleting empleado:', error);
     }

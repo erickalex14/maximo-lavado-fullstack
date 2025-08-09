@@ -61,24 +61,24 @@ export const useTipoVehiculoStore = defineStore('tipoVehiculo', () => {
   }
 
   async function update(id: number, data: UpdateTipoVehiculoRequest) {
-    try { setLoading(true); clearError(); const resp = await tipoVehiculoService.updateTipoVehiculo(id, data); if (resp.data) { const idx = tipos.value.findIndex(t => t.id === id); if (idx !== -1) tipos.value[idx] = resp.data; if (current.value?.id === id) current.value = resp.data; } return resp.data; }
+  try { setLoading(true); clearError(); const resp = await tipoVehiculoService.updateTipoVehiculo(id, data); if (resp.data) { const idx = tipos.value.findIndex(t => t.tipo_vehiculo_id === id); if (idx !== -1) tipos.value[idx] = resp.data; if (current.value?.tipo_vehiculo_id === id) current.value = resp.data; } return resp.data; }
     catch (e: any) { setError(e.response?.data?.message || 'Error al actualizar tipo de vehículo'); throw e; }
     finally { setLoading(false); }
   }
 
   async function toggleActivo(id: number) {
-    try { const resp = await tipoVehiculoService.toggleActivo(id); if (resp.data) { const idx = tipos.value.findIndex(t => t.id === id); if (idx !== -1) tipos.value[idx] = resp.data; if (current.value?.id === id) current.value = resp.data; } return resp.data; }
+    try { const resp = await tipoVehiculoService.toggleActivo(id); if (resp.data) { const idx = tipos.value.findIndex(t => t.tipo_vehiculo_id === id); if (idx !== -1) tipos.value[idx] = resp.data; if (current.value?.tipo_vehiculo_id === id) current.value = resp.data; } return resp.data; }
     catch (e) { console.error('toggleActivo tipoVehiculo error', e); }
   }
 
   async function remove(id: number) {
-    try { setLoading(true); clearError(); await tipoVehiculoService.deleteTipoVehiculo(id); tipos.value = tipos.value.filter(t => t.id !== id); pagination.value.total = Math.max(0, pagination.value.total - 1); if (current.value?.id === id) current.value = null; }
+    try { setLoading(true); clearError(); await tipoVehiculoService.deleteTipoVehiculo(id); tipos.value = tipos.value.filter(t => t.tipo_vehiculo_id !== id); pagination.value.total = Math.max(0, pagination.value.total - 1); if (current.value?.tipo_vehiculo_id === id) current.value = null; }
     catch (e: any) { setError(e.response?.data?.message || 'Error al eliminar tipo de vehículo'); throw e; }
     finally { setLoading(false); }
   }
 
   async function restore(id: number) {
-    try { const resp = await tipoVehiculoService.restoreTipoVehiculo(id); if (resp.data) { tipos.value.unshift(resp.data); tiposTrashed.value = tiposTrashed.value.filter(t => t.id !== id); } return resp.data; }
+    try { const resp = await tipoVehiculoService.restoreTipoVehiculo(id); if (resp.data) { tipos.value.unshift(resp.data); tiposTrashed.value = tiposTrashed.value.filter(t => t.tipo_vehiculo_id !== id); } return resp.data; }
     catch (e) { console.error('restore tipoVehiculo error', e); }
   }
 

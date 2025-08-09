@@ -135,7 +135,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-// import { useEmpleadoStore } from '@/stores/empleado';
+import { useEmpleadoStore } from '@/stores/empleado';
 import type { Empleado, CreateEmpleadoRequest } from '@/types';
 
 interface Props {
@@ -149,7 +149,7 @@ const emit = defineEmits<{
   success: [];
 }>();
 
-// const empleadoStore = useEmpleadoStore();
+const empleadoStore = useEmpleadoStore();
 
 // Estado del formulario
 const form = ref<CreateEmpleadoRequest>({
@@ -195,9 +195,9 @@ const submitForm = async () => {
     errors.value = {};
 
     if (props.empleado) {
-      // await empleadoStore.updateEmpleado(props.empleado.empleado_id, form.value);
+      await empleadoStore.updateEmpleado(props.empleado.empleado_id, form.value);
     } else {
-      // await empleadoStore.createEmpleado(form.value);
+      await empleadoStore.createEmpleado(form.value);
     }
 
     emit('success');

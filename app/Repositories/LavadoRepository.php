@@ -339,20 +339,23 @@ class LavadoRepository implements LavadoRepositoryInterface
 
         $queryHoy = Lavado::whereDate('fecha', $hoy);
         $queryMes = Lavado::whereBetween('fecha', [$inicioMes, $finMes]);
-        
+
         // Aplicar filtros a las consultas
         $this->applyFilters($queryHoy, $filters);
         $this->applyFilters($queryMes, $filters);
-        
-        $totalHoy = $queryHoy->count();
-        $totalMes = $queryMes->count();
-        $ingresosMes = $queryMes->sum('precio');
-        $promedioDiario = $totalMes > 0 ? $ingresosMes / $hoy->day : 0;
+
+        // Clonar builders para evitar side effects entre count/sum (cada llamada genera consulta nueva, pero mantenemos claridad)
+        $totalHoy = (clone $queryHoy)->count();
+        $ingresosHoy = (clone $queryHoy)->sum('precio');
+        $totalMes = (clone $queryMes)->count();
+        $ingresosMes = (clone $queryMes)->sum('precio');
+        $promedioDiario = $hoy->day > 0 ? ($ingresosMes / $hoy->day) : 0;
 
         return [
             'total_hoy' => $totalHoy,
+            'ingresos_hoy' => round($ingresosHoy, 2),
             'total_mes' => $totalMes,
-            'ingresos_mes' => $ingresosMes,
+            'ingresos_mes' => round($ingresosMes, 2),
             'promedio_diario' => round($promedioDiario, 2),
             'filtros_aplicados' => !empty($filters)
         ];

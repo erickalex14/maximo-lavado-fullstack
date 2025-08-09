@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import empleadoService from '@/services/empleado.service';
-import type { Empleado, PaginatedResponse, CreateEmpleadoRequest, UpdateEmpleadoRequest, EmpleadoFilters } from '@/types';
+import type { Empleado, CreateEmpleadoRequest, UpdateEmpleadoRequest, EmpleadoFilters, ApiResponse } from '@/types';
 
 export const useEmpleadoStore = defineStore('empleado', () => {
   // State
@@ -58,16 +58,15 @@ export const useEmpleadoStore = defineStore('empleado', () => {
     try {
       setLoading(true);
       clearError();
-      
       const filtersToUse = customFilters || filters.value;
-      const response: PaginatedResponse<Empleado> = await empleadoService.getEmpleados(filtersToUse);
-      
-      empleados.value = response.data;
+  const apiResp: ApiResponse<Empleado[]> = await empleadoService.getEmpleados(filtersToUse);
+  let lista: Empleado[] = apiResp.data || [];
+      empleados.value = lista;
       pagination.value = {
-        current_page: response.current_page,
-        last_page: response.last_page,
-        per_page: response.per_page,
-        total: response.total,
+        current_page: 1,
+        last_page: 1,
+        per_page: lista.length,
+        total: lista.length,
       };
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al cargar los empleados');
@@ -98,12 +97,13 @@ export const useEmpleadoStore = defineStore('empleado', () => {
     try {
       setLoading(true);
       clearError();
-      
-  const resp = await empleadoService.createEmpleado(data);
-      
-      // Actualizar la lista de empleados
-  await fetchEmpleados();
-  return resp.data ?? null;
+      const resp: any = await empleadoService.createEmpleado(data);
+      const nuevo = resp?.data;
+      if (nuevo) {
+        empleados.value.unshift(nuevo);
+        pagination.value.total += 1;
+      }
+      return nuevo ?? null;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al crear el empleado');
       console.error('Error creating empleado:', err);

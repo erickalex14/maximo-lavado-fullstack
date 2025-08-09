@@ -364,10 +364,45 @@ export const useProductoStore = defineStore('producto', () => {
     try {
       setLoading(true);
       clearError();
-      
-  const resp = await productoService.getMetricas();
-  metricas.value = resp.data || {};
-  return metricas.value;
+      const resp = await productoService.getMetricas();
+      const raw: any = resp.data || {};
+      // Normalización flexible para distintos formatos backend
+      const autom = raw.automotrices || raw.automotriz || {};
+      const desp = raw.despensa || raw.productos_despensa || {};
+      const totalAutom = Number(autom.total ?? autom.cantidad ?? 0);
+      const totalDesp = Number(desp.total ?? desp.cantidad ?? 0);
+      const stockBajoAutom = Number(autom.stock_bajo ?? autom.stockBajo ?? 0);
+      const stockBajoDesp = Number(desp.stock_bajo ?? desp.stockBajo ?? 0);
+      const sinStockAutom = Number(autom.sin_stock ?? autom.sinStock ?? 0);
+      const sinStockDesp = Number(desp.sin_stock ?? desp.sinStock ?? 0);
+      const valorInvAutom = Number(autom.valor_inventario ?? autom.valorInventario ?? 0);
+      const valorInvDesp = Number(desp.valor_inventario ?? desp.valorInventario ?? 0);
+      const flattened = {
+        // Totales generales
+        total_productos: (raw.total_productos ?? raw.total ?? (totalAutom + totalDesp)) ?? 0,
+        total: (raw.total ?? (totalAutom + totalDesp)) ?? 0,
+        stock_bajo: raw.stock_bajo ?? (stockBajoAutom + stockBajoDesp),
+        sin_stock: raw.sin_stock ?? (sinStockAutom + sinStockDesp),
+        valor_inventario_total: raw.valor_inventario_total ?? (valorInvAutom + valorInvDesp),
+        // Segmentos
+        automotrices_total: totalAutom,
+        despensa_total: totalDesp,
+        automotrices_activos: Number(autom.activos ?? autom.activo ?? 0),
+        despensa_activos: Number(desp.activos ?? desp.activo ?? 0),
+        automotrices_inactivos: Number(autom.inactivos ?? 0),
+        despensa_inactivos: Number(desp.inactivos ?? 0),
+        automotrices_stock_bajo: stockBajoAutom,
+        despensa_stock_bajo: stockBajoDesp,
+        automotrices_sin_stock: sinStockAutom,
+        despensa_sin_stock: sinStockDesp,
+        automotrices_valor_inventario: valorInvAutom,
+        despensa_valor_inventario: valorInvDesp,
+        // Conserva objetos originales por compatibilidad
+        automotrices: autom,
+        despensa: desp,
+      };
+      metricas.value = flattened;
+      return metricas.value;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al cargar las métricas');
       console.error('Error fetching metricas:', err);
