@@ -1,27 +1,25 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { ventaService } from '@/services/venta.service';
+import ventaService from '@/services/venta.service';
+import clienteService from '@/services/cliente.service';
+import productoService from '@/services/producto.service';
 import type {
-  VentaProductoAutomotriz,
-  VentaProductoDespensa,
-  VentaMetricas,
-  ProductoVentaOption,
+  Venta,
   Cliente,
-  CreateVentaAutomotrizRequest,
-  CreateVentaDespensaRequest,
-  UpdateVentaAutomotrizRequest,
-  UpdateVentaDespensaRequest,
-  VentaAutomotrizFilters,
-  VentaDespensaFilters,
+  CreateVentaRequest,
+  UpdateVentaRequest,
+  VentaFilters,
   PaginatedResponse,
-  VentaUnificada
 } from '@/types';
+
+// Opción simple para selects de productos
+type ProductoVentaOption = { id: number; nombre: string; tipo: 'automotriz' | 'despensa' };
 
 export const useVentaStore = defineStore('venta', () => {
   // === STATE ===
   
   // Ventas automotrices
-  const ventasAutomotrices = ref<VentaProductoAutomotriz[]>([]);
+  const ventasAutomotrices = ref<Venta[]>([]);
   const ventasAutomotricesPagination = ref({
     current_page: 1,
     last_page: 1,
@@ -30,7 +28,7 @@ export const useVentaStore = defineStore('venta', () => {
   });
 
   // Ventas de despensa
-  const ventasDespensa = ref<VentaProductoDespensa[]>([]);
+  const ventasDespensa = ref<Venta[]>([]);
   const ventasDespensaPagination = ref({
     current_page: 1,
     last_page: 1,
@@ -41,7 +39,7 @@ export const useVentaStore = defineStore('venta', () => {
   // Datos auxiliares
   const productosDisponibles = ref<ProductoVentaOption[]>([]);
   const clientes = ref<Cliente[]>([]);
-  const metricas = ref<VentaMetricas | null>(null);
+  const metricas = ref<any | null>(null);
 
   // Estados de carga
   const loading = ref(false);
@@ -50,7 +48,7 @@ export const useVentaStore = defineStore('venta', () => {
   const loadingClientes = ref(false);
 
   // Filtros
-  const filtrosAutomotrices = ref<VentaAutomotrizFilters>({
+  const filtrosAutomotrices = ref<VentaFilters>({
     page: 1,
     per_page: 10,
     search: '',
@@ -58,7 +56,7 @@ export const useVentaStore = defineStore('venta', () => {
     fecha_fin: ''
   });
 
-  const filtrosDespensa = ref<VentaDespensaFilters>({
+  const filtrosDespensa = ref<VentaFilters>({
     page: 1,
     per_page: 10,
     search: '',
@@ -71,40 +69,9 @@ export const useVentaStore = defineStore('venta', () => {
   /**
    * Ventas unificadas para mostrar en tabla general
    */
-  const ventasUnificadas = computed<VentaUnificada[]>(() => {
-    const automotrices: VentaUnificada[] = ventasAutomotrices.value.map(venta => ({
-      id: venta.id,
-      tipo: 'automotriz' as const,
-      producto_nombre: venta.producto_automotriz?.nombre || 'N/A',
-      cliente_nombre: venta.cliente?.nombre || 'Cliente general',
-      cantidad: venta.cantidad,
-      precio_unitario: venta.precio_unitario,
-      total: venta.cantidad * venta.precio_unitario,
-      fecha: venta.fecha,
-      created_at: venta.created_at,
-      updated_at: venta.updated_at,
-      deleted_at: venta.deleted_at,
-      original_data: venta
-    }));
-
-    const despensa: VentaUnificada[] = ventasDespensa.value.map(venta => ({
-      id: venta.id,
-      tipo: 'despensa' as const,
-      producto_nombre: venta.producto_despensa?.nombre || 'N/A',
-      cliente_nombre: venta.cliente?.nombre || 'Cliente general',
-      cantidad: venta.cantidad,
-      precio_unitario: venta.precio_unitario,
-      total: venta.cantidad * venta.precio_unitario,
-      fecha: venta.fecha,
-      created_at: venta.created_at,
-      updated_at: venta.updated_at,
-      deleted_at: venta.deleted_at,
-      original_data: venta
-    }));
-
-    return [...automotrices, ...despensa].sort((a, b) => 
-      new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
-    );
+  const ventasUnificadas = computed<Venta[]>(() => {
+    return [...ventasAutomotrices.value, ...ventasDespensa.value]
+      .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
   });
 
   /**
@@ -126,12 +93,18 @@ export const useVentaStore = defineStore('venta', () => {
   // Productos y datos auxiliares
   async function fetchProductosDisponibles() {
     if (loadingProductos.value) return;
-    
     try {
       loadingProductos.value = true;
-      productosDisponibles.value = await ventaService.getProductosDisponibles();
+      // Cargar productos automotrices activos
+      const autoResp = await productoService.getProductosAutomotrices({ page: 1, per_page: 1000, activo: true });
+      const automotrices = (autoResp.data || []).map(p => ({ id: p.producto_automotriz_id, nombre: p.nombre, tipo: 'automotriz' as const }));
+      // Cargar productos de despensa activos
+      const despResp = await productoService.getProductosDespensa({ page: 1, per_page: 1000, activo: true });
+      const despensa = (despResp.data || []).map(p => ({ id: p.producto_despensa_id, nombre: p.nombre, tipo: 'despensa' as const }));
+      productosDisponibles.value = [...automotrices, ...despensa];
     } catch (error) {
       console.error('Error al cargar productos:', error);
+      productosDisponibles.value = [];
     } finally {
       loadingProductos.value = false;
     }
@@ -142,7 +115,8 @@ export const useVentaStore = defineStore('venta', () => {
     
     try {
       loadingClientes.value = true;
-      clientes.value = await ventaService.getClientes();
+      const resp = await clienteService.getAllForSelect();
+      clientes.value = resp.data || [];
     } catch (error) {
       console.error('Error al cargar clientes:', error);
     } finally {
@@ -155,7 +129,8 @@ export const useVentaStore = defineStore('venta', () => {
     
     try {
       loadingMetricas.value = true;
-      metricas.value = await ventaService.getMetricas();
+      const resp = await ventaService.getStats();
+      metricas.value = resp.data || null;
     } catch (error) {
       console.error('Error al cargar métricas:', error);
     } finally {
@@ -165,7 +140,7 @@ export const useVentaStore = defineStore('venta', () => {
 
   // === VENTAS AUTOMOTRICES ===
 
-  async function fetchVentasAutomotrices(filters?: VentaAutomotrizFilters) {
+  async function fetchVentasAutomotrices(filters?: VentaFilters) {
     if (loading.value) return;
     
     try {
@@ -175,7 +150,7 @@ export const useVentaStore = defineStore('venta', () => {
         filtrosAutomotrices.value = { ...filtrosAutomotrices.value, ...filters };
       }
       
-      const response: PaginatedResponse<VentaProductoAutomotriz> = await ventaService.getVentasAutomotrices(filtrosAutomotrices.value);
+      const response: PaginatedResponse<Venta> = await ventaService.getVentas({ ...filtrosAutomotrices.value, tipo: 'producto_automotriz' });
       
       ventasAutomotrices.value = response.data;
       ventasAutomotricesPagination.value = {
@@ -191,10 +166,22 @@ export const useVentaStore = defineStore('venta', () => {
     }
   }
 
-  async function createVentaAutomotriz(ventaData: CreateVentaAutomotrizRequest): Promise<VentaProductoAutomotriz | null> {
+  async function createVentaAutomotriz(ventaData: { producto_automotriz_id: number; cantidad: number; precio_unitario?: number; cliente_id?: number; empleado_id?: number; vehiculo_id?: number; descripcion?: string; generar_factura?: boolean; }): Promise<Venta | null> {
     try {
       loading.value = true;
-      const nuevaVenta = await ventaService.createVentaAutomotriz(ventaData);
+      const payload: CreateVentaRequest = {
+        tipo: 'producto_automotriz',
+        referencia_id: ventaData.producto_automotriz_id,
+        cantidad: ventaData.cantidad,
+        precio_unitario: ventaData.precio_unitario,
+        cliente_id: ventaData.cliente_id,
+        empleado_id: ventaData.empleado_id,
+        vehiculo_id: ventaData.vehiculo_id,
+        descripcion: ventaData.descripcion,
+        generar_factura: ventaData.generar_factura,
+      };
+      const resp = await ventaService.createVenta(payload);
+      const nuevaVenta = resp.data || null;
       
       // Recargar la lista
       await fetchVentasAutomotrices();
@@ -208,15 +195,27 @@ export const useVentaStore = defineStore('venta', () => {
     }
   }
 
-  async function updateVentaAutomotriz(id: number, ventaData: UpdateVentaAutomotrizRequest): Promise<VentaProductoAutomotriz | null> {
+  async function updateVentaAutomotriz(id: number, ventaData: { producto_automotriz_id?: number; cantidad?: number; precio_unitario?: number; cliente_id?: number; empleado_id?: number; vehiculo_id?: number; descripcion?: string; generar_factura?: boolean; }): Promise<Venta | null> {
     try {
       loading.value = true;
-      const ventaActualizada = await ventaService.updateVentaAutomotriz(id, ventaData);
+      const patch: UpdateVentaRequest = {
+        tipo: 'producto_automotriz',
+        referencia_id: ventaData.producto_automotriz_id ?? undefined,
+        cantidad: ventaData.cantidad,
+        precio_unitario: ventaData.precio_unitario,
+        cliente_id: ventaData.cliente_id,
+        empleado_id: ventaData.empleado_id,
+        vehiculo_id: ventaData.vehiculo_id,
+        descripcion: ventaData.descripcion,
+        generar_factura: ventaData.generar_factura,
+      };
+      const resp = await ventaService.updateVenta(id, patch);
+      const ventaActualizada = resp.data || null;
       
       // Actualizar en la lista local
       const index = ventasAutomotrices.value.findIndex(v => v.id === id);
       if (index !== -1) {
-        ventasAutomotrices.value[index] = ventaActualizada;
+        if (ventaActualizada) ventasAutomotrices.value[index] = ventaActualizada;
       }
       
       return ventaActualizada;
@@ -231,7 +230,7 @@ export const useVentaStore = defineStore('venta', () => {
   async function deleteVentaAutomotriz(id: number): Promise<boolean> {
     try {
       loading.value = true;
-      await ventaService.deleteVentaAutomotriz(id);
+      await ventaService.deleteVenta(id);
       
       // Remover de la lista local
       ventasAutomotrices.value = ventasAutomotrices.value.filter(v => v.id !== id);
@@ -247,7 +246,7 @@ export const useVentaStore = defineStore('venta', () => {
 
   // === VENTAS DE DESPENSA ===
 
-  async function fetchVentasDespensa(filters?: VentaDespensaFilters) {
+  async function fetchVentasDespensa(filters?: VentaFilters) {
     if (loading.value) return;
     
     try {
@@ -257,7 +256,7 @@ export const useVentaStore = defineStore('venta', () => {
         filtrosDespensa.value = { ...filtrosDespensa.value, ...filters };
       }
       
-      const response: PaginatedResponse<VentaProductoDespensa> = await ventaService.getVentasDespensa(filtrosDespensa.value);
+      const response: PaginatedResponse<Venta> = await ventaService.getVentas({ ...filtrosDespensa.value, tipo: 'producto_despensa' });
       
       ventasDespensa.value = response.data;
       ventasDespensaPagination.value = {
@@ -273,10 +272,22 @@ export const useVentaStore = defineStore('venta', () => {
     }
   }
 
-  async function createVentaDespensa(ventaData: CreateVentaDespensaRequest): Promise<VentaProductoDespensa | null> {
+  async function createVentaDespensa(ventaData: { producto_despensa_id: number; cantidad: number; precio_unitario?: number; cliente_id?: number; empleado_id?: number; vehiculo_id?: number; descripcion?: string; generar_factura?: boolean; }): Promise<Venta | null> {
     try {
       loading.value = true;
-      const nuevaVenta = await ventaService.createVentaDespensa(ventaData);
+      const payload: CreateVentaRequest = {
+        tipo: 'producto_despensa',
+        referencia_id: ventaData.producto_despensa_id,
+        cantidad: ventaData.cantidad,
+        precio_unitario: ventaData.precio_unitario,
+        cliente_id: ventaData.cliente_id,
+        empleado_id: ventaData.empleado_id,
+        vehiculo_id: ventaData.vehiculo_id,
+        descripcion: ventaData.descripcion,
+        generar_factura: ventaData.generar_factura,
+      };
+      const resp = await ventaService.createVenta(payload);
+      const nuevaVenta = resp.data || null;
       
       // Recargar la lista
       await fetchVentasDespensa();
@@ -290,15 +301,27 @@ export const useVentaStore = defineStore('venta', () => {
     }
   }
 
-  async function updateVentaDespensa(id: number, ventaData: UpdateVentaDespensaRequest): Promise<VentaProductoDespensa | null> {
+  async function updateVentaDespensa(id: number, ventaData: { producto_despensa_id?: number; cantidad?: number; precio_unitario?: number; cliente_id?: number; empleado_id?: number; vehiculo_id?: number; descripcion?: string; generar_factura?: boolean; }): Promise<Venta | null> {
     try {
       loading.value = true;
-      const ventaActualizada = await ventaService.updateVentaDespensa(id, ventaData);
+      const patch: UpdateVentaRequest = {
+        tipo: 'producto_despensa',
+        referencia_id: ventaData.producto_despensa_id ?? undefined,
+        cantidad: ventaData.cantidad,
+        precio_unitario: ventaData.precio_unitario,
+        cliente_id: ventaData.cliente_id,
+        empleado_id: ventaData.empleado_id,
+        vehiculo_id: ventaData.vehiculo_id,
+        descripcion: ventaData.descripcion,
+        generar_factura: ventaData.generar_factura,
+      };
+      const resp = await ventaService.updateVenta(id, patch);
+      const ventaActualizada = resp.data || null;
       
       // Actualizar en la lista local
       const index = ventasDespensa.value.findIndex(v => v.id === id);
       if (index !== -1) {
-        ventasDespensa.value[index] = ventaActualizada;
+        if (ventaActualizada) ventasDespensa.value[index] = ventaActualizada;
       }
       
       return ventaActualizada;
@@ -313,7 +336,7 @@ export const useVentaStore = defineStore('venta', () => {
   async function deleteVentaDespensa(id: number): Promise<boolean> {
     try {
       loading.value = true;
-      await ventaService.deleteVentaDespensa(id);
+      await ventaService.deleteVenta(id);
       
       // Remover de la lista local
       ventasDespensa.value = ventasDespensa.value.filter(v => v.id !== id);

@@ -1,115 +1,157 @@
 import apiService from './api';
 import type { 
+  ApiResponse,
+  PaginatedResponse,
   Proveedor, 
   PagoProveedor,
   CreateProveedorRequest, 
   UpdateProveedorRequest,
   CreatePagoProveedorRequest,
-  UpdatePagoProveedorRequest
+  UpdatePagoProveedorRequest,
+  ProveedorFilters
 } from '@/types';
 
-export interface ProveedorFilters {
-  page?: number;
-  per_page?: number;
-  search?: string;
-  activo?: boolean;
-}
-
-export interface PagoFilters {
-  page?: number;
-  per_page?: number;
-  search?: string;
-  proveedor_id?: number;
-  fecha_desde?: string;
-  fecha_hasta?: string;
-}
-
+/**
+ * Servicio para Proveedores - Sistema Legacy
+ * Consume las rutas /api/proveedores
+ */
 class ProveedorService {
-  private basePath = '/proveedores';
+  private readonly BASE_URL = '/proveedores';
 
-  // CRUD Proveedores
-  async getProveedores(filters?: ProveedorFilters) {
+  // ===== CRUD PROVEEDORES =====
+
+  /**
+   * Obtener todos los proveedores con paginación y filtros
+   * GET /api/proveedores
+   */
+  async getProveedores(filters?: ProveedorFilters): Promise<PaginatedResponse<Proveedor>> {
     const params = new URLSearchParams();
     
-    if (filters?.page) params.append('page', filters.page.toString());
-    if (filters?.per_page) params.append('per_page', filters.per_page.toString());
-    if (filters?.search) params.append('search', filters.search);
-    if (filters?.activo !== undefined) params.append('activo', filters.activo.toString());
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value.toString());
+        }
+      });
+    }
 
-    const queryString = params.toString();
-    const url = queryString ? `${this.basePath}?${queryString}` : this.basePath;
-    
-    return await apiService.get<Proveedor[]>(url);
+    const url = `${this.BASE_URL}${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await apiService.get<PaginatedResponse<Proveedor>>(url);
+    return response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
   }
 
-  async getProveedor(id: number) {
-    return await apiService.get<Proveedor>(`${this.basePath}/${id}`);
+  /**
+   * Obtener proveedores eliminados
+   * GET /api/proveedores/trashed
+   */
+  async getTrashedProveedores(): Promise<ApiResponse<Proveedor[]>> {
+    return await apiService.get(`${this.BASE_URL}/trashed`);
   }
 
-  async createProveedor(data: CreateProveedorRequest) {
-    return await apiService.post<Proveedor>(this.basePath, data);
+  /**
+   * Obtener todos los pagos
+   * GET /api/proveedores/pagos
+   */
+  async getAllPagos(): Promise<ApiResponse<PagoProveedor[]>> {
+    return await apiService.get(`${this.BASE_URL}/pagos`);
   }
 
-  async updateProveedor(id: number, data: UpdateProveedorRequest) {
-    return await apiService.put<Proveedor>(`${this.basePath}/${id}`, data);
+  /**
+   * Obtener métricas de pagos
+   * GET /api/proveedores/pagos/metricas
+   */
+  async getMetricasPagos(): Promise<ApiResponse<any>> {
+    return await apiService.get(`${this.BASE_URL}/pagos/metricas`);
   }
 
-  async deleteProveedor(id: number) {
-    return await apiService.delete(`${this.basePath}/${id}`);
+  /**
+   * Crear un nuevo proveedor
+   * POST /api/proveedores
+   */
+  async createProveedor(data: CreateProveedorRequest): Promise<ApiResponse<Proveedor>> {
+    return await apiService.post(this.BASE_URL, data);
   }
 
-  async restoreProveedor(id: number) {
-    return await apiService.put<Proveedor>(`${this.basePath}/${id}/restore`);
+  /**
+   * Crear un nuevo pago
+   * POST /api/proveedores/pagos
+   */
+  async createPago(data: CreatePagoProveedorRequest): Promise<ApiResponse<PagoProveedor>> {
+    return await apiService.post(`${this.BASE_URL}/pagos`, data);
   }
 
-  async getTrashedProveedores() {
-    return await apiService.get<Proveedor[]>(`${this.basePath}/trashed`);
+  /**
+   * Obtener un proveedor específico
+   * GET /api/proveedores/{id}
+   */
+  async getProveedor(id: number): Promise<ApiResponse<Proveedor>> {
+    return await apiService.get(`${this.BASE_URL}/${id}`);
   }
 
-  // Gestión de deudas
-  async getDeudaProveedor(id: number) {
-    return await apiService.get(`${this.basePath}/${id}/deuda`);
+  /**
+   * Actualizar un proveedor
+   * PUT /api/proveedores/{id}
+   */
+  async updateProveedor(id: number, data: UpdateProveedorRequest): Promise<ApiResponse<Proveedor>> {
+    return await apiService.put(`${this.BASE_URL}/${id}`, data);
   }
 
-  async getPagosProveedor(id: number) {
-    return await apiService.get<PagoProveedor[]>(`${this.basePath}/${id}/pagos`);
+  /**
+   * Eliminar un proveedor (soft delete)
+   * DELETE /api/proveedores/{id}
+   */
+  async deleteProveedor(id: number): Promise<ApiResponse<void>> {
+    return await apiService.delete(`${this.BASE_URL}/${id}`);
   }
 
-  // Gestión de pagos (todos los proveedores)
-  async getAllPagos(filters?: PagoFilters) {
-    const params = new URLSearchParams();
-    
-    if (filters?.page) params.append('page', filters.page.toString());
-    if (filters?.per_page) params.append('per_page', filters.per_page.toString());
-    if (filters?.search) params.append('search', filters.search);
-    if (filters?.proveedor_id) params.append('proveedor_id', filters.proveedor_id.toString());
-    if (filters?.fecha_desde) params.append('fecha_desde', filters.fecha_desde);
-    if (filters?.fecha_hasta) params.append('fecha_hasta', filters.fecha_hasta);
-
-    const queryString = params.toString();
-    const url = queryString ? `${this.basePath}/pagos?${queryString}` : `${this.basePath}/pagos`;
-    
-    return await apiService.get<PagoProveedor[]>(url);
+  /**
+   * Restaurar un proveedor eliminado
+   * PUT /api/proveedores/{id}/restore
+   */
+  async restoreProveedor(id: number): Promise<ApiResponse<Proveedor>> {
+    return await apiService.put(`${this.BASE_URL}/${id}/restore`);
   }
 
-  async createPago(data: CreatePagoProveedorRequest) {
-    return await apiService.post<PagoProveedor>(`${this.basePath}/pagos`, data);
+  // ===== GESTIÓN DE DEUDAS Y PAGOS =====
+
+  /**
+   * Ver deuda de un proveedor
+   * GET /api/proveedores/{id}/deuda
+   */
+  async verDeuda(id: number): Promise<ApiResponse<any>> {
+    return await apiService.get(`${this.BASE_URL}/${id}/deuda`);
   }
 
-  async getPago(pagoId: number) {
-    return await apiService.get<PagoProveedor>(`${this.basePath}/pagos/${pagoId}`);
+  /**
+   * Obtener pagos de un proveedor
+   * GET /api/proveedores/{id}/pagos
+   */
+  async getPagosByProveedor(id: number): Promise<ApiResponse<PagoProveedor[]>> {
+    return await apiService.get(`${this.BASE_URL}/${id}/pagos`);
   }
 
-  async updatePago(pagoId: number, data: UpdatePagoProveedorRequest) {
-    return await apiService.put<PagoProveedor>(`${this.basePath}/pagos/${pagoId}`, data);
+  /**
+   * Obtener un pago específico
+   * GET /api/proveedores/pagos/{pagoId}
+   */
+  async getPago(pagoId: number): Promise<ApiResponse<PagoProveedor>> {
+    return await apiService.get(`${this.BASE_URL}/pagos/${pagoId}`);
   }
 
-  async deletePago(pagoId: number) {
-    return await apiService.delete(`${this.basePath}/pagos/${pagoId}`);
+  /**
+   * Actualizar un pago
+   * PUT /api/proveedores/pagos/{pagoId}
+   */
+  async updatePago(pagoId: number, data: UpdatePagoProveedorRequest): Promise<ApiResponse<PagoProveedor>> {
+    return await apiService.put(`${this.BASE_URL}/pagos/${pagoId}`, data);
   }
 
-  async getMetricasPagos() {
-    return await apiService.get(`${this.basePath}/pagos/metricas`);
+  /**
+   * Eliminar un pago
+   * DELETE /api/proveedores/pagos/{pagoId}
+   */
+  async deletePago(pagoId: number): Promise<ApiResponse<void>> {
+    return await apiService.delete(`${this.BASE_URL}/pagos/${pagoId}`);
   }
 }
 

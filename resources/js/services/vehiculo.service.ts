@@ -5,188 +5,107 @@ import type {
   UpdateVehiculoRequest,
   ApiResponse, 
   PaginatedResponse,
-  FilterOptions 
+  VehiculoFilters
 } from '@/types';
 
-export interface VehiculoStats {
-  total_vehiculos: number;
-  vehiculos_activos: number;
-  por_tipo: {
-    moto: number;
-    camioneta: number;
-    auto_pequeno: number;
-    auto_mediano: number;
-  };
-  con_lavados: number;
-}
-
-export interface VehiculoFilters extends FilterOptions {
-  cliente_id?: number;
-  tipo?: string;
-}
-
+/**
+ * Servicio para Vehículos - Sistema Legacy
+ * Consume las rutas /api/vehiculos
+ */
 class VehiculoService {
-  private readonly baseUrl = '/vehiculos';
+  private readonly BASE_URL = '/vehiculos';
 
   /**
-   * Obtener lista paginada de vehículos
-   * GET /vehiculos
+   * Obtener todos los vehículos con paginación y filtros
+   * GET /api/vehiculos
    */
-  async getVehiculos(params?: VehiculoFilters): Promise<PaginatedResponse<Vehiculo>> {
-    const response = await apiService.get<PaginatedResponse<Vehiculo>>(
-      this.baseUrl,
-      params
-    );
+  async getVehiculos(filters?: VehiculoFilters): Promise<PaginatedResponse<Vehiculo>> {
+    const params = new URLSearchParams();
     
-    if (!response.success) {
-      throw new Error(response.message);
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value.toString());
+        }
+      });
     }
-    
-    return response.data!;
+
+    const url = `${this.BASE_URL}${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await apiService.get<PaginatedResponse<Vehiculo>>(url);
+    return response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
   }
 
   /**
-   * Obtener todos los vehículos (para selects)
-   * GET /vehiculos/all
+   * Obtener todos los vehículos sin paginación
+   * GET /api/vehiculos/all
    */
-  async getAllVehiculos(): Promise<Vehiculo[]> {
-    const response = await apiService.get<Vehiculo[]>(
-      `${this.baseUrl}/all`
-    );
-    
-    if (!response.success) {
-      throw new Error(response.message);
-    }
-    
-    return response.data!;
+  async getAllVehiculos(): Promise<ApiResponse<Vehiculo[]>> {
+    return await apiService.get(`${this.BASE_URL}/all`);
   }
 
   /**
    * Obtener estadísticas de vehículos
-   * GET /vehiculos/stats
+   * GET /api/vehiculos/stats
    */
-  async getEstadisticas(): Promise<VehiculoStats> {
-    const response = await apiService.get<VehiculoStats>(
-      `${this.baseUrl}/stats`
-    );
-    
-    if (!response.success) {
-      throw new Error(response.message);
-    }
-    
-    return response.data!;
-  }
-
-  /**
-   * Obtener vehículos por cliente
-   * GET /vehiculos/cliente/{clienteId}
-   */
-  async getVehiculosByCliente(clienteId: number): Promise<Vehiculo[]> {
-    const response = await apiService.get<Vehiculo[]>(
-      `${this.baseUrl}/cliente/${clienteId}`
-    );
-    
-    if (!response.success) {
-      throw new Error(response.message);
-    }
-    
-    return response.data!;
-  }
-
-  /**
-   * Crear nuevo vehículo
-   * POST /vehiculos
-   */
-  async createVehiculo(vehiculo: CreateVehiculoRequest): Promise<Vehiculo> {
-    const response = await apiService.post<Vehiculo>(
-      this.baseUrl,
-      vehiculo
-    );
-    
-    if (!response.success) {
-      throw new Error(response.message);
-    }
-    
-    return response.data!;
-  }
-
-  /**
-   * Obtener vehículo específico
-   * GET /vehiculos/{id}
-   */
-  async getVehiculoById(id: number): Promise<Vehiculo> {
-    const response = await apiService.get<Vehiculo>(
-      `${this.baseUrl}/${id}`
-    );
-    
-    if (!response.success) {
-      throw new Error(response.message);
-    }
-    
-    return response.data!;
-  }
-
-  /**
-   * Actualizar vehículo
-   * PUT /vehiculos/{id}
-   */
-  async updateVehiculo(id: number, vehiculo: UpdateVehiculoRequest): Promise<Vehiculo> {
-    const response = await apiService.put<Vehiculo>(
-      `${this.baseUrl}/${id}`,
-      vehiculo
-    );
-    
-    if (!response.success) {
-      throw new Error(response.message);
-    }
-    
-    return response.data!;
-  }
-
-  /**
-   * Eliminar vehículo (soft delete)
-   * DELETE /vehiculos/{id}
-   */
-  async deleteVehiculo(id: number): Promise<void> {
-    const response = await apiService.delete<void>(
-      `${this.baseUrl}/${id}`
-    );
-    
-    if (!response.success) {
-      throw new Error(response.message);
-    }
-  }
-
-  /**
-   * Restaurar vehículo eliminado
-   * PUT /vehiculos/{id}/restore
-   */
-  async restoreVehiculo(id: number): Promise<void> {
-    const response = await apiService.put<void>(
-      `${this.baseUrl}/${id}/restore`
-    );
-    
-    if (!response.success) {
-      throw new Error(response.message);
-    }
+  async getStats(): Promise<ApiResponse<any>> {
+    return await apiService.get(`${this.BASE_URL}/stats`);
   }
 
   /**
    * Obtener vehículos eliminados
-   * GET /vehiculos/trashed
+   * GET /api/vehiculos/trashed
    */
-  async getTrashedVehiculos(): Promise<Vehiculo[]> {
-    const response = await apiService.get<Vehiculo[]>(
-      `${this.baseUrl}/trashed`
-    );
-    
-    if (!response.success) {
-      throw new Error(response.message);
-    }
-    
-    return response.data!;
+  async getTrashedVehiculos(): Promise<ApiResponse<Vehiculo[]>> {
+    return await apiService.get(`${this.BASE_URL}/trashed`);
+  }
+
+  /**
+   * Obtener vehículos por cliente
+   * GET /api/vehiculos/cliente/{clienteId}
+   */
+  async getVehiculosByCliente(clienteId: number): Promise<ApiResponse<Vehiculo[]>> {
+    return await apiService.get(`${this.BASE_URL}/cliente/${clienteId}`);
+  }
+
+  /**
+   * Crear un nuevo vehículo
+   * POST /api/vehiculos
+   */
+  async createVehiculo(data: CreateVehiculoRequest): Promise<ApiResponse<Vehiculo>> {
+    return await apiService.post(this.BASE_URL, data);
+  }
+
+  /**
+   * Obtener un vehículo específico
+   * GET /api/vehiculos/{id}
+   */
+  async getVehiculoById(id: number): Promise<ApiResponse<Vehiculo>> {
+    return await apiService.get(`${this.BASE_URL}/${id}`);
+  }
+
+  /**
+   * Actualizar un vehículo
+   * PUT /api/vehiculos/{id}
+   */
+  async updateVehiculo(id: number, data: UpdateVehiculoRequest): Promise<ApiResponse<Vehiculo>> {
+    return await apiService.put(`${this.BASE_URL}/${id}`, data);
+  }
+
+  /**
+   * Eliminar un vehículo (soft delete)
+   * DELETE /api/vehiculos/{id}
+   */
+  async deleteVehiculo(id: number): Promise<ApiResponse<void>> {
+    return await apiService.delete(`${this.BASE_URL}/${id}`);
+  }
+
+  /**
+   * Restaurar un vehículo eliminado
+   * PUT /api/vehiculos/{id}/restore
+   */
+  async restoreVehiculo(id: number): Promise<ApiResponse<Vehiculo>> {
+    return await apiService.put(`${this.BASE_URL}/${id}/restore`);
   }
 }
 
-export const vehiculoService = new VehiculoService();
-export default vehiculoService;
+export default new VehiculoService();

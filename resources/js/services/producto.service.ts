@@ -1,136 +1,187 @@
 import apiService from './api';
-import type { ProductoAutomotriz, ProductoDespensa, PaginatedResponse, CreateProductoAutomotrizRequest, UpdateProductoAutomotrizRequest, CreateProductoDespensaRequest, UpdateProductoDespensaRequest } from '@/types';
+import type { 
+  ApiResponse,
+  ProductoAutomotriz, 
+  ProductoDespensa, 
+  PaginatedResponse, 
+  CreateProductoAutomotrizRequest, 
+  UpdateProductoAutomotrizRequest, 
+  CreateProductoDespensaRequest, 
+  UpdateProductoDespensaRequest,
+  ProductoFilters
+} from '@/types';
 
-export interface ProductoFilters {
-  page?: number;
-  per_page?: number;
-  search?: string;
-  activo?: boolean;
-  categoria?: string;
-}
-
-export interface StockUpdate {
-  stock: number;
-  motivo?: string;
-}
-
+/**
+ * Servicio para Productos Unificados - Sistema Legacy
+ * Consume las rutas /api/productos
+ */
 class ProductoService {
+  private readonly BASE_URL = '/productos';
+
   // ===== MÉTODOS GENERALES =====
   
-  async getAllProductos(filters: ProductoFilters = {}): Promise<any> {
-    const params = new URLSearchParams();
-    
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, value.toString());
-      }
-    });
-
-    const response = await apiService.get(`/api/productos?${params.toString()}`);
-    return response.data;
-  }
-
-  async getMetricas(): Promise<any> {
-    const response = await apiService.get('/api/productos/metricas');
-    return response.data;
+  /**
+   * Obtener métricas generales de productos
+   * GET /api/productos/metricas
+   */
+  async getMetricas(): Promise<ApiResponse<any>> {
+    return await apiService.get(`${this.BASE_URL}/metricas`);
   }
 
   // ===== PRODUCTOS AUTOMOTRICES =====
   
-  async getProductosAutomotrices(filters: ProductoFilters = {}): Promise<PaginatedResponse<ProductoAutomotriz>> {
+  /**
+   * Obtener productos automotrices con paginación y filtros
+   * GET /api/productos/automotrices
+   */
+  async getProductosAutomotrices(filters?: ProductoFilters): Promise<PaginatedResponse<ProductoAutomotriz>> {
     const params = new URLSearchParams();
     
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, value.toString());
-      }
-    });
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value.toString());
+        }
+      });
+    }
 
-    const response = await apiService.get(`/api/productos/automotrices?${params.toString()}`);
-    return response.data;
+    const url = `${this.BASE_URL}/automotrices${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await apiService.get<PaginatedResponse<ProductoAutomotriz>>(url);
+    return response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
   }
 
-  async getProductoAutomotriz(id: number): Promise<ProductoAutomotriz> {
-    const response = await apiService.get(`/api/productos/automotrices/${id}`);
-    return response.data.data;
+  /**
+   * Obtener productos automotrices eliminados
+   * GET /api/productos/automotrices/trashed
+   */
+  async getTrashedAutomotrices(): Promise<ApiResponse<ProductoAutomotriz[]>> {
+    return await apiService.get(`${this.BASE_URL}/automotrices/trashed`);
   }
 
-  async createProductoAutomotriz(data: CreateProductoAutomotrizRequest): Promise<ProductoAutomotriz> {
-    const response = await apiService.post('/api/productos/automotrices', data);
-    return response.data.data;
+  /**
+   * Crear producto automotriz
+   * POST /api/productos/automotrices
+   */
+  async createProductoAutomotriz(data: CreateProductoAutomotrizRequest): Promise<ApiResponse<ProductoAutomotriz>> {
+    return await apiService.post(`${this.BASE_URL}/automotrices`, data);
   }
 
-  async updateProductoAutomotriz(id: number, data: UpdateProductoAutomotrizRequest): Promise<ProductoAutomotriz> {
-    const response = await apiService.put(`/api/productos/automotrices/${id}`, data);
-    return response.data.data;
+  /**
+   * Obtener producto automotriz por ID
+   * GET /api/productos/automotrices/{id}
+   */
+  async getProductoAutomotrizById(id: number): Promise<ApiResponse<ProductoAutomotriz>> {
+    return await apiService.get(`${this.BASE_URL}/automotrices/${id}`);
   }
 
-  async deleteProductoAutomotriz(id: number): Promise<void> {
-    await apiService.delete(`/api/productos/automotrices/${id}`);
+  /**
+   * Actualizar producto automotriz
+   * PUT /api/productos/automotrices/{id}
+   */
+  async updateProductoAutomotriz(id: number, data: UpdateProductoAutomotrizRequest): Promise<ApiResponse<ProductoAutomotriz>> {
+    return await apiService.put(`${this.BASE_URL}/automotrices/${id}`, data);
   }
 
-  async restoreProductoAutomotriz(id: number): Promise<ProductoAutomotriz> {
-    const response = await apiService.put(`/api/productos/automotrices/${id}/restore`);
-    return response.data.data;
+  /**
+   * Restaurar producto automotriz eliminado
+   * PUT /api/productos/automotrices/{id}/restore
+   */
+  async restoreProductoAutomotriz(id: number): Promise<ApiResponse<ProductoAutomotriz>> {
+    return await apiService.put(`${this.BASE_URL}/automotrices/${id}/restore`);
   }
 
-  async getTrashedAutomotrices(): Promise<ProductoAutomotriz[]> {
-    const response = await apiService.get('/api/productos/automotrices/trashed');
-    return response.data.data;
+  /**
+   * Actualizar stock de producto automotriz
+   * PUT /api/productos/automotrices/{id}/stock
+   */
+  async updateStockAutomotriz(id: number, stock: number): Promise<ApiResponse<ProductoAutomotriz>> {
+    return await apiService.put(`${this.BASE_URL}/automotrices/${id}/stock`, { stock });
   }
 
-  async updateStockAutomotriz(id: number, data: StockUpdate): Promise<ProductoAutomotriz> {
-    const response = await apiService.put(`/api/productos/automotrices/${id}/stock`, data);
-    return response.data.data;
+  /**
+   * Eliminar producto automotriz
+   * DELETE /api/productos/automotrices/{id}
+   */
+  async deleteProductoAutomotriz(id: number): Promise<ApiResponse<void>> {
+    return await apiService.delete(`${this.BASE_URL}/automotrices/${id}`);
   }
 
   // ===== PRODUCTOS DE DESPENSA =====
   
-  async getProductosDespensa(filters: ProductoFilters = {}): Promise<PaginatedResponse<ProductoDespensa>> {
+  /**
+   * Obtener productos de despensa con paginación y filtros
+   * GET /api/productos/despensa
+   */
+  async getProductosDespensa(filters?: ProductoFilters): Promise<PaginatedResponse<ProductoDespensa>> {
     const params = new URLSearchParams();
     
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, value.toString());
-      }
-    });
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value.toString());
+        }
+      });
+    }
 
-    const response = await apiService.get(`/api/productos/despensa?${params.toString()}`);
-    return response.data;
+    const url = `${this.BASE_URL}/despensa${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await apiService.get<PaginatedResponse<ProductoDespensa>>(url);
+    return response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
   }
 
-  async getProductoDespensa(id: number): Promise<ProductoDespensa> {
-    const response = await apiService.get(`/api/productos/despensa/${id}`);
-    return response.data.data;
+  /**
+   * Obtener productos de despensa eliminados
+   * GET /api/productos/despensa/trashed
+   */
+  async getTrashedDespensa(): Promise<ApiResponse<ProductoDespensa[]>> {
+    return await apiService.get(`${this.BASE_URL}/despensa/trashed`);
   }
 
-  async createProductoDespensa(data: CreateProductoDespensaRequest): Promise<ProductoDespensa> {
-    const response = await apiService.post('/api/productos/despensa', data);
-    return response.data.data;
+  /**
+   * Crear producto de despensa
+   * POST /api/productos/despensa
+   */
+  async createProductoDespensa(data: CreateProductoDespensaRequest): Promise<ApiResponse<ProductoDespensa>> {
+    return await apiService.post(`${this.BASE_URL}/despensa`, data);
   }
 
-  async updateProductoDespensa(id: number, data: UpdateProductoDespensaRequest): Promise<ProductoDespensa> {
-    const response = await apiService.put(`/api/productos/despensa/${id}`, data);
-    return response.data.data;
+  /**
+   * Obtener producto de despensa por ID
+   * GET /api/productos/despensa/{id}
+   */
+  async getProductoDespensaById(id: number): Promise<ApiResponse<ProductoDespensa>> {
+    return await apiService.get(`${this.BASE_URL}/despensa/${id}`);
   }
 
-  async deleteProductoDespensa(id: number): Promise<void> {
-    await apiService.delete(`/api/productos/despensa/${id}`);
+  /**
+   * Actualizar producto de despensa
+   * PUT /api/productos/despensa/{id}
+   */
+  async updateProductoDespensa(id: number, data: UpdateProductoDespensaRequest): Promise<ApiResponse<ProductoDespensa>> {
+    return await apiService.put(`${this.BASE_URL}/despensa/${id}`, data);
   }
 
-  async restoreProductoDespensa(id: number): Promise<ProductoDespensa> {
-    const response = await apiService.put(`/api/productos/despensa/${id}/restore`);
-    return response.data.data;
+  /**
+   * Restaurar producto de despensa eliminado
+   * PUT /api/productos/despensa/{id}/restore
+   */
+  async restoreProductoDespensa(id: number): Promise<ApiResponse<ProductoDespensa>> {
+    return await apiService.put(`${this.BASE_URL}/despensa/${id}/restore`);
   }
 
-  async getTrashedDespensa(): Promise<ProductoDespensa[]> {
-    const response = await apiService.get('/api/productos/despensa/trashed');
-    return response.data.data;
+  /**
+   * Actualizar stock de producto de despensa
+   * PUT /api/productos/despensa/{id}/stock
+   */
+  async updateStockDespensa(id: number, stock: number): Promise<ApiResponse<ProductoDespensa>> {
+    return await apiService.put(`${this.BASE_URL}/despensa/${id}/stock`, { stock });
   }
 
-  async updateStockDespensa(id: number, data: StockUpdate): Promise<ProductoDespensa> {
-    const response = await apiService.put(`/api/productos/despensa/${id}/stock`, data);
-    return response.data.data;
+  /**
+   * Eliminar producto de despensa
+   * DELETE /api/productos/despensa/{id}
+   */
+  async deleteProductoDespensa(id: number): Promise<ApiResponse<void>> {
+    return await apiService.delete(`${this.BASE_URL}/despensa/${id}`);
   }
 }
 

@@ -4,10 +4,10 @@ import type { ApiResponse, DashboardMetrics, DashboardChartData } from '@/types'
 class DashboardService {
   /**
    * Obtener datos principales del dashboard
-   * GET /api/dashboard/data
+  * GET /api/dashboard/datos
    */
   async getData(): Promise<ApiResponse<any>> {
-    return await apiService.get('/dashboard/data');
+   return await apiService.get('/dashboard/datos');
   }
 
   /**

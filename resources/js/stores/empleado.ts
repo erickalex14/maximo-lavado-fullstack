@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import empleadoService, { type EmpleadoFilters } from '@/services/empleado.service';
-import type { Empleado, PaginatedResponse, CreateEmpleadoRequest, UpdateEmpleadoRequest } from '@/types';
+import empleadoService from '@/services/empleado.service';
+import type { Empleado, PaginatedResponse, CreateEmpleadoRequest, UpdateEmpleadoRequest, EmpleadoFilters } from '@/types';
 
 export const useEmpleadoStore = defineStore('empleado', () => {
   // State
@@ -82,10 +82,9 @@ export const useEmpleadoStore = defineStore('empleado', () => {
       setLoading(true);
       clearError();
       
-      const empleado = await empleadoService.getEmpleado(id);
-      currentEmpleado.value = empleado;
-      
-      return empleado;
+  const resp = await empleadoService.getEmpleado(id);
+  currentEmpleado.value = resp.data ?? null;
+  return resp.data ?? null;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al cargar el empleado');
       console.error('Error fetching empleado:', err);
@@ -100,12 +99,11 @@ export const useEmpleadoStore = defineStore('empleado', () => {
       setLoading(true);
       clearError();
       
-      const newEmpleado = await empleadoService.createEmpleado(data);
+  const resp = await empleadoService.createEmpleado(data);
       
       // Actualizar la lista de empleados
-      await fetchEmpleados();
-      
-      return newEmpleado;
+  await fetchEmpleados();
+  return resp.data ?? null;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al crear el empleado');
       console.error('Error creating empleado:', err);
@@ -120,20 +118,21 @@ export const useEmpleadoStore = defineStore('empleado', () => {
       setLoading(true);
       clearError();
       
-      const updatedEmpleado = await empleadoService.updateEmpleado(id, data);
+  const resp = await empleadoService.updateEmpleado(id, data);
+  const updatedEmpleado = resp.data;
       
       // Actualizar en la lista local
       const index = empleados.value.findIndex(e => e.empleado_id === id);
-      if (index !== -1) {
+      if (index !== -1 && updatedEmpleado) {
         empleados.value[index] = updatedEmpleado;
       }
       
       // Actualizar el empleado actual si coincide
       if (currentEmpleado.value?.empleado_id === id) {
-        currentEmpleado.value = updatedEmpleado;
+        currentEmpleado.value = updatedEmpleado ?? null;
       }
       
-      return updatedEmpleado;
+  return updatedEmpleado ?? null;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al actualizar el empleado');
       console.error('Error updating empleado:', err);
@@ -193,7 +192,7 @@ export const useEmpleadoStore = defineStore('empleado', () => {
     await fetchEmpleados();
   };
 
-  const filterByTipoSalario = async (tipoSalario: string) => {
+  const filterByTipoSalario = async (tipoSalario: EmpleadoFilters['tipo_salario']) => {
     setFilters({ page: 1, tipo_salario: tipoSalario });
     await fetchEmpleados();
   };

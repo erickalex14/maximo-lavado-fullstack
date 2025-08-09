@@ -1,11 +1,14 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import finanzasService, { 
-  type IngresoFilters, 
-  type EgresoFilters, 
-  type GastoGeneralFilters,
-  type BalanceFilters 
-} from '@/services/finanzas.service';
+import finanzasService from '@/services/finanzas.service';
+import { buildPagination, emptyPagination, extractErrorMessage } from './helpers/storeHelpers';
+import type { 
+  IngresoFilters, 
+  EgresoFilters, 
+  GastoGeneralFilters,
+  
+} from '@/types';
+import type { BalanceFilters } from '@/services/finanzas.service';
 import type { 
   Ingreso, 
   Egreso, 
@@ -27,37 +30,26 @@ export const useFinanzasStore = defineStore('finanzas', () => {
   const currentEgreso = ref<Egreso | null>(null);
   const currentGastoGeneral = ref<GastoGeneral | null>(null);
   
-  const paginationIngresos = ref({
-    current_page: 1,
-    last_page: 1,
-    per_page: 15,
-    total: 0,
-    from: 0,
-    to: 0
-  });
+  const paginationIngresos = ref(emptyPagination());
   
-  const paginationEgresos = ref({
-    current_page: 1,
-    last_page: 1,
-    per_page: 15,
-    total: 0,
-    from: 0,
-    to: 0
-  });
+  const paginationEgresos = ref(emptyPagination());
   
-  const paginationGastosGenerales = ref({
-    current_page: 1,
-    last_page: 1,
-    per_page: 15,
-    total: 0,
-    from: 0,
-    to: 0
-  });
+  const paginationGastosGenerales = ref(emptyPagination());
 
   const loading = ref(false);
   const error = ref<string | null>(null);
   const metricas = ref<any>({});
   const balance = ref<any>({});
+  // Estados para endpoints avanzados de balance
+  const balanceCategorias = ref<any>({});
+  const balanceMensual = ref<any>({});
+  const balanceTrimestral = ref<any>({});
+  const balanceAnual = ref<any>({});
+  const flujoCaja = ref<any>({});
+  const indicadoresFinancieros = ref<any>({});
+  const comparativoMensual = ref<any>({});
+  const proyeccion = ref<any>({});
+  const resumenCompleto = ref<any>({});
   
   const filtersIngresos = ref<IngresoFilters>({
     page: 1,
@@ -122,26 +114,11 @@ export const useFinanzasStore = defineStore('finanzas', () => {
     try {
       setLoading(true);
       clearError();
-      
       const response = await finanzasService.getIngresos(filters);
-      
-      if (response.data) {
-        if (Array.isArray(response.data)) {
-          ingresos.value = response.data;
-        } else {
-          ingresos.value = response.data.data || [];
-          paginationIngresos.value = {
-            current_page: response.data.current_page || 1,
-            last_page: response.data.last_page || 1,
-            per_page: response.data.per_page || 15,
-            total: response.data.total || 0,
-            from: response.data.from || 0,
-            to: response.data.to || 0
-          };
-        }
-      }
-    } catch (err: any) {
-      setError(err.message || 'Error al cargar ingresos');
+      ingresos.value = response.data || [];
+      paginationIngresos.value = buildPagination(response);
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Error al cargar ingresos'));
       console.error('Error fetching ingresos:', err);
     } finally {
       setLoading(false);
@@ -248,26 +225,11 @@ export const useFinanzasStore = defineStore('finanzas', () => {
     try {
       setLoading(true);
       clearError();
-      
       const response = await finanzasService.getEgresos(filters);
-      
-      if (response.data) {
-        if (Array.isArray(response.data)) {
-          egresos.value = response.data;
-        } else {
-          egresos.value = response.data.data || [];
-          paginationEgresos.value = {
-            current_page: response.data.current_page || 1,
-            last_page: response.data.last_page || 1,
-            per_page: response.data.per_page || 15,
-            total: response.data.total || 0,
-            from: response.data.from || 0,
-            to: response.data.to || 0
-          };
-        }
-      }
-    } catch (err: any) {
-      setError(err.message || 'Error al cargar egresos');
+      egresos.value = response.data || [];
+      paginationEgresos.value = buildPagination(response);
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Error al cargar egresos'));
       console.error('Error fetching egresos:', err);
     } finally {
       setLoading(false);
@@ -326,26 +288,11 @@ export const useFinanzasStore = defineStore('finanzas', () => {
     try {
       setLoading(true);
       clearError();
-      
       const response = await finanzasService.getGastosGenerales(filters);
-      
-      if (response.data) {
-        if (Array.isArray(response.data)) {
-          gastosGenerales.value = response.data;
-        } else {
-          gastosGenerales.value = response.data.data || [];
-          paginationGastosGenerales.value = {
-            current_page: response.data.current_page || 1,
-            last_page: response.data.last_page || 1,
-            per_page: response.data.per_page || 15,
-            total: response.data.total || 0,
-            from: response.data.from || 0,
-            to: response.data.to || 0
-          };
-        }
-      }
-    } catch (err: any) {
-      setError(err.message || 'Error al cargar gastos generales');
+      gastosGenerales.value = response.data || [];
+      paginationGastosGenerales.value = buildPagination(response);
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Error al cargar gastos generales'));
       console.error('Error fetching gastos generales:', err);
     } finally {
       setLoading(false);
@@ -422,8 +369,90 @@ export const useFinanzasStore = defineStore('finanzas', () => {
     try {
       const response = await finanzasService.getBalanceGeneral(filters);
       balance.value = response.data || {};
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error fetching balance:', err);
+    }
+  };
+
+  // Endpoints avanzados de balance
+  const fetchBalanceCategorias = async (filters?: BalanceFilters) => {
+    try {
+      const response = await finanzasService.getBalancePorCategoria(filters);
+      balanceCategorias.value = response.data || {};
+    } catch (err) {
+      console.error('Error fetching balance categorias:', err);
+    }
+  };
+
+  const fetchBalanceMensual = async (filters?: BalanceFilters) => {
+    try {
+      const response = await finanzasService.getBalanceMensual(filters);
+      balanceMensual.value = response.data || {};
+    } catch (err) {
+      console.error('Error fetching balance mensual:', err);
+    }
+  };
+
+  const fetchBalanceTrimestral = async (filters?: BalanceFilters) => {
+    try {
+      const response = await finanzasService.getBalanceTrimestral(filters);
+      balanceTrimestral.value = response.data || {};
+    } catch (err) {
+      console.error('Error fetching balance trimestral:', err);
+    }
+  };
+
+  const fetchBalanceAnual = async (filters?: BalanceFilters) => {
+    try {
+      const response = await finanzasService.getBalanceAnual(filters);
+      balanceAnual.value = response.data || {};
+    } catch (err) {
+      console.error('Error fetching balance anual:', err);
+    }
+  };
+
+  const fetchFlujoCaja = async (filters?: BalanceFilters) => {
+    try {
+      const response = await finanzasService.getFlujoCaja(filters);
+      flujoCaja.value = response.data || {};
+    } catch (err) {
+      console.error('Error fetching flujo de caja:', err);
+    }
+  };
+
+  const fetchIndicadoresFinancieros = async (filters?: BalanceFilters) => {
+    try {
+      const response = await finanzasService.getIndicadoresFinancieros(filters);
+      indicadoresFinancieros.value = response.data || {};
+    } catch (err) {
+      console.error('Error fetching indicadores financieros:', err);
+    }
+  };
+
+  const fetchComparativoMensual = async (filters?: BalanceFilters) => {
+    try {
+      const response = await finanzasService.getComparativoMensual(filters);
+      comparativoMensual.value = response.data || {};
+    } catch (err) {
+      console.error('Error fetching comparativo mensual:', err);
+    }
+  };
+
+  const fetchProyeccion = async (filters?: BalanceFilters) => {
+    try {
+      const response = await finanzasService.getProyeccion(filters);
+      proyeccion.value = response.data || {};
+    } catch (err) {
+      console.error('Error fetching proyeccion:', err);
+    }
+  };
+
+  const fetchResumenCompleto = async (filters?: BalanceFilters) => {
+    try {
+      const response = await finanzasService.getResumenCompleto(filters);
+      resumenCompleto.value = response.data || {};
+    } catch (err) {
+      console.error('Error fetching resumen completo:', err);
     }
   };
 
@@ -448,9 +477,18 @@ export const useFinanzasStore = defineStore('finanzas', () => {
     error,
     metricas,
     balance,
-    filtersIngresos,
+  filtersIngresos,
     filtersEgresos,
     filtersGastosGenerales,
+  balanceCategorias,
+  balanceMensual,
+  balanceTrimestral,
+  balanceAnual,
+  flujoCaja,
+  indicadoresFinancieros,
+  comparativoMensual,
+  proyeccion,
+  resumenCompleto,
     
     // Getters
     hasIngresos,
@@ -482,7 +520,16 @@ export const useFinanzasStore = defineStore('finanzas', () => {
     createGastoGeneral,
     deleteGastoGeneral,
     fetchMetricas,
-    fetchBalance,
+  fetchBalance,
+  fetchBalanceCategorias,
+  fetchBalanceMensual,
+  fetchBalanceTrimestral,
+  fetchBalanceAnual,
+  fetchFlujoCaja,
+  fetchIndicadoresFinancieros,
+  fetchComparativoMensual,
+  fetchProyeccion,
+  fetchResumenCompleto,
     clearCurrents
   };
 });

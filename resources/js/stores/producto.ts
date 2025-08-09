@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import productoService, { type ProductoFilters, type StockUpdate } from '@/services/producto.service';
-import type { ProductoAutomotriz, ProductoDespensa, PaginatedResponse, CreateProductoAutomotrizRequest, UpdateProductoAutomotrizRequest, CreateProductoDespensaRequest, UpdateProductoDespensaRequest } from '@/types';
+import productoService from '@/services/producto.service';
+import type { ProductoAutomotriz, ProductoDespensa, PaginatedResponse, CreateProductoAutomotrizRequest, UpdateProductoAutomotrizRequest, CreateProductoDespensaRequest, UpdateProductoDespensaRequest, ProductoFilters } from '@/types';
 
 export const useProductoStore = defineStore('producto', () => {
   // State
@@ -109,10 +109,9 @@ export const useProductoStore = defineStore('producto', () => {
       setLoading(true);
       clearError();
       
-      const producto = await productoService.getProductoAutomotriz(id);
-      currentProductoAutomotriz.value = producto;
-      
-      return producto;
+  const resp = await productoService.getProductoAutomotrizById(id);
+  currentProductoAutomotriz.value = resp.data ?? null;
+  return resp.data ?? null;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al cargar el producto automotriz');
       console.error('Error fetching producto automotriz:', err);
@@ -127,12 +126,12 @@ export const useProductoStore = defineStore('producto', () => {
       setLoading(true);
       clearError();
       
-      const newProducto = await productoService.createProductoAutomotriz(data);
+  const resp = await productoService.createProductoAutomotriz(data);
       
       // Actualizar la lista
       await fetchProductosAutomotrices();
       
-      return newProducto;
+  return resp.data ?? null;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al crear el producto automotriz');
       console.error('Error creating producto automotriz:', err);
@@ -147,20 +146,21 @@ export const useProductoStore = defineStore('producto', () => {
       setLoading(true);
       clearError();
       
-      const updatedProducto = await productoService.updateProductoAutomotriz(id, data);
+  const resp = await productoService.updateProductoAutomotriz(id, data);
+  const updatedProducto = resp.data;
       
       // Actualizar en la lista local
       const index = productosAutomotrices.value.findIndex(p => p.producto_automotriz_id === id);
-      if (index !== -1) {
+      if (index !== -1 && updatedProducto) {
         productosAutomotrices.value[index] = updatedProducto;
       }
       
       // Actualizar el producto actual si coincide
       if (currentProductoAutomotriz.value?.producto_automotriz_id === id) {
-        currentProductoAutomotriz.value = updatedProducto;
+        currentProductoAutomotriz.value = updatedProducto ?? null;
       }
       
-      return updatedProducto;
+  return updatedProducto ?? null;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al actualizar el producto automotriz');
       console.error('Error updating producto automotriz:', err);
@@ -175,7 +175,7 @@ export const useProductoStore = defineStore('producto', () => {
       setLoading(true);
       clearError();
       
-      await productoService.deleteProductoAutomotriz(id);
+  await productoService.deleteProductoAutomotriz(id);
       
       // Remover de la lista local
       productosAutomotrices.value = productosAutomotrices.value.filter(p => p.producto_automotriz_id !== id);
@@ -197,20 +197,21 @@ export const useProductoStore = defineStore('producto', () => {
     }
   };
 
-  const updateStockAutomotriz = async (id: number, data: StockUpdate) => {
+  const updateStockAutomotriz = async (id: number, data: { stock: number }) => {
     try {
       setLoading(true);
       clearError();
       
-      const updatedProducto = await productoService.updateStockAutomotriz(id, data);
+  const resp = await productoService.updateStockAutomotriz(id, data.stock);
+  const updatedProducto = resp.data;
       
       // Actualizar en la lista local
       const index = productosAutomotrices.value.findIndex(p => p.producto_automotriz_id === id);
-      if (index !== -1) {
+      if (index !== -1 && updatedProducto) {
         productosAutomotrices.value[index] = updatedProducto;
       }
       
-      return updatedProducto;
+  return updatedProducto ?? null;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al actualizar el stock');
       console.error('Error updating stock:', err);
@@ -262,12 +263,12 @@ export const useProductoStore = defineStore('producto', () => {
       setLoading(true);
       clearError();
       
-      const newProducto = await productoService.createProductoDespensa(data);
+  const resp = await productoService.createProductoDespensa(data);
       
       // Actualizar la lista
       await fetchProductosDespensa();
       
-      return newProducto;
+  return resp.data ?? null;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al crear el producto de despensa');
       console.error('Error creating producto despensa:', err);
@@ -282,20 +283,21 @@ export const useProductoStore = defineStore('producto', () => {
       setLoading(true);
       clearError();
       
-      const updatedProducto = await productoService.updateProductoDespensa(id, data);
+  const resp = await productoService.updateProductoDespensa(id, data);
+  const updatedProducto = resp.data;
       
       // Actualizar en la lista local
       const index = productosDespensa.value.findIndex(p => p.producto_despensa_id === id);
-      if (index !== -1) {
+      if (index !== -1 && updatedProducto) {
         productosDespensa.value[index] = updatedProducto;
       }
       
       // Actualizar el producto actual si coincide
       if (currentProductoDespensa.value?.producto_despensa_id === id) {
-        currentProductoDespensa.value = updatedProducto;
+        currentProductoDespensa.value = updatedProducto ?? null;
       }
       
-      return updatedProducto;
+  return updatedProducto ?? null;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al actualizar el producto de despensa');
       console.error('Error updating producto despensa:', err);
@@ -310,7 +312,7 @@ export const useProductoStore = defineStore('producto', () => {
       setLoading(true);
       clearError();
       
-      await productoService.deleteProductoDespensa(id);
+  await productoService.deleteProductoDespensa(id);
       
       // Remover de la lista local
       productosDespensa.value = productosDespensa.value.filter(p => p.producto_despensa_id !== id);
@@ -332,20 +334,21 @@ export const useProductoStore = defineStore('producto', () => {
     }
   };
 
-  const updateStockDespensa = async (id: number, data: StockUpdate) => {
+  const updateStockDespensa = async (id: number, data: { stock: number }) => {
     try {
       setLoading(true);
       clearError();
       
-      const updatedProducto = await productoService.updateStockDespensa(id, data);
+  const resp = await productoService.updateStockDespensa(id, data.stock);
+  const updatedProducto = resp.data;
       
       // Actualizar en la lista local
       const index = productosDespensa.value.findIndex(p => p.producto_despensa_id === id);
-      if (index !== -1) {
+      if (index !== -1 && updatedProducto) {
         productosDespensa.value[index] = updatedProducto;
       }
       
-      return updatedProducto;
+  return updatedProducto ?? null;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al actualizar el stock');
       console.error('Error updating stock despensa:', err);
@@ -362,10 +365,9 @@ export const useProductoStore = defineStore('producto', () => {
       setLoading(true);
       clearError();
       
-      const metrics = await productoService.getMetricas();
-      metricas.value = metrics;
-      
-      return metrics;
+  const resp = await productoService.getMetricas();
+  metricas.value = resp.data || {};
+  return metricas.value;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al cargar las métricas');
       console.error('Error fetching metricas:', err);

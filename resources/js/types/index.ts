@@ -1,3 +1,7 @@
+// ========================================================
+// 🔥 TIPOS TYPESCRIPT - CONSISTENTES CON MIGRACIONES
+// ========================================================
+
 // Tipos base del sistema
 export interface BaseModel {
   created_at: string;
@@ -5,7 +9,11 @@ export interface BaseModel {
   deleted_at?: string | null;
 }
 
-// Usuario
+// ========================================================
+// 👤 USUARIOS Y AUTENTICACIÓN
+// ========================================================
+
+// Usuario - Tabla: users
 export interface User extends BaseModel {
   id: number;
   name: string;
@@ -13,7 +21,290 @@ export interface User extends BaseModel {
   email_verified_at?: string | null;
 }
 
-// Form interfaces para usuarios
+// ========================================================
+// 📊 ENTIDADES PRINCIPALES - SISTEMA LEGACY
+// ========================================================
+
+// Cliente - Tabla: clientes
+export interface Cliente extends BaseModel {
+  cliente_id: number;
+  nombre: string;
+  telefono: string;
+  email: string;
+  direccion?: string | null;
+  cedula: string;
+  // Relaciones
+  vehiculos?: Vehiculo[];
+  facturas?: Factura[];
+}
+
+// Empleado - Tabla: empleados
+export interface Empleado extends BaseModel {
+  empleado_id: number;
+  nombres: string;
+  apellidos: string;
+  telefono: string;
+  cedula: string;
+  tipo_salario: 'mensual' | 'diario' | 'quincenal' | 'semanal';
+  salario: number;
+  // Relaciones
+  lavados?: Lavado[];
+}
+
+// Tipo de Vehículo - Tabla: tipos_vehiculos (Sistema V2)
+export interface TipoVehiculo extends BaseModel {
+  id: number;
+  nombre: string;
+  descripcion?: string | null;
+  activo: boolean;
+  // Relaciones
+  vehiculos?: Vehiculo[];
+  servicios_precios?: ServicioPrecio[];
+}
+
+// Vehículo - Tabla: vehiculos
+export interface Vehiculo extends BaseModel {
+  vehiculo_id: number;
+  cliente_id: number;
+  tipo_vehiculo_id: number;
+  matricula?: string | null;
+  descripcion?: string | null;
+  // Relaciones
+  cliente?: Cliente;
+  tipo_vehiculo?: TipoVehiculo;
+  lavados?: Lavado[];
+}
+
+// Servicio - Tabla: servicios (Sistema V2)
+export interface Servicio extends BaseModel {
+  id: number;
+  nombre: string;
+  descripcion?: string | null;
+  precio_base: number;
+  duracion_estimada?: number | null;
+  activo: boolean;
+  // Relaciones
+  precios?: ServicioPrecio[];
+  lavados?: Lavado[];
+}
+
+// Precio de Servicio - Tabla: servicio_precios (Sistema V2)
+export interface ServicioPrecio extends BaseModel {
+  id: number;
+  servicio_id: number;
+  tipo_vehiculo_id: number;
+  precio: number;
+  // Relaciones
+  servicio?: Servicio;
+  tipo_vehiculo?: TipoVehiculo;
+}
+
+// Lavado - Tabla: lavados
+export interface Lavado extends BaseModel {
+  lavado_id: number;
+  vehiculo_id: number;
+  empleado_id: number;
+  fecha: string;
+  tipo_lavado: 'completo' | 'solo_fuera' | 'solo_por_dentro';
+  precio: number;
+  pulverizado: boolean;
+  servicio_id?: number | null;
+  // Relaciones
+  vehiculo?: Vehiculo;
+  empleado?: Empleado;
+  servicio?: Servicio;
+  detalles_factura?: FacturaDetalle[];
+}
+
+// Producto Automotriz - Tabla: productos_automotrices
+export interface ProductoAutomotriz extends BaseModel {
+  producto_automotriz_id: number;
+  codigo: string;
+  nombre: string;
+  descripcion: string;
+  precio_venta: number;
+  stock: number;
+  activo: boolean;
+  // Relaciones
+  detalles_factura?: FacturaDetalle[];
+}
+
+// Producto Despensa - Tabla: productos_despensa
+export interface ProductoDespensa extends BaseModel {
+  producto_despensa_id: number;
+  nombre: string;
+  descripcion: string;
+  precio_venta: number;
+  stock: number;
+  activo: boolean;
+  // Relaciones
+  detalles_factura?: FacturaDetalle[];
+}
+
+// Proveedor - Tabla: proveedores
+export interface Proveedor extends BaseModel {
+  proveedor_id: number;
+  nombre: string;
+  email?: string | null;
+  descripcion?: string | null;
+  telefono?: string | null;
+  deuda_pendiente: number;
+  // Relaciones
+  pagos?: PagoProveedor[];
+}
+
+// Pago Proveedor - Tabla: pagos_proveedores
+export interface PagoProveedor extends BaseModel {
+  id_pago_proveedor: number;
+  proveedor_id: number;
+  monto: number;
+  fecha: string;
+  descripcion?: string | null;
+  // Relaciones
+  proveedor?: Proveedor;
+}
+
+// Ingreso - Tabla: ingresos
+export interface Ingreso extends BaseModel {
+  ingreso_id: number;
+  fecha: string;
+  tipo: 'venta' | 'servicio';
+  referencia_id?: number | null;
+  monto: number;
+  descripcion?: string | null;
+  // Relaciones dinámicas según el tipo
+  venta?: Venta;
+  lavado?: Lavado;
+}
+
+// Egreso - Tabla: egresos
+export interface Egreso extends BaseModel {
+  egreso_id: number;
+  fecha: string;
+  tipo: 'salario' | 'proveedor' | 'gasto_general';
+  referencia_id?: number | null;
+  monto: number;
+  descripcion?: string | null;
+  // Relaciones dinámicas según el tipo
+  empleado?: Empleado;
+  pago_proveedor?: PagoProveedor;
+  gasto_general?: GastoGeneral;
+}
+
+// Gasto General - Tabla: gastos_generales
+export interface GastoGeneral extends BaseModel {
+  gasto_general_id: number;
+  nombre: string;
+  descripcion?: string | null;
+  monto: number;
+  fecha: string;
+}
+
+// Factura - Tabla: facturas
+export interface Factura extends BaseModel {
+  factura_id: number;
+  numero_factura: string;
+  cliente_id: number;
+  fecha: string;
+  descripcion?: string | null;
+  total: number;
+  // Relaciones
+  cliente?: Cliente;
+  detalles?: FacturaDetalle[];
+}
+
+// Detalle de Factura - Tabla: facturas_detalles
+export interface FacturaDetalle extends BaseModel {
+  factura_detalle_id: number;
+  factura_id: number;
+  lavado_id?: number | null;
+  producto_automotriz_id?: number | null;
+  producto_despensa_id?: number | null;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+  // Relaciones
+  factura?: Factura;
+  lavado?: Lavado;
+  producto_automotriz?: ProductoAutomotriz;
+  producto_despensa?: ProductoDespensa;
+}
+
+// ========================================================
+// 🔥 SISTEMA UNIFICADO V2 - ENTIDADES PRINCIPALES
+// ========================================================
+
+// Venta Unificada - Tabla: ventas (Sistema V2)
+export interface Venta extends BaseModel {
+  id: number;
+  cliente_id?: number | null;
+  empleado_id?: number | null;
+  vehiculo_id?: number | null;
+  tipo: 'servicio' | 'producto_automotriz' | 'producto_despensa';
+  referencia_id: number;
+  cantidad: number;
+  precio_unitario: number;
+  total: number;
+  fecha: string;
+  descripcion?: string | null;
+  // Relaciones
+  cliente?: Cliente;
+  empleado?: Empleado;
+  vehiculo?: Vehiculo;
+  servicio?: Servicio;
+  producto_automotriz?: ProductoAutomotriz;
+  producto_despensa?: ProductoDespensa;
+  factura_electronica?: FacturaElectronica;
+}
+
+// Detalle de Venta - Tabla: venta_detalles (Sistema V2)
+export interface VentaDetalle extends BaseModel {
+  id: number;
+  venta_id: number;
+  tipo: 'servicio' | 'producto_automotriz' | 'producto_despensa';
+  referencia_id: number;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+  // Relaciones
+  venta?: Venta;
+  servicio?: Servicio;
+  producto_automotriz?: ProductoAutomotriz;
+  producto_despensa?: ProductoDespensa;
+}
+
+// Factura Electrónica - Tabla: facturas_electronicas (Sistema SRI)
+export interface FacturaElectronica extends BaseModel {
+  id: number;
+  venta_id: number;
+  numero_factura: string;
+  autorizacion?: string | null;
+  fecha_emision: string;
+  fecha_autorizacion?: string | null;
+  estado: 'borrador' | 'autorizada' | 'anulada' | 'error';
+  xml_firmado?: string | null;
+  clave_acceso?: string | null;
+  errores_sri?: string | string[] | null;
+  // Datos del cliente
+  cliente_razon_social: string;
+  cliente_identificacion: string;
+  cliente_direccion?: string | null;
+  cliente_email?: string | null;
+  cliente_telefono?: string | null;
+  // Totales
+  subtotal_0: number;
+  subtotal_12: number;
+  iva: number;
+  total: number;
+  // Relaciones
+  venta?: Venta;
+}
+
+// ========================================================
+// 📝 FORMULARIOS DE CREACIÓN Y ACTUALIZACIÓN
+// ========================================================
+
+// Formularios para Usuarios
 export interface CreateUserForm {
   name: string;
   email: string;
@@ -28,46 +319,8 @@ export interface UpdateUserForm {
   password_confirmation?: string;
 }
 
-export interface UpdatePasswordForm {
-  current_password: string;
-  new_password: string;
-  new_password_confirmation: string;
-}
-
-export interface ResetPasswordForm {
-  new_password: string;
-  new_password_confirmation: string;
-}
-
-// Estadísticas de usuarios
-export interface UserStats {
-  total_users: number;
-  active_users: number;
-  verified_users: number;
-  unverified_users: number;
-  deleted_users: number;
-  users_this_month: number;
-  users_last_month: number;
-  growth_percentage: number;
-}
-
-// Cliente
-export interface Cliente extends BaseModel {
-  cliente_id: number;
-  nombre: string;
-  telefono: string;
-  email: string;
-  direccion?: string;
-  cedula: string;
-  vehiculos?: Vehiculo[];
-  vehiculos_count?: number;
-  facturas?: Factura[];
-  // Soft delete simulation for active/inactive
-  activo?: boolean; // Computed field based on deleted_at
-}
-
-// Form interfaces
-export interface CreateClienteForm {
+// Formularios para Clientes
+export interface CreateClienteRequest {
   nombre: string;
   telefono: string;
   email: string;
@@ -75,181 +328,175 @@ export interface CreateClienteForm {
   cedula: string;
 }
 
-export interface UpdateClienteForm extends Partial<CreateClienteForm> {}
+export interface UpdateClienteRequest extends Partial<CreateClienteRequest> {}
 
-// Empleado - Exactamente como en el modelo Laravel y migración
-export interface Empleado extends BaseModel {
-  empleado_id: number;
+// Formularios para Empleados
+export interface CreateEmpleadoRequest {
   nombres: string;
   apellidos: string;
   telefono: string;
   cedula: string;
-  tipo_salario: 'mensual' | 'diario' | 'quincenal' | 'semanal'; // Enum exacto de la migración
+  tipo_salario: 'mensual' | 'diario' | 'quincenal' | 'semanal';
   salario: number;
-  lavados?: Lavado[];
 }
 
-// Vehículo - Con lógica de negocio: matricula nullable solo para motos
-export interface Vehiculo extends BaseModel {
-  vehiculo_id: number;
+export interface UpdateEmpleadoRequest extends Partial<CreateEmpleadoRequest> {}
+
+// Formularios para Vehículos
+export interface CreateVehiculoRequest {
   cliente_id: number;
-  tipo: 'moto' | 'camioneta' | 'auto_pequeno' | 'auto_mediano'; // Enum exacto de la migración
-  matricula?: string | null; // Nullable solo para motos según la lógica de negocio
-  descripcion?: string | null; // Nullable según la migración
-  cliente?: Cliente;
-  lavados?: Lavado[];
+  tipo_vehiculo_id: number;
+  matricula?: string;
+  descripcion?: string;
 }
 
-// Lavado - Exactamente como en el modelo Laravel y migración
-export interface Lavado extends BaseModel {
-  lavado_id: number;
+export interface UpdateVehiculoRequest extends Partial<CreateVehiculoRequest> {}
+
+// Formularios para Tipos de Vehículos
+export interface CreateTipoVehiculoRequest {
+  nombre: string;
+  descripcion?: string;
+  activo?: boolean;
+}
+
+export interface UpdateTipoVehiculoRequest extends Partial<CreateTipoVehiculoRequest> {}
+
+// Formularios para Servicios
+export interface CreateServicioRequest {
+  nombre: string;
+  descripcion?: string;
+  precio_base: number;
+  duracion_estimada?: number;
+  activo?: boolean;
+  precios?: Array<{
+    tipo_vehiculo_id: number;
+    precio: number;
+  }>;
+}
+
+export interface UpdateServicioRequest extends Partial<CreateServicioRequest> {}
+
+// Formularios para Lavados
+export interface CreateLavadoRequest {
   vehiculo_id: number;
   empleado_id: number;
   fecha: string;
-  tipo_lavado: 'completo' | 'solo_fuera' | 'solo_por_dentro'; // Enum exacto de la migración
+  tipo_lavado: 'completo' | 'solo_fuera' | 'solo_por_dentro';
   precio: number;
-  pulverizado: boolean; // Booleano con default false
-  vehiculo?: Vehiculo;
-  empleado?: Empleado;
-  detalles_factura?: FacturaDetalle[];
+  pulverizado?: boolean;
+  servicio_id?: number;
 }
 
-// Producto Automotriz - Exactamente como en el modelo Laravel
-export interface ProductoAutomotriz extends BaseModel {
-  producto_automotriz_id: number;
-  codigo: string; // Código único del producto
+export interface UpdateLavadoRequest extends Partial<CreateLavadoRequest> {}
+
+// Formularios para Productos Automotrices
+export interface CreateProductoAutomotrizRequest {
+  codigo: string;
   nombre: string;
   descripcion: string;
-  precio_venta: number; // Precio de venta
-  stock: number; // Nivel de stock
-  activo: boolean; // Estado del producto (activo/inactivo)
-  detalles_factura?: FacturaDetalle[];
+  precio_venta: number;
+  stock: number;
+  activo?: boolean;
 }
 
-// Producto Despensa - Exactamente como en el modelo Laravel
-export interface ProductoDespensa extends BaseModel {
-  producto_despensa_id: number;
+export interface UpdateProductoAutomotrizRequest extends Partial<CreateProductoAutomotrizRequest> {}
+
+// Formularios para Productos de Despensa
+export interface CreateProductoDespensaRequest {
   nombre: string;
   descripcion: string;
-  precio_venta: number; // Precio de venta
-  stock: number; // Nivel de stock
-  activo: boolean; // Estado del producto (activo/inactivo)
-  detalles_factura?: FacturaDetalle[];
+  precio_venta: number;
+  stock: number;
+  activo?: boolean;
 }
 
-// Proveedor - Exactamente como en el modelo Laravel y migración
-export interface Proveedor extends BaseModel {
-  proveedor_id: number;
+export interface UpdateProductoDespensaRequest extends Partial<CreateProductoDespensaRequest> {}
+
+// Formularios para Proveedores
+export interface CreateProveedorRequest {
   nombre: string;
-  email?: string | null; // Nullable según la migración
-  descripcion?: string | null; // Nullable según la migración
-  telefono?: string | null; // Nullable según la migración
-  deuda_pendiente: number; // Default 0 según la migración
-  pagos?: PagoProveedor[];
+  email?: string;
+  descripcion?: string;
+  telefono?: string;
+  deuda_pendiente?: number;
 }
 
-// Pago Proveedor - Exactamente como en el modelo Laravel y migración
-export interface PagoProveedor extends BaseModel {
-  id_pago_proveedor: number; // Clave primaria personalizada según la migración
+export interface UpdateProveedorRequest extends Partial<CreateProveedorRequest> {}
+
+// Formularios para Pagos a Proveedores
+export interface CreatePagoProveedorRequest {
   proveedor_id: number;
   monto: number;
-  fecha: string; // DateTime en la migración
-  descripcion?: string | null; // Nullable según la migración
-  proveedor?: Proveedor;
-}
-
-// Ingreso - Con lógica de negocio: referencia_id según el tipo
-export interface Ingreso extends BaseModel {
-  ingreso_id: number;
   fecha: string;
-  tipo: 'lavado' | 'producto_automotriz' | 'producto_despensa'; // Enum exacto de la migración
-  referencia_id?: number | null; // ID según el tipo: lavado_id, venta_producto_automotriz.id, venta_producto_despensa.id
-  monto: number;
-  descripcion?: string | null; // Nullable según la migración
-  // Relaciones dinámicas según el tipo
-  lavado?: Lavado; // Si tipo === 'lavado'
-  venta_producto_automotriz?: VentaProductoAutomotriz; // Si tipo === 'producto_automotriz'
-  venta_producto_despensa?: VentaProductoDespensa; // Si tipo === 'producto_despensa'
+  descripcion?: string;
 }
 
-// Egreso - Con lógica de negocio: referencia_id según el tipo
-export interface Egreso extends BaseModel {
-  egreso_id: number;
+export interface UpdatePagoProveedorRequest extends Partial<CreatePagoProveedorRequest> {}
+
+// Formularios para Ingresos
+export interface CreateIngresoRequest {
   fecha: string;
-  tipo: 'salario' | 'proveedor' | 'gasto_general'; // Enum exacto de la migración
-  referencia_id?: number | null; // ID según el tipo: empleado_id, id_pago_proveedor, gasto_general_id
+  tipo: 'venta' | 'servicio';
+  referencia_id?: number;
   monto: number;
-  descripcion?: string | null; // Nullable según la migración
-  // Relaciones dinámicas según el tipo
-  empleado?: Empleado; // Si tipo === 'salario' (referencia_id = empleado_id)
-  pago_proveedor?: PagoProveedor; // Si tipo === 'proveedor' (referencia_id = id_pago_proveedor)
-  gasto_general?: GastoGeneral; // Si tipo === 'gasto_general' (referencia_id = gasto_general_id)
+  descripcion?: string;
 }
 
-// Gasto General - Exactamente como en el modelo Laravel y migración
-export interface GastoGeneral extends BaseModel {
-  gasto_general_id: number;
+export interface UpdateIngresoRequest extends Partial<CreateIngresoRequest> {}
+
+// Formularios para Egresos
+export interface CreateEgresoRequest {
+  fecha: string;
+  tipo: 'salario' | 'proveedor' | 'gasto_general';
+  referencia_id?: number;
+  monto: number;
+  descripcion?: string;
+}
+
+export interface UpdateEgresoRequest extends Partial<CreateEgresoRequest> {}
+
+// Formularios para Gastos Generales
+export interface CreateGastoGeneralRequest {
   nombre: string;
-  descripcion?: string | null; // Nullable según la migración
+  descripcion?: string;
   monto: number;
   fecha: string;
 }
 
-// Factura - Exactamente como en el modelo Laravel y migración
-export interface Factura extends BaseModel {
-  factura_id: number;
-  numero_factura: string; // Unique según la migración
-  cliente_id: number;
-  fecha: string; // Date según la migración
-  descripcion?: string | null; // Nullable según la migración
-  total: number;
-  cliente?: Cliente;
-  detalles?: FacturaDetalle[];
-}
+export interface UpdateGastoGeneralRequest extends Partial<CreateGastoGeneralRequest> {}
 
-// Detalle de Factura - Exactamente como en el modelo Laravel y migración
-export interface FacturaDetalle extends BaseModel {
-  factura_detalle_id: number; // Clave primaria según la migración
-  factura_id: number;
-  lavado_id?: number | null; // Nullable según la migración
-  venta_producto_automotriz_id?: number | null; // Nullable según la migración
-  venta_producto_despensa_id?: number | null; // Nullable según la migración
-  cantidad: number; // Default 1 según la migración
-  precio_unitario: number;
-  subtotal: number;
-  factura?: Factura;
-  lavado?: Lavado;
-  venta_producto_automotriz?: VentaProductoAutomotriz;
-  venta_producto_despensa?: VentaProductoDespensa;
-}
-
-// Venta Producto Automotriz - Exactamente como en el modelo Laravel y migración
-export interface VentaProductoAutomotriz extends BaseModel {
-  id: number; // Clave primaria default según la migración
-  producto_id: number; // Referencia a producto_automotriz_id según la migración
-  cliente_id?: number | null; // Nullable según la migración
+// Formularios para Ventas Unificadas
+export interface CreateVentaRequest {
+  cliente_id?: number;
+  empleado_id?: number;
+  vehiculo_id?: number;
+  tipo: 'servicio' | 'producto_automotriz' | 'producto_despensa';
+  referencia_id: number;
   cantidad: number;
-  precio_unitario: number;
-  total: number;
-  fecha: string; // DateTime según la migración
-  producto_automotriz?: ProductoAutomotriz;
-  cliente?: Cliente;
+  precio_unitario?: number;
+  descripcion?: string;
+  generar_factura?: boolean;
 }
 
-// Venta Producto Despensa - Exactamente como en el modelo Laravel y migración
-export interface VentaProductoDespensa extends BaseModel {
-  id: number; // Clave primaria default según la migración
-  producto_id: number; // Referencia a producto_despensa_id según la migración
-  cliente_id?: number | null; // Nullable según la migración
-  cantidad: number;
-  precio_unitario: number;
-  total: number;
-  fecha: string; // DateTime según la migración
-  producto_despensa?: ProductoDespensa;
-  cliente?: Cliente;
+export interface UpdateVentaRequest extends Partial<CreateVentaRequest> {}
+
+// Formularios para Facturas Electrónicas
+export interface CreateFacturaElectronicaRequest {
+  venta_id: number;
+  cliente_razon_social?: string;
+  cliente_identificacion?: string;
+  cliente_direccion?: string;
+  cliente_email?: string;
+  cliente_telefono?: string;
 }
 
-// Tipos para respuestas de API
+export interface UpdateFacturaElectronicaRequest extends Partial<CreateFacturaElectronicaRequest> {}
+
+// ========================================================
+// 🔍 FILTROS Y PAGINACIÓN
+// ========================================================
+
+// Tipos base para respuestas de API
 export interface ApiResponse<T = any> {
   success: boolean;
   message: string;
@@ -267,7 +514,7 @@ export interface PaginatedResponse<T = any> {
   to: number;
 }
 
-// Filtros
+// Filtros base
 export interface FilterOptions {
   search?: string;
   page?: number;
@@ -278,7 +525,70 @@ export interface FilterOptions {
   fecha_fin?: string;
 }
 
-// Dashboard
+// Filtros específicos por entidad
+export interface EmpleadoFilters extends FilterOptions {
+  tipo_salario?: 'mensual' | 'diario' | 'quincenal' | 'semanal';
+}
+
+export interface VehiculoFilters extends FilterOptions {
+  cliente_id?: number;
+  tipo_vehiculo_id?: number;
+}
+
+export interface LavadoFilters extends FilterOptions {
+  empleado_id?: number;
+  vehiculo_id?: number;
+  cliente_id?: number;
+  servicio_id?: number;
+  tipo_lavado?: 'completo' | 'solo_fuera' | 'solo_por_dentro';
+  pulverizado?: boolean;
+}
+
+export interface ProductoFilters extends FilterOptions {
+  activo?: boolean;
+  categoria?: string;
+}
+
+export interface ProveedorFilters extends FilterOptions {
+  deuda_pendiente?: boolean;
+}
+
+export interface VentaFilters extends FilterOptions {
+  tipo?: 'servicio' | 'producto_automotriz' | 'producto_despensa';
+  cliente_id?: number;
+  empleado_id?: number;
+  vehiculo_id?: number;
+  servicio_id?: number;
+  producto_id?: number;
+}
+
+export interface IngresoFilters extends FilterOptions {
+  tipo?: 'venta' | 'servicio';
+  referencia_id?: number;
+}
+
+export interface EgresoFilters extends FilterOptions {
+  tipo?: 'salario' | 'proveedor' | 'gasto_general';
+  referencia_id?: number;
+}
+
+export interface GastoGeneralFilters extends FilterOptions {
+  nombre?: string;
+}
+
+export interface FacturaElectronicaFilters extends FilterOptions {
+  estado?: 'borrador' | 'autorizada' | 'anulada' | 'error';
+  venta_id?: number;
+  cliente_identificacion?: string;
+  numero_factura?: string;
+  fecha_emision_inicio?: string;
+  fecha_emision_fin?: string;
+}
+
+// ========================================================
+// 📊 DASHBOARD Y MÉTRICAS
+// ========================================================
+
 export interface DashboardMetrics {
   total_lavados_hoy: number;
   ingresos_hoy: number;
@@ -294,10 +604,14 @@ export interface DashboardChartData {
   productos_mas_vendidos: Array<{ nombre: string; cantidad: number }>;
 }
 
-// Autenticación
+// ========================================================
+// 🔐 AUTENTICACIÓN
+// ========================================================
+
 export interface LoginCredentials {
   email: string;
   password: string;
+  remember?: boolean;
 }
 
 export interface AuthUser extends User {
@@ -305,568 +619,74 @@ export interface AuthUser extends User {
   roles?: string[];
 }
 
-// Formularios - Exactamente como los campos del backend
-export interface CreateEmpleadoForm {
-  nombres: string;
-  apellidos: string;
-  telefono: string;
-  cedula: string;
-  tipo_salario: 'mensual' | 'diario' | 'quincenal' | 'semanal'; // Enum exacto
-  salario: number;
+// ========================================================
+// 📊 ESTADÍSTICAS Y REPORTES
+// ========================================================
+
+export interface UserStats {
+  total_users: number;
+  active_users: number;
+  verified_users: number;
+  unverified_users: number;
+  deleted_users: number;
+  users_this_month: number;
+  users_last_month: number;
+  growth_percentage: number;
 }
 
-export interface CreateVehiculoForm {
-  cliente_id: number;
-  tipo: 'moto' | 'camioneta' | 'auto_pequeno' | 'auto_mediano'; // Enum exacto
-  matricula?: string; // Opcional
-  descripcion?: string; // Opcional
-}
+// ========================================================
+// 📋 REPORTES ESPECÍFICOS
+// ========================================================
 
-export interface CreateLavadoForm {
-  vehiculo_id: number;
-  empleado_id: number;
-  fecha: string;
-  tipo_lavado: 'completo' | 'solo_fuera' | 'solo_por_dentro'; // Enum exacto
-  precio: number;
-  pulverizado: boolean;
-}
-
-// Request types - Exactamente como los campos del backend
-export interface CreateEmpleadoRequest {
-  nombres: string;
-  apellidos: string;
-  telefono: string;
-  cedula: string;
-  tipo_salario: 'mensual' | 'diario' | 'quincenal' | 'semanal'; // Enum exacto de la migración
-  salario: number;
-}
-
-export interface UpdateEmpleadoRequest extends Partial<CreateEmpleadoRequest> {}
-
-export interface CreateVehiculoRequest {
-  cliente_id: number;
-  tipo: 'moto' | 'camioneta' | 'auto_pequeno' | 'auto_mediano'; // Enum exacto de la migración
-  matricula?: string; // Opcional
-  descripcion?: string; // Opcional
-}
-
-export interface UpdateVehiculoRequest extends Partial<CreateVehiculoRequest> {}
-
-export interface CreateLavadoRequest {
-  vehiculo_id: number;
-  empleado_id: number;
-  fecha: string;
-  tipo_lavado: 'completo' | 'solo_fuera' | 'solo_por_dentro'; // Enum exacto de la migración
-  precio: number;
-  pulverizado: boolean;
-}
-
-export interface UpdateLavadoRequest extends Partial<CreateLavadoRequest> {}
-
-export interface CreateProductoAutomotrizRequest {
-  codigo: string;
-  nombre: string;
-  descripcion?: string;
-  precio_venta: number;
-  stock?: number;
-  activo?: boolean;
-}
-
-export interface UpdateProductoAutomotrizRequest extends Partial<CreateProductoAutomotrizRequest> {}
-
-export interface CreateProductoDespensaRequest {
-  nombre: string;
-  descripcion?: string;
-  precio_venta: number;
-  stock?: number;
-  activo?: boolean;
-}
-
-export interface UpdateProductoDespensaRequest extends Partial<CreateProductoDespensaRequest> {}
-
-export interface CreateProveedorRequest {
-  nombre: string;
-  email?: string;
-  descripcion?: string;
-  telefono?: string;
-  deuda_pendiente?: number;
-}
-
-export interface UpdateProveedorRequest extends Partial<CreateProveedorRequest> {}
-
-export interface CreatePagoProveedorRequest {
-  proveedor_id: number;
-  monto: number;
-  fecha: string;
-  descripcion?: string;
-}
-
-export interface UpdatePagoProveedorRequest extends Partial<CreatePagoProveedorRequest> {}
-
-// Selectores
-export interface SelectOption {
-  value: string | number;
-  label: string;
-  disabled?: boolean;
-}
-
-// Estados de carga
-export interface LoadingState {
-  loading: boolean;
-  error: string | null;
-}
-
-// Configuración de tablas
-export interface TableColumn {
-  key: string;
-  label: string;
-  sortable?: boolean;
-  width?: string;
-  align?: 'left' | 'center' | 'right';
-  format?: (value: any) => string;
-}
-
-export interface TableAction {
-  key: string;
-  label: string;
-  icon?: string;
-  color?: 'primary' | 'secondary' | 'danger';
-  disabled?: (item: any) => boolean;
-  visible?: (item: any) => boolean;
-}
-
-// Tipos específicos para lógica de negocio
-
-// Formulario de vehículo con validación de matrícula según tipo
-export interface CreateVehiculoFormWithValidation extends CreateVehiculoForm {
-  // Si tipo === 'moto', matricula es opcional
-  // Si tipo !== 'moto', matricula es requerida
-  matricula: string | undefined;
-}
-
-// Tipos específicos para ingresos según el tipo
-export interface CreateIngresoLavadoRequest {
-  fecha: string;
-  tipo: 'lavado';
-  referencia_id: number; // lavado_id
-  monto: number;
-  descripcion?: string;
-}
-
-export interface CreateIngresoProductoAutomotrizRequest {
-  fecha: string;
-  tipo: 'producto_automotriz';
-  referencia_id: number; // venta_producto_automotriz.id
-  monto: number;
-  descripcion?: string;
-}
-
-export interface CreateIngresoProductoDespensaRequest {
-  fecha: string;
-  tipo: 'producto_despensa';
-  referencia_id: number; // venta_producto_despensa.id
-  monto: number;
-  descripcion?: string;
-}
-
-export type CreateIngresoRequest = 
-  | CreateIngresoLavadoRequest 
-  | CreateIngresoProductoAutomotrizRequest 
-  | CreateIngresoProductoDespensaRequest;
-
-// Tipos específicos para egresos según el tipo
-export interface CreateEgresoSalarioRequest {
-  fecha: string;
-  tipo: 'salario';
-  referencia_id: number; // empleado_id
-  monto: number;
-  descripcion?: string;
-}
-
-export interface CreateEgresoProveedorRequest {
-  fecha: string;
-  tipo: 'proveedor';
-  referencia_id: number; // id_pago_proveedor
-  monto: number;
-  descripcion?: string;
-}
-
-export interface CreateEgresoGastoGeneralRequest {
-  fecha: string;
-  tipo: 'gasto_general';
-  referencia_id: number; // gasto_general_id
-  monto: number;
-  descripcion?: string;
-}
-
-export type CreateEgresoRequest = 
-  | CreateEgresoSalarioRequest 
-  | CreateEgresoProveedorRequest 
-  | CreateEgresoGastoGeneralRequest;
-
-// Tipos para Gastos Generales
-export interface CreateGastoGeneralRequest {
-  nombre: string;
-  descripcion?: string;
-  monto: number;
-  fecha: string;
-}
-
-export interface UpdateGastoGeneralRequest extends Partial<CreateGastoGeneralRequest> {}
-
-// Tipos de Update para Ingresos y Egresos
-export interface UpdateIngresoRequest extends Partial<Omit<CreateIngresoRequest, 'tipo'>> {
-  tipo?: CreateIngresoRequest['tipo'];
-}
-
-export interface UpdateEgresoRequest extends Partial<Omit<CreateEgresoRequest, 'tipo'>> {
-  tipo?: CreateEgresoRequest['tipo'];
-}
-
-// Helper types para validaciones de lógica de negocio
-
-// Validador de matrícula según tipo de vehículo
-export type VehiculoMatriculaValidation<T extends Vehiculo['tipo']> = T extends 'moto' 
-  ? { matricula?: string | null } 
-  : { matricula: string };
-
-// Helper para determinar si un vehículo requiere matrícula
-export const requiereMatricula = (tipo: Vehiculo['tipo']): boolean => {
-  return tipo !== 'moto';
-};
-
-// Helper para obtener el nombre de la referencia según el tipo
-export const getReferenciaTipo = (tipo: string): string => {
-  const referencias: Record<string, string> = {
-    // Ingresos
-    'lavado': 'lavado_id',
-    'producto_automotriz': 'venta_producto_automotriz_id',
-    'producto_despensa': 'venta_producto_despensa_id',
-    // Egresos
-    'salario': 'empleado_id',
-    'proveedor': 'id_pago_proveedor',
-    'gasto_general': 'gasto_general_id'
-  };
-  return referencias[tipo] || 'referencia_id';
-};
-
-// Tipos para las requests de ventas
-export interface CreateVentaAutomotrizRequest {
-  producto_id: number;
-  cliente_id?: number | null;
-  cantidad: number;
-  precio_unitario: number;
-  fecha: string;
-}
-
-export interface UpdateVentaAutomotrizRequest extends Partial<CreateVentaAutomotrizRequest> {}
-
-export interface CreateVentaDespensaRequest {
-  producto_id: number;
-  cliente_id?: number | null;
-  cantidad: number;
-  precio_unitario: number;
-  fecha: string;
-}
-
-export interface UpdateVentaDespensaRequest extends Partial<CreateVentaDespensaRequest> {}
-
-// Tipos para filtros de ventas
-export interface VentaFilters {
-  page?: number;
-  per_page?: number;
-  search?: string;
-  tipo?: 'automotriz' | 'despensa';
-  cliente_id?: number;
-  producto_id?: number;
-  fecha_inicio?: string;
-  fecha_fin?: string;
-}
-
-// Tipo unificado para mostrar ventas en la tabla
-export interface VentaUnificada {
-  id: number;
-  tipo: 'automotriz' | 'despensa';
-  producto_nombre: string;
-  cliente_nombre?: string;
-  cantidad: number;
-  precio_unitario: number;
-  total: number;
-  fecha: string;
-  created_at?: string;
-  updated_at?: string;
-  deleted_at?: string | null;
-  // Referencias originales para acciones
-  original_data: VentaProductoAutomotriz | VentaProductoDespensa;
-}
-
-// Tipos para métricas de ventas
-export interface VentaMetricas {
-  total_ventas: number;
-  total_ingresos: number;
-  ventas_automotrices: {
-    total: number;
-    ingresos: number;
-  };
-  ventas_despensa: {
-    total: number;
-    ingresos: number;
-  };
-  producto_mas_vendido: {
-    nombre: string;
-    cantidad: number;
-  } | null;
-  ventas_por_mes: Array<{
-    mes: string;
-    cantidad: number;
-    ingresos: number;
-  }>;
-}
-
-// Tipo para opciones de productos en ventas
-export interface ProductoVentaOption {
-  id: number;
-  nombre: string;
-  codigo?: string;
-  precio_venta: number;
-  stock: number;
-  tipo: 'automotriz' | 'despensa';
-  activo: boolean;
-}
-
-// Tipos para filtros específicos de ventas automotrices y despensa
-export interface VentaAutomotrizFilters extends VentaFilters {
-  codigo_producto?: string;
-}
-
-export interface VentaDespensaFilters extends VentaFilters {
-  stock_minimo?: number;
-}
-
-// ==========================================
-// REPORTES TYPES
-// ==========================================
-
-// Tipos base para reportes
-export interface ReporteDisponible {
-  id: string;
-  nombre: string;
-  descripcion: string;
-  categoria: string;
-  requiere_fechas: boolean;
-  formato_disponible: string[];
-}
-
-export interface ReporteRequest {
-  fecha_inicio?: string;
-  fecha_fin?: string;
-  formato?: 'json' | 'pdf' | 'excel';
-}
-
-export interface ReporteMetricas {
-  total: number;
-  promedio: number;
-  maximo: number;
-  minimo: number;
-  crecimiento?: number;
-}
-
-// Reporte de Ventas
 export interface ReporteVentas {
   resumen: {
     total_ventas: number;
-    total_unidades: number;
+    ingresos_totales: number;
     ticket_promedio: number;
-    crecimiento_periodo: number;
+    crecimiento_mensual: number;
   };
-  ventas_por_dia: Array<{
-    fecha: string;
-    total: number;
-    cantidad: number;
-  }>;
-  productos_mas_vendidos: Array<{
-    producto: string;
-    cantidad: number;
-    total: number;
-  }>;
   ventas_por_categoria: Array<{
     categoria: string;
+    cantidad: number;
     total: number;
     porcentaje: number;
   }>;
+  tendencia_diaria: Array<{
+    fecha: string;
+    ventas: number;
+    ingresos: number;
+  }>;
+  productos_top: Array<{
+    producto: string;
+    cantidad: number;
+    ingresos: number;
+  }>;
 }
 
-// Reporte de Lavados
 export interface ReporteLavados {
   resumen: {
     total_lavados: number;
-    total_ingresos: number;
-    lavado_promedio: number;
-    crecimiento_periodo: number;
+    ingresos_lavados: number;
+    promedio_por_lavado: number;
+    lavados_con_pulverizado: number;
   };
-  lavados_por_dia: Array<{
-    fecha: string;
-    cantidad: number;
-    total: number;
-  }>;
-  tipos_mas_solicitados: Array<{
-    tipo_lavado: string;
-    cantidad: number;
-    total: number;
-  }>;
-  empleados_performance: Array<{
-    empleado: string;
-    lavados_realizados: number;
-    total_generado: number;
-  }>;
-}
-
-// Reporte de Ingresos
-export interface ReporteIngresos {
-  resumen: {
-    total_ingresos: number;
-    promedio_diario: number;
-    crecimiento: number;
-  };
-  ingresos_por_dia: Array<{
-    fecha: string;
-    total: number;
-  }>;
-  ingresos_por_fuente: Array<{
-    fuente: string;
-    total: number;
-    porcentaje: number;
-  }>;
-  detalle_ingresos: Array<{
-    fecha: string;
-    concepto: string;
-    monto: number;
+  lavados_por_tipo: Array<{
     tipo: string;
-  }>;
-}
-
-// Reporte de Egresos
-export interface ReporteEgresos {
-  resumen: {
-    total_egresos: number;
-    promedio_diario: number;
-    crecimiento: number;
-  };
-  egresos_por_dia: Array<{
-    fecha: string;
-    total: number;
-  }>;
-  egresos_por_categoria: Array<{
-    categoria: string;
-    total: number;
+    cantidad: number;
     porcentaje: number;
   }>;
-  detalle_egresos: Array<{
-    fecha: string;
-    concepto: string;
-    monto: number;
-    categoria: string;
-  }>;
-}
-
-// Reporte de Facturas
-export interface ReporteFacturas {
-  resumen: {
-    total_facturas: number;
-    total_facturado: number;
-    factura_promedio: number;
-    crecimiento: number;
-  };
-  facturas_por_dia: Array<{
-    fecha: string;
-    cantidad: number;
-    total: number;
-  }>;
-  clientes_top: Array<{
-    cliente: string;
-    facturas: number;
-    total: number;
-  }>;
-  detalle_facturas: Array<{
-    numero_factura: string;
-    fecha: string;
-    cliente: string;
-    total: number;
-  }>;
-}
-
-// Reporte de Empleados
-export interface ReporteEmpleados {
-  resumen: {
-    total_empleados: number;
-    promedio_performance: number;
-  };
   performance_empleados: Array<{
     empleado: string;
     lavados_realizados: number;
-    ventas_realizadas: number;
-    total_generado: number;
-    calificacion: number;
+    ingresos_generados: number;
   }>;
-  empleados_por_mes: Array<{
-    mes: string;
-    empleados_activos: number;
-  }>;
-}
-
-// Reporte de Productos
-export interface ReporteProductos {
-  resumen: {
-    total_productos: number;
-    productos_agotados: number;
-    valor_inventario: number;
-  };
-  productos_mas_vendidos: Array<{
-    producto: string;
-    categoria: string;
-    cantidad_vendida: number;
-    stock_actual: number;
-    valor_total: number;
-  }>;
-  productos_bajo_stock: Array<{
-    producto: string;
-    stock_actual: number;
-    stock_minimo: number;
-    categoria: string;
-  }>;
-  rotacion_inventario: Array<{
-    producto: string;
-    rotacion: number;
-    dias_promedio: number;
-  }>;
-}
-
-// Reporte de Clientes
-export interface ReporteClientes {
-  resumen: {
-    total_clientes: number;
-    clientes_activos: number;
-    ticket_promedio: number;
-    frecuencia_promedio: number;
-  };
-  clientes_top: Array<{
-    cliente: string;
-    total_gastado: number;
-    visitas: number;
-    ultima_visita: string;
-  }>;
-  clientes_nuevos: Array<{
-    mes: string;
-    nuevos_clientes: number;
-  }>;
-  segmentacion: Array<{
-    segmento: string;
+  tendencia_diaria: Array<{
+    fecha: string;
     cantidad: number;
-    porcentaje: number;
+    ingresos: number;
   }>;
 }
 
-// Reporte Financiero
 export interface ReporteFinanciero {
   resumen: {
     total_ingresos: number;
@@ -893,40 +713,63 @@ export interface ReporteFinanciero {
   }>;
 }
 
-// Reporte de Balance
-export interface ReporteBalance {
-  activos: {
-    efectivo: number;
-    inventario: number;
-    cuentas_por_cobrar: number;
-    total_activos: number;
-  };
-  pasivos: {
-    cuentas_por_pagar: number;
-    total_pasivos: number;
-  };
-  patrimonio: {
-    capital: number;
-    utilidades_retenidas: number;
-    total_patrimonio: number;
-  };
-  ratios: {
-    liquidez: number;
-    rentabilidad: number;
-    endeudamiento: number;
-  };
+// Reportes adicionales (estructura base genérica hasta refinar con backend)
+export interface ReporteIngresos {
+  resumen: { total_ingresos: number; promedio_diario?: number };
+  ingresos_por_dia?: Array<{ fecha: string; monto: number }>;
+  ingresos_por_tipo?: Array<{ tipo: string; cantidad: number; total: number; porcentaje: number }>;
 }
 
-// Reporte Completo
+export interface ReporteEgresos {
+  resumen: { total_egresos: number; promedio_diario?: number };
+  egresos_por_dia?: Array<{ fecha: string; monto: number }>;
+  egresos_por_tipo?: Array<{ tipo: string; cantidad: number; total: number; porcentaje: number }>;
+}
+
+export interface ReporteFacturas {
+  resumen: { total_facturas: number; autorizadas: number; anuladas: number; pendientes: number };
+  facturas_por_estado?: Array<{ estado: string; cantidad: number; porcentaje: number }>;
+  facturacion_diaria?: Array<{ fecha: string; total: number }>;
+}
+
+export interface ReporteEmpleados {
+  resumen: { total_empleados: number; activos: number; lavados_promedio?: number };
+  productividad?: Array<{ empleado: string; lavados: number; ingresos?: number }>;
+}
+
+export interface ReporteProductos {
+  resumen: { total_productos: number; productos_activos: number; ingresos_total?: number };
+  top_productos?: Array<{ producto: string; cantidad: number; ingresos: number }>; 
+  inventario_bajo?: Array<{ producto: string; stock: number }>; 
+}
+
+export interface ReporteClientes {
+  resumen: { total_clientes: number; nuevos_periodo?: number; tickets_promedio?: number };
+  clientes_frecuentes?: Array<{ cliente: string; compras: number; total: number }>;
+}
+
+export interface ReporteBalance {
+  resumen: { ingresos: number; egresos: number; utilidad: number };
+  balance_mensual?: Array<{ mes: string; ingresos: number; egresos: number; utilidad: number }>;
+}
+
 export interface ReporteCompleto {
-  periodo: {
-    fecha_inicio: string;
-    fecha_fin: string;
-  };
-  ventas: ReporteVentas;
-  lavados: ReporteLavados;
-  financiero: ReporteFinanciero;
-  clientes: ReporteClientes;
-  empleados: ReporteEmpleados;
-  productos: ReporteProductos;
+  ventas?: ReporteVentas;
+  lavados?: ReporteLavados;
+  ingresos?: ReporteIngresos;
+  egresos?: ReporteEgresos;
+  facturas?: ReporteFacturas;
+  empleados?: ReporteEmpleados;
+  productos?: ReporteProductos;
+  clientes?: ReporteClientes;
+  financiero?: ReporteFinanciero;
+  balance?: ReporteBalance;
+}
+
+export interface ReporteDisponible { tipo: string; descripcion: string }
+
+export interface ReporteRequest {
+  fecha_inicio: string;
+  fecha_fin: string;
+  formato: 'json' | 'pdf' | 'excel';
 }

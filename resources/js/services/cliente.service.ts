@@ -1,5 +1,12 @@
 import apiService from './api';
-import type { Cliente, CreateClienteForm, ApiResponse, PaginatedResponse, FilterOptions } from '@/types';
+import type { 
+  Cliente, 
+  CreateClienteRequest, 
+  UpdateClienteRequest,
+  ApiResponse, 
+  PaginatedResponse, 
+  FilterOptions 
+} from '@/types';
 
 class ClienteService {
   /**
@@ -38,7 +45,7 @@ class ClienteService {
    * Crear nuevo cliente
    * POST /api/clientes
    */
-  async create(data: CreateClienteForm): Promise<ApiResponse<Cliente>> {
+  async create(data: CreateClienteRequest): Promise<ApiResponse<Cliente>> {
     return await apiService.post('/clientes', data);
   }
 
@@ -54,7 +61,7 @@ class ClienteService {
    * Actualizar cliente
    * PUT /api/clientes/{id}
    */
-  async update(id: number, data: Partial<CreateClienteForm>): Promise<ApiResponse<Cliente>> {
+  async update(id: number, data: UpdateClienteRequest): Promise<ApiResponse<Cliente>> {
     return await apiService.put(`/clientes/${id}`, data);
   }
 

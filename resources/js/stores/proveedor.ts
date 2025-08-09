@@ -1,13 +1,15 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import proveedorService, { type ProveedorFilters, type PagoFilters } from '@/services/proveedor.service';
+import proveedorService from '@/services/proveedor.service';
 import type { 
   Proveedor, 
   PagoProveedor, 
   CreateProveedorRequest, 
   UpdateProveedorRequest,
   CreatePagoProveedorRequest,
-  UpdatePagoProveedorRequest 
+  UpdatePagoProveedorRequest,
+  ProveedorFilters,
+  PaginatedResponse,
 } from '@/types';
 
 export const useProveedorStore = defineStore('proveedor', () => {
@@ -45,7 +47,7 @@ export const useProveedorStore = defineStore('proveedor', () => {
     search: '',
   });
   
-  const filtersPagos = ref<PagoFilters>({
+  const filtersPagos = ref<{ page: number; per_page: number; search: string }>({
     page: 1,
     per_page: 15,
     search: '',
@@ -83,11 +85,16 @@ export const useProveedorStore = defineStore('proveedor', () => {
       setLoading(true);
       clearError();
       
-      const response = await proveedorService.getProveedores(filters);
-      
-      if (response.data) {
-        proveedores.value = Array.isArray(response.data) ? response.data : [];
-      }
+      const response: PaginatedResponse<Proveedor> = await proveedorService.getProveedores(filters);
+      proveedores.value = response.data;
+      paginationProveedores.value = {
+        current_page: response.current_page,
+        last_page: response.last_page,
+        per_page: response.per_page,
+        total: response.total,
+        from: response.from,
+        to: response.to,
+      };
     } catch (err: any) {
       setError(err.message || 'Error al cargar proveedores');
       console.error('Error fetching proveedores:', err);
@@ -105,8 +112,7 @@ export const useProveedorStore = defineStore('proveedor', () => {
       if (response.data) {
         currentProveedor.value = response.data;
       }
-      
-      return response.data;
+      return response.data ?? null;
     } catch (err: any) {
       setError(err.message || 'Error al cargar proveedor');
       console.error('Error fetching proveedor:', err);
@@ -122,13 +128,11 @@ export const useProveedorStore = defineStore('proveedor', () => {
       clearError();
       
       const response = await proveedorService.createProveedor(data);
-      
       if (response.data) {
         proveedores.value.unshift(response.data);
         paginationProveedores.value.total += 1;
       }
-      
-      return response.data;
+      return response.data ?? null;
     } catch (err: any) {
       setError(err.message || 'Error al crear proveedor');
       console.error('Error creating proveedor:', err);
@@ -144,19 +148,16 @@ export const useProveedorStore = defineStore('proveedor', () => {
       clearError();
       
       const response = await proveedorService.updateProveedor(id, data);
-      
       if (response.data) {
         const index = proveedores.value.findIndex(p => p.proveedor_id === id);
         if (index !== -1) {
           proveedores.value[index] = response.data;
         }
-        
         if (currentProveedor.value?.proveedor_id === id) {
           currentProveedor.value = response.data;
         }
       }
-      
-      return response.data;
+      return response.data ?? null;
     } catch (err: any) {
       setError(err.message || 'Error al actualizar proveedor');
       console.error('Error updating proveedor:', err);
@@ -192,16 +193,22 @@ export const useProveedorStore = defineStore('proveedor', () => {
   };
 
   // Gestión de pagos
-  const fetchPagos = async (filters?: PagoFilters) => {
+  const fetchPagos = async () => {
     try {
       setLoading(true);
       clearError();
       
-      const response = await proveedorService.getAllPagos(filters);
-      
-      if (response.data) {
-        pagos.value = Array.isArray(response.data) ? response.data : [];
-      }
+      const response = await proveedorService.getAllPagos();
+      pagos.value = Array.isArray(response.data) ? response.data : [];
+      // Actualizar paginación local (client-side)
+      paginationPagos.value = {
+        current_page: 1,
+        last_page: 1,
+        per_page: response.data ? response.data.length : 0,
+        total: response.data ? response.data.length : 0,
+        from: 0,
+        to: response.data ? response.data.length : 0,
+      };
     } catch (err: any) {
       setError(err.message || 'Error al cargar pagos');
       console.error('Error fetching pagos:', err);
@@ -216,13 +223,11 @@ export const useProveedorStore = defineStore('proveedor', () => {
       clearError();
       
       const response = await proveedorService.createPago(data);
-      
       if (response.data) {
         pagos.value.unshift(response.data);
         paginationPagos.value.total += 1;
       }
-      
-      return response.data;
+      return response.data ?? null;
     } catch (err: any) {
       setError(err.message || 'Error al crear pago');
       console.error('Error creating pago:', err);

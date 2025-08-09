@@ -1,18 +1,18 @@
 import apiService from './api';
 import type { 
-  ReporteDisponible,
-  ReporteRequest,
   ReporteVentas,
   ReporteLavados,
+  ReporteFinanciero,
   ReporteIngresos,
   ReporteEgresos,
   ReporteFacturas,
   ReporteEmpleados,
   ReporteProductos,
   ReporteClientes,
-  ReporteFinanciero,
   ReporteBalance,
-  ReporteCompleto
+  ReporteCompleto,
+  ReporteDisponible,
+  ReporteRequest
 } from '@/types';
 
 export interface ApiResponse<T> {
@@ -22,7 +22,7 @@ export interface ApiResponse<T> {
 }
 
 export class ReporteService {
-  private baseUrl = '/api/reportes';
+  private baseUrl = '/reportes';
 
   // Obtener reportes disponibles
   async getReportesDisponibles(): Promise<ReporteDisponible[]> {

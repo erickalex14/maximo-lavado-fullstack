@@ -1,14 +1,14 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import vehiculoService, { type VehiculoStats, type VehiculoFilters } from '@/services/vehiculo.service';
-import type { Vehiculo, PaginatedResponse } from '@/types';
+import vehiculoService from '@/services/vehiculo.service';
+import type { Vehiculo, PaginatedResponse, VehiculoFilters } from '@/types';
 
 export const useVehiculoStore = defineStore('vehiculo', () => {
   // State
   const vehiculos = ref<Vehiculo[]>([]);
   const vehiculosPaginados = ref<PaginatedResponse<Vehiculo> | null>(null);
   const vehiculoActual = ref<Vehiculo | null>(null);
-  const estadisticas = ref<VehiculoStats | null>(null);
+  const estadisticas = ref<any | null>(null);
   const trashedVehiculos = ref<Vehiculo[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
@@ -23,7 +23,7 @@ export const useVehiculoStore = defineStore('vehiculo', () => {
   });
 
   const vehiculosPorTipo = computed(() => {
-    return (tipo: string) => vehiculos.value.filter(v => v.tipo === tipo);
+    return (tipoVehiculoId: number) => vehiculos.value.filter(v => v.tipo_vehiculo_id === tipoVehiculoId);
   });
 
   // Actions
@@ -50,8 +50,8 @@ export const useVehiculoStore = defineStore('vehiculo', () => {
       loading.value = true;
       error.value = null;
       
-      const response = await vehiculoService.getAllVehiculos();
-      vehiculos.value = response;
+  const response = await vehiculoService.getAllVehiculos();
+  vehiculos.value = response.data ?? [];
       
       return response;
     } catch (err: any) {
@@ -66,8 +66,8 @@ export const useVehiculoStore = defineStore('vehiculo', () => {
     try {
       error.value = null;
       
-      const response = await vehiculoService.getEstadisticas();
-      estadisticas.value = response;
+  const response = await vehiculoService.getStats();
+  estadisticas.value = response.data ?? null;
       
       return response;
     } catch (err: any) {
@@ -81,9 +81,8 @@ export const useVehiculoStore = defineStore('vehiculo', () => {
       loading.value = true;
       error.value = null;
       
-      const response = await vehiculoService.getVehiculosByCliente(clienteId);
-      
-      return response;
+  const response = await vehiculoService.getVehiculosByCliente(clienteId);
+  return response.data ?? [];
     } catch (err: any) {
       error.value = err.message || 'Error al cargar vehículos del cliente';
       throw err;
@@ -97,10 +96,9 @@ export const useVehiculoStore = defineStore('vehiculo', () => {
       loading.value = true;
       error.value = null;
       
-      const response = await vehiculoService.getVehiculoById(id);
-      vehiculoActual.value = response;
-      
-      return response;
+  const response = await vehiculoService.getVehiculoById(id);
+  vehiculoActual.value = response.data ?? null;
+  return response.data ?? null;
     } catch (err: any) {
       error.value = err.message || 'Error al cargar vehículo';
       throw err;
@@ -117,11 +115,11 @@ export const useVehiculoStore = defineStore('vehiculo', () => {
       const response = await vehiculoService.createVehiculo(vehiculo);
       
       // Agregar a la lista local si existe
-      if (vehiculos.value) {
-        vehiculos.value.unshift(response);
+      if (vehiculos.value && response.data) {
+        vehiculos.value.unshift(response.data);
       }
       
-      return response;
+      return response.data ?? null;
     } catch (err: any) {
       error.value = err.message || 'Error al crear vehículo';
       throw err;
@@ -139,16 +137,16 @@ export const useVehiculoStore = defineStore('vehiculo', () => {
       
       // Actualizar en la lista local
       const index = vehiculos.value.findIndex(v => v.vehiculo_id === id);
-      if (index !== -1) {
-        vehiculos.value[index] = response;
+      if (index !== -1 && response.data) {
+        vehiculos.value[index] = response.data;
       }
       
       // Actualizar vehículo actual si coincide
       if (vehiculoActual.value?.vehiculo_id === id) {
-        vehiculoActual.value = response;
+        vehiculoActual.value = response.data ?? null;
       }
       
-      return response;
+      return response.data ?? null;
     } catch (err: any) {
       error.value = err.message || 'Error al actualizar vehículo';
       throw err;
@@ -206,10 +204,10 @@ export const useVehiculoStore = defineStore('vehiculo', () => {
       loading.value = true;
       error.value = null;
       
-      const response = await vehiculoService.getTrashedVehiculos();
-      trashedVehiculos.value = response;
+  const response = await vehiculoService.getTrashedVehiculos();
+  trashedVehiculos.value = response.data ?? [];
       
-      return response;
+  return trashedVehiculos.value;
     } catch (err: any) {
       error.value = err.message || 'Error al cargar vehículos eliminados';
       throw err;

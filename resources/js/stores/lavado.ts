@@ -1,7 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import lavadoService, { type LavadoFilters, type LavadoDateFilters } from '@/services/lavado.service';
-import type { Lavado, PaginatedResponse, CreateLavadoRequest, UpdateLavadoRequest } from '@/types';
+import lavadoService from '@/services/lavado.service';
+import type { Lavado, PaginatedResponse, CreateLavadoRequest, UpdateLavadoRequest, LavadoFilters } from '@/types';
+
+// Filtros de fecha locales para compatibilidad con la UI
+type LavadoDateFilters = { fecha?: string; anio?: number; mes?: number };
 
 export const useLavadoStore = defineStore('lavado', () => {
   // State
@@ -82,10 +85,10 @@ export const useLavadoStore = defineStore('lavado', () => {
       setLoading(true);
       clearError();
       
-      const lavado = await lavadoService.getLavado(id);
-      currentLavado.value = lavado;
+      const resp = await lavadoService.getLavado(id);
+      currentLavado.value = resp.data ?? null;
       
-      return lavado;
+      return resp.data;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al cargar el lavado');
       console.error('Error fetching lavado:', err);
@@ -100,12 +103,12 @@ export const useLavadoStore = defineStore('lavado', () => {
       setLoading(true);
       clearError();
       
-      const newLavado = await lavadoService.createLavado(data);
+      const resp = await lavadoService.createLavado(data);
       
       // Actualizar la lista de lavados
       await fetchLavados();
       
-      return newLavado;
+      return resp.data;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al crear el lavado');
       console.error('Error creating lavado:', err);
@@ -120,20 +123,20 @@ export const useLavadoStore = defineStore('lavado', () => {
       setLoading(true);
       clearError();
       
-      const updatedLavado = await lavadoService.updateLavado(id, data);
+      const resp = await lavadoService.updateLavado(id, data);
       
       // Actualizar en la lista local
       const index = lavados.value.findIndex(l => l.lavado_id === id);
       if (index !== -1) {
-        lavados.value[index] = updatedLavado;
+        if (resp.data) lavados.value[index] = resp.data;
       }
       
       // Actualizar el lavado actual si coincide
       if (currentLavado.value?.lavado_id === id) {
-        currentLavado.value = updatedLavado;
+        currentLavado.value = resp.data ?? null;
       }
       
-      return updatedLavado;
+      return resp.data;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al actualizar el lavado');
       console.error('Error updating lavado:', err);
@@ -175,12 +178,12 @@ export const useLavadoStore = defineStore('lavado', () => {
       setLoading(true);
       clearError();
       
-      const restoredLavado = await lavadoService.restoreLavado(id);
+      const resp = await lavadoService.restoreLavado(id);
       
       // Actualizar la lista de lavados
       await fetchLavados();
       
-      return restoredLavado;
+      return resp.data;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al restaurar el lavado');
       console.error('Error restoring lavado:', err);
@@ -190,19 +193,18 @@ export const useLavadoStore = defineStore('lavado', () => {
     }
   };
 
-  const fetchLavadosByEmpleado = async (empleadoId: number, customFilters?: LavadoFilters) => {
+  const fetchLavadosByEmpleado = async (empleadoId: number) => {
     try {
       setLoading(true);
       clearError();
       
-      const response: PaginatedResponse<Lavado> = await lavadoService.getByEmpleado(empleadoId, customFilters);
-      
-      lavados.value = response.data;
+      const resp = await lavadoService.getByEmpleado(empleadoId);
+      lavados.value = resp.data || [];
       pagination.value = {
-        current_page: response.current_page,
-        last_page: response.last_page,
-        per_page: response.per_page,
-        total: response.total,
+        current_page: 1,
+        last_page: 1,
+        per_page: resp.data?.length ?? 0,
+        total: resp.data?.length ?? 0,
       };
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al cargar los lavados del empleado');
@@ -212,19 +214,18 @@ export const useLavadoStore = defineStore('lavado', () => {
     }
   };
 
-  const fetchLavadosByVehiculo = async (vehiculoId: number, customFilters?: LavadoFilters) => {
+  const fetchLavadosByVehiculo = async (vehiculoId: number) => {
     try {
       setLoading(true);
       clearError();
       
-      const response: PaginatedResponse<Lavado> = await lavadoService.getByVehiculo(vehiculoId, customFilters);
-      
-      lavados.value = response.data;
+      const resp = await lavadoService.getByVehiculo(vehiculoId);
+      lavados.value = resp.data || [];
       pagination.value = {
-        current_page: response.current_page,
-        last_page: response.last_page,
-        per_page: response.per_page,
-        total: response.total,
+        current_page: 1,
+        last_page: 1,
+        per_page: resp.data?.length ?? 0,
+        total: resp.data?.length ?? 0,
       };
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al cargar los lavados del vehículo');
@@ -239,7 +240,9 @@ export const useLavadoStore = defineStore('lavado', () => {
       setLoading(true);
       clearError();
       
-      const lavadosDelDia = await lavadoService.getByDay(dateFilters);
+      const fecha = dateFilters?.fecha ?? new Date().toISOString().slice(0, 10);
+      const resp = await lavadoService.getByDay(fecha);
+      const lavadosDelDia = resp.data || [];
       lavados.value = lavadosDelDia;
       
       return lavadosDelDia;
@@ -257,7 +260,9 @@ export const useLavadoStore = defineStore('lavado', () => {
       setLoading(true);
       clearError();
       
-      const lavadosDeLaSemana = await lavadoService.getByWeek(dateFilters);
+      const fecha = dateFilters?.fecha ?? new Date().toISOString().slice(0, 10);
+      const resp = await lavadoService.getByWeek(fecha);
+      const lavadosDeLaSemana = resp.data || [];
       lavados.value = lavadosDeLaSemana;
       
       return lavadosDeLaSemana;
@@ -275,7 +280,10 @@ export const useLavadoStore = defineStore('lavado', () => {
       setLoading(true);
       clearError();
       
-      const lavadosDelMes = await lavadoService.getByMonth(dateFilters);
+      const anio = dateFilters?.anio ?? new Date().getFullYear();
+      const mes = dateFilters?.mes ?? (new Date().getMonth() + 1);
+      const resp = await lavadoService.getByMonth(anio, mes);
+      const lavadosDelMes = resp.data || [];
       lavados.value = lavadosDelMes;
       
       return lavadosDelMes;
@@ -293,8 +301,8 @@ export const useLavadoStore = defineStore('lavado', () => {
       setLoading(true);
       clearError();
       
-      const stats = await lavadoService.getStats();
-      return stats;
+      const resp = await lavadoService.getStats();
+      return resp.data;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al cargar las estadísticas');
       console.error('Error fetching lavado stats:', err);

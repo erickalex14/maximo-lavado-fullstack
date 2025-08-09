@@ -2,16 +2,14 @@ import apiService from './api';
 import type { 
   User, 
   CreateUserForm, 
-  UpdateUserForm, 
-  UpdatePasswordForm, 
-  ResetPasswordForm,
+  UpdateUserForm,
   UserStats 
 } from '@/types';
 
 export interface CreateUserRequest extends CreateUserForm {}
 export interface UpdateUserRequest extends UpdateUserForm {}
-export interface UpdatePasswordRequest extends UpdatePasswordForm {}
-export interface ResetPasswordRequest extends ResetPasswordForm {}
+export interface UpdatePasswordRequest { current_password: string; new_password: string; new_password_confirmation: string; }
+export interface ResetPasswordRequest { new_password: string; new_password_confirmation: string; }
 
 export interface ApiResponse<T> {
   status: string;
@@ -20,7 +18,7 @@ export interface ApiResponse<T> {
 }
 
 export class UserService {
-  private baseUrl = '/api/usuarios';
+  private baseUrl = '/usuarios';
 
   // Obtener todos los usuarios
   async getUsers(): Promise<User[]> {
@@ -131,25 +129,10 @@ export class UserService {
 
   validatePassword(data: UpdatePasswordRequest): { valid: boolean; errors: Record<string, string> } {
     const errors: Record<string, string> = {};
-
-    if (!data.current_password?.trim()) {
-      errors.current_password = 'La contraseña actual es requerida';
-    }
-
-    if (!data.new_password?.trim()) {
-      errors.new_password = 'La nueva contraseña es requerida';
-    } else if (data.new_password.length < 8) {
-      errors.new_password = 'La nueva contraseña debe tener al menos 8 caracteres';
-    }
-
-    if (data.new_password !== data.new_password_confirmation) {
-      errors.new_password_confirmation = 'Las contraseñas no coinciden';
-    }
-
-    return {
-      valid: Object.keys(errors).length === 0,
-      errors
-    };
+    if (!data.current_password || !data.current_password.trim()) errors.current_password = 'La contraseña actual es requerida';
+    if (!data.new_password || data.new_password.length < 8) errors.new_password = 'La nueva contraseña debe tener al menos 8 caracteres';
+    if (data.new_password !== data.new_password_confirmation) errors.new_password_confirmation = 'Las contraseñas no coinciden';
+    return { valid: Object.keys(errors).length === 0, errors };
   }
 }
 
