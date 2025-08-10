@@ -220,7 +220,7 @@
 
     <!-- Modales -->
     <ProveedorModal
-      :is-open="showCreateModal || showEditModal"
+      :isOpen="showCreateModal || showEditModal"
       :proveedor="selectedProveedor"
       :loading="isLoading"
       @close="closeModals"
@@ -228,14 +228,14 @@
     />
 
     <ProveedorViewModal
-      :is-open="showViewModal"
+      :isOpen="showViewModal"
       :proveedor="selectedProveedor"
       @close="closeModals"
       @edit="editProveedor"
     />
 
     <PagoModal
-      :is-open="showCreatePagoModal || showEditPagoModal"
+      :isOpen="showCreatePagoModal || showEditPagoModal"
       :pago="selectedPago"
       :proveedores="proveedores"
       :loading="isLoading"
@@ -244,7 +244,7 @@
     />
 
     <PagoViewModal
-      :is-open="showViewPagoModal"
+      :isOpen="showViewPagoModal"
       :pago="selectedPago"
       @close="closePagoModals"
       @edit="editPago"
@@ -343,9 +343,13 @@ const paginationPagos = computed(() => proveedorStore.paginationPagos);
 const totalProveedores = computed(() => proveedorStore.totalProveedores);
 const proveedoresConDeuda = computed(() => proveedorStore.proveedoresConDeuda);
 
-const totalDeuda = computed(() => 
-  proveedores.value.reduce((sum, p) => sum + p.deuda_pendiente, 0)
-);
+// Total deuda (asegurando conversión numérica para evitar concatenación de strings)
+const totalDeuda = computed(() => {
+  return proveedores.value.reduce((sum, p) => {
+    const val = Number((p as any).deuda_pendiente ?? 0);
+    return sum + (isNaN(val) ? 0 : val);
+  }, 0);
+});
 
 // Métodos
 const loadProveedores = async () => {

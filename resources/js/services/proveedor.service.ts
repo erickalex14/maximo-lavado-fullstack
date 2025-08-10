@@ -26,18 +26,36 @@ class ProveedorService {
    */
   async getProveedores(filters?: ProveedorFilters): Promise<PaginatedResponse<Proveedor>> {
     const params = new URLSearchParams();
-    
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
-          params.append(key, value.toString());
+          // Mapear nombres si backend usa snake_case
+          const mapped = key === 'conDeuda' ? 'con_deuda' : key;
+          params.append(mapped, value.toString());
         }
       });
     }
-
     const url = `${this.BASE_URL}${params.toString() ? `?${params.toString()}` : ''}`;
-    const response = await apiService.get<PaginatedResponse<Proveedor>>(url);
-    return response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
+    const raw: any = await apiService.get<any>(url);
+    // Posibles formatos:
+    // 1) { success:true, data:{ data:[...], current_page:1,... } }
+    // 2) { data:[...], current_page:1,... }
+    // 3) PaginatedResponse directamente
+    const candidate = raw?.data && raw.data.data && Array.isArray(raw.data.data) ? raw.data : (raw && Array.isArray(raw.data) && 'current_page' in raw ? raw : null);
+    if (candidate) {
+      return {
+        data: candidate.data || [],
+        current_page: candidate.current_page || 1,
+        last_page: candidate.last_page || 1,
+        per_page: candidate.per_page || (candidate.data?.length ?? 15),
+        total: candidate.total || (candidate.data?.length ?? 0),
+        from: candidate.from ?? (candidate.data?.length ? 1 : 0),
+        to: candidate.to ?? (candidate.data?.length ?? 0),
+      };
+    }
+    // Si viene array plano
+    const arr: Proveedor[] = Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw) ? raw : []);
+    return { data: arr, current_page: 1, last_page: 1, per_page: arr.length || 15, total: arr.length, from: arr.length ? 1 : 0, to: arr.length };
   }
 
   /**
@@ -60,15 +78,32 @@ class ProveedorService {
    * Obtener pagos con filtros/paginación (si el backend lo soporta)
    * GET /api/proveedores/pagos?proveedor_id=&search=&fecha_desde=&fecha_hasta=&page=&per_page=
    */
-  async getPagos(filters?: Record<string, any>): Promise<any> { // retorno flexible (paginated o array)
+  async getPagos(filters?: Record<string, any>): Promise<PaginatedResponse<PagoProveedor>> { // retornamos paginado normalizado
     const params = new URLSearchParams();
     if (filters) {
       Object.entries(filters).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && v !== '') params.append(k, v.toString());
+        if (v !== undefined && v !== null && v !== '') {
+          const mapped = k === 'proveedor_id' ? 'proveedor_id' : (k === 'fecha_desde' ? 'fecha_desde' : (k === 'fecha_hasta' ? 'fecha_hasta' : k));
+          params.append(mapped, v.toString());
+        }
       });
     }
     const url = `${this.BASE_URL}/pagos${params.toString() ? `?${params.toString()}` : ''}`;
-    return await apiService.get(url);
+    const raw: any = await apiService.get<any>(url);
+    const candidate = raw?.data && raw.data.data && Array.isArray(raw.data.data) ? raw.data : (raw && Array.isArray(raw.data) && 'current_page' in raw ? raw : null);
+    if (candidate) {
+      return {
+        data: candidate.data || [],
+        current_page: candidate.current_page || 1,
+        last_page: candidate.last_page || 1,
+        per_page: candidate.per_page || (candidate.data?.length ?? 15),
+        total: candidate.total || (candidate.data?.length ?? 0),
+        from: candidate.from ?? (candidate.data?.length ? 1 : 0),
+        to: candidate.to ?? (candidate.data?.length ?? 0),
+      };
+    }
+    const arr: PagoProveedor[] = Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw) ? raw : []);
+    return { data: arr, current_page: 1, last_page: 1, per_page: arr.length || 15, total: arr.length, from: arr.length ? 1 : 0, to: arr.length };
   }
 
   /**

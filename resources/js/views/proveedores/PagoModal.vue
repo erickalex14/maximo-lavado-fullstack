@@ -149,6 +149,15 @@ const form = reactive<CreatePagoProveedorRequest & { id_pago_proveedor?: number 
 const errors = ref<Record<string, string>>({});
 const submitError = ref<string>('');
 
+// Reset form helper (debe declararse antes de watchers immediate)
+const resetForm = () => {
+  form.proveedor_id = 0;
+  form.monto = 0;
+  form.fecha = new Date().toISOString().split('T')[0];
+  form.descripcion = '';
+  delete form.id_pago_proveedor;
+};
+
 // Initialize form when pago prop changes
 watch(() => props.pago, (newPago) => {
   if (newPago) {
@@ -171,13 +180,6 @@ watch(() => props.isOpen, (isOpen) => {
   submitError.value = '';
 });
 
-const resetForm = () => {
-  form.proveedor_id = 0;
-  form.monto = 0;
-  form.fecha = new Date().toISOString().split('T')[0];
-  form.descripcion = '';
-  delete form.id_pago_proveedor;
-};
 
 const validateForm = (): boolean => {
   errors.value = {};

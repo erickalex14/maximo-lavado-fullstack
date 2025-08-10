@@ -134,6 +134,8 @@ const formatCurrency = (amount: number): string => {
 
 const getTypeLabel = (tipo?: string): string => {
   const labels: Record<string, string> = {
+    venta: 'Venta',
+    servicio: 'Servicio',
     lavado: 'Lavado',
     producto_automotriz: 'Producto Automotriz',
     producto_despensa: 'Producto de Despensa'

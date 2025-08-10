@@ -138,14 +138,14 @@
 
     <!-- Modales -->
     <EgresoModal
-      :is-open="showEgresoModal"
+      :isOpen="showEgresoModal"
       :egreso="selectedEgreso"
       @close="closeEgresoModal"
       @save="handleSaveEgreso"
     />
 
     <EgresoViewModal
-      :is-open="showEgresoViewModal"
+      :isOpen="showEgresoViewModal"
       :egreso="selectedEgreso"
       @close="closeEgresoViewModal"
       @edit="editEgreso"

@@ -202,30 +202,16 @@ export const useProveedorStore = defineStore('proveedor', () => {
       setLoading(true);
       clearError();
       const toUse = filters || filtersPagos.value;
-      const raw: any = await proveedorService.getPagos(toUse);
-      const candidate = raw?.data && Array.isArray(raw.data.data) && ('current_page' in raw.data) ? raw.data : (raw && 'current_page' in raw && Array.isArray(raw.data) ? raw : null);
-      if (candidate) {
-        pagos.value = candidate.data;
-        paginationPagos.value = {
-          current_page: candidate.current_page,
-          last_page: candidate.last_page,
-          per_page: candidate.per_page,
-          total: candidate.total,
-          from: candidate.from ?? ((candidate.current_page - 1) * candidate.per_page + 1),
-          to: candidate.to ?? Math.min(candidate.current_page * candidate.per_page, candidate.total),
-        };
-      } else {
-        const arr = Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw) ? raw : []);
-        pagos.value = arr;
-        paginationPagos.value = {
-          current_page: 1,
-          last_page: 1,
-          per_page: arr.length || 15,
-          total: arr.length,
-          from: arr.length ? 1 : 0,
-          to: arr.length,
-        };
-      }
+      const paginated = await proveedorService.getPagos(toUse);
+      pagos.value = paginated.data;
+      paginationPagos.value = {
+        current_page: paginated.current_page,
+        last_page: paginated.last_page,
+        per_page: paginated.per_page,
+        total: paginated.total,
+        from: paginated.from,
+        to: paginated.to,
+      };
     } catch (err: any) {
       setError(err.message || 'Error al cargar pagos');
       console.error('Error fetching pagos:', err);

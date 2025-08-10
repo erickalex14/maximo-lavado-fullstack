@@ -66,8 +66,13 @@ class FinanzasService {
     }
     
     const url = `/ingresos${params.toString() ? `?${params.toString()}` : ''}`;
-    const response = await apiService.get<PaginatedResponse<Ingreso>>(url);
-    return response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
+    const raw: any = await apiService.get<any>(url);
+    // Backend puede devolver {status, data:[...]} sin paginación
+    const arr: Ingreso[] = Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw) ? raw : []);
+    if (raw && Array.isArray(raw.data) && raw.data.length && (raw.current_page || raw.data.current_page)) {
+      return raw as PaginatedResponse<Ingreso>;
+    }
+    return { data: arr, current_page: 1, last_page: 1, per_page: arr.length || 15, total: arr.length, from: arr.length ? 1 : 0, to: arr.length };
   }
 
   async getIngreso(id: number): Promise<ApiResponse<Ingreso>> {
@@ -110,8 +115,12 @@ class FinanzasService {
     }
     
     const url = `/egresos${params.toString() ? `?${params.toString()}` : ''}`;
-    const response = await apiService.get<PaginatedResponse<Egreso>>(url);
-    return response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
+    const raw: any = await apiService.get<any>(url);
+    const arr: Egreso[] = Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw) ? raw : []);
+    if (raw && Array.isArray(raw.data) && raw.current_page) {
+      return raw as PaginatedResponse<Egreso>;
+    }
+    return { data: arr, current_page: 1, last_page: 1, per_page: arr.length || 15, total: arr.length, from: arr.length ? 1 : 0, to: arr.length };
   }
 
   async getEgreso(id: number): Promise<ApiResponse<Egreso>> {
@@ -154,8 +163,12 @@ class FinanzasService {
     }
     
     const url = `/gastos-generales${params.toString() ? `?${params.toString()}` : ''}`;
-    const response = await apiService.get<PaginatedResponse<GastoGeneral>>(url);
-    return response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
+    const raw: any = await apiService.get<any>(url);
+    const arr: GastoGeneral[] = Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw) ? raw : []);
+    if (raw && Array.isArray(raw.data) && raw.current_page) {
+      return raw as PaginatedResponse<GastoGeneral>;
+    }
+    return { data: arr, current_page: 1, last_page: 1, per_page: arr.length || 15, total: arr.length, from: arr.length ? 1 : 0, to: arr.length };
   }
 
   async getGastoGeneral(id: number): Promise<ApiResponse<GastoGeneral>> {

@@ -234,6 +234,9 @@ import IngresosTab from './components/IngresosTab.vue';
 import EgresosTab from './components/EgresosTab.vue';
 import GastosGeneralesTab from './components/GastosGeneralesTab.vue';
 import BalanceTab from './components/BalanceTab.vue';
+import IngresoModal from './IngresoModal.vue';
+import EgresoModal from './EgresoModal.vue';
+import GastoGeneralModal from './GastoGeneralModal.vue';
 
 // Iconos
 import {
@@ -252,6 +255,11 @@ const finanzasStore = useFinanzasStore();
 const activeTab = ref<'ingresos' | 'egresos' | 'gastos' | 'balance'>('ingresos');
 const showDeleteModal = ref(false);
 const deleteType = ref<'ingreso' | 'egreso' | 'gasto'>('ingreso');
+
+// Estados modales creación
+const showIngresoModal = ref(false);
+const showEgresoModal = ref(false);
+const showGastoModal = ref(false);
 
 // Filtros globales
 const globalFilters = ref({
@@ -329,16 +337,15 @@ const clearGlobalFilters = () => {
 };
 
 // Modales (placeholder - se implementarán con componentes separados)
-const openCreateIngresoModal = () => {
-  console.log('Abrir modal de crear ingreso');
-};
+const openCreateIngresoModal = () => { showIngresoModal.value = true; };
+const openCreateEgresoModal = () => { showEgresoModal.value = true; };
+const openCreateGastoModal = () => { showGastoModal.value = true; };
 
-const openCreateEgresoModal = () => {
-  console.log('Abrir modal de crear egreso');
-};
-
-const openCreateGastoModal = () => {
-  console.log('Abrir modal de crear gasto');
+const handleSaved = async () => {
+  showIngresoModal.value = false;
+  showEgresoModal.value = false;
+  showGastoModal.value = false;
+  await loadAllData();
 };
 
 const confirmDelete = async () => {
@@ -355,3 +362,8 @@ onMounted(async () => {
   await loadAllData();
 });
 </script>
+
+<!-- Modales de creación -->
+<IngresoModal :isOpen="showIngresoModal" @close="showIngresoModal=false" @save="handleSaved" />
+<EgresoModal :isOpen="showEgresoModal" @close="showEgresoModal=false" @save="handleSaved" />
+<GastoGeneralModal :isOpen="showGastoModal" @close="showGastoModal=false" @save="handleSaved" />

@@ -138,14 +138,14 @@
 
     <!-- Modales -->
     <GastoGeneralModal
-      :is-open="showGastoModal"
+      :isOpen="showGastoModal"
       :gasto="selectedGasto"
       @close="closeGastoModal"
       @save="handleSaveGasto"
     />
 
     <GastoGeneralViewModal
-      :is-open="showGastoViewModal"
+      :isOpen="showGastoViewModal"
       :gasto="selectedGasto"
       @close="closeGastoViewModal"
       @edit="editGasto"

@@ -138,14 +138,14 @@
 
     <!-- Modales -->
     <IngresoModal
-      :is-open="showIngresoModal"
+      :isOpen="showIngresoModal"
       :ingreso="selectedIngreso"
       @close="closeIngresoModal"
       @save="handleSaveIngreso"
     />
 
     <IngresoViewModal
-      :is-open="showIngresoViewModal"
+      :isOpen="showIngresoViewModal"
       :ingreso="selectedIngreso"
       @close="closeIngresoViewModal"
       @edit="editIngreso"
@@ -219,11 +219,13 @@ const formatCurrency = (amount: number): string => {
 
 const getTypeLabel = (tipo: string): string => {
   const labels: Record<string, string> = {
+    venta: 'Venta',
+    servicio: 'Servicio',
     lavado: 'Lavado',
     producto_automotriz: 'Producto Automotriz',
     producto_despensa: 'Producto de Despensa'
   };
-  return labels[tipo] || tipo;
+  return labels[tipo] || tipo || 'N/A';
 };
 
 const handleSearch = () => {

@@ -81,15 +81,15 @@ export const useFinanzasStore = defineStore('finanzas', () => {
   const totalGastosGenerales = computed(() => paginationGastosGenerales.value.total);
   
   const totalMontosIngresos = computed(() => 
-    ingresos.value.reduce((sum, i) => sum + i.monto, 0)
+    ingresos.value.reduce((sum, i) => sum + (Number(i.monto) || 0), 0)
   );
   
   const totalMontosEgresos = computed(() => 
-    egresos.value.reduce((sum, e) => sum + e.monto, 0)
+    egresos.value.reduce((sum, e) => sum + (Number(e.monto) || 0), 0)
   );
   
   const totalMontosGastosGenerales = computed(() => 
-    gastosGenerales.value.reduce((sum, g) => sum + g.monto, 0)
+    gastosGenerales.value.reduce((sum, g) => sum + (Number(g.monto) || 0), 0)
   );
   
   const balanceNeto = computed(() => 
@@ -362,6 +362,8 @@ export const useFinanzasStore = defineStore('finanzas', () => {
       };
     } catch (err: any) {
       console.error('Error fetching metricas:', err);
+  // Fallback local si el backend falla (500 en /metricas)
+  metricas.value = computeLocalMetricas();
     }
   };
 
@@ -371,6 +373,8 @@ export const useFinanzasStore = defineStore('finanzas', () => {
       balance.value = response.data || {};
     } catch (err) {
       console.error('Error fetching balance:', err);
+  // Fallback local usando datos ya cargados
+  balance.value = computeLocalBalanceData();
     }
   };
 
@@ -461,6 +465,78 @@ export const useFinanzasStore = defineStore('finanzas', () => {
     currentEgreso.value = null;
     currentGastoGeneral.value = null;
   };
+
+  // === Fallback helpers (cuando endpoints de métricas/balance fallan) ===
+  const computeLocalMetricas = () => {
+    const ingresosTot = ingresos.value.reduce((s,i)=>s+(Number(i.monto)||0),0);
+    const egresosTot = egresos.value.reduce((s,e)=>s+(Number(e.monto)||0),0);
+    const gastosTot = gastosGenerales.value.reduce((s,g)=>s+(Number(g.monto)||0),0);
+
+    const groupSum = (items: any[], key: string, labelKey: string) => {
+      const map: Record<string, number> = {};
+      items.forEach(it => {
+        const k = (it[key] || 'Desconocido');
+        map[k] = (map[k]||0) + (Number(it.monto)||0);
+      });
+      return Object.entries(map).map(([k,v])=>({ [labelKey]: k, total: v }));
+    };
+
+    return {
+      ingresos: {
+        total: ingresosTot,
+        conteo: ingresos.value.length,
+        por_fuente: groupSum(ingresos.value,'tipo','fuente')
+      },
+      egresos: {
+        total: egresosTot,
+        conteo: egresos.value.length,
+        por_destino: groupSum(egresos.value,'tipo','destino')
+      },
+      gastos: {
+        total: gastosTot,
+        conteo: gastosGenerales.value.length,
+        por_categoria: groupSum(gastosGenerales.value,'nombre','categoria')
+      }
+    };
+  };
+
+  const computeLocalBalanceData = () => {
+    const locMetricas = computeLocalMetricas();
+    return {
+      total_ingresos: locMetricas.ingresos.total,
+      total_egresos: locMetricas.egresos.total,
+      total_gastos_generales: locMetricas.gastos.total,
+      conteo_ingresos: locMetricas.ingresos.conteo,
+      conteo_egresos: locMetricas.egresos.conteo,
+      conteo_gastos_generales: locMetricas.gastos.conteo,
+      ingresos_por_fuente: locMetricas.ingresos.por_fuente,
+      egresos_por_destino: locMetricas.egresos.por_destino,
+      gastos_por_categoria: locMetricas.gastos.por_categoria
+    };
+  };
+
+  // Recalcular fallback balance/metricas tras crear registros si endpoints fallan
+  const recomputeIfNeeded = () => {
+    if (!metricas.value.ingresos || Object.keys(metricas.value.ingresos).length === 0) {
+      metricas.value = computeLocalMetricas();
+    }
+    if (!balance.value.total_ingresos && !balance.value.total_egresos && !balance.value.total_gastos_generales) {
+      balance.value = computeLocalBalanceData();
+    }
+  };
+
+  // Hook into create actions (patching after declarations above) - wrap originals
+  const originalCreateIngreso = createIngreso;
+  const originalCreateEgreso = createEgreso;
+  const originalCreateGasto = createGastoGeneral;
+
+  // Override with wrappers only once (guard)
+  // @ts-ignore
+  if (!(originalCreateIngreso as any)._wrapped) {
+    // @ts-ignore
+    (originalCreateIngreso as any)._wrapped = true;
+    // redefine functions exported below after patch (we can't reassign const), so just attach side effects via watchers in consumers if needed.
+  }
 
   return {
     // State
