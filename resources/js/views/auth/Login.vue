@@ -3,10 +3,8 @@
     <div class="max-w-md w-full space-y-8">
       <!-- Header -->
       <div class="text-center">
-        <div class="mx-auto h-16 w-16 bg-primary-500 rounded-xl flex items-center justify-center">
-          <svg class="h-10 w-10 text-white" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
-          </svg>
+        <div class="mx-auto h-20 w-20 rounded-xl flex items-center justify-center overflow-hidden bg-white shadow">
+          <img src="/images/maximo-lavado-logo.png" alt="Máximo Lavado" class="object-contain h-full w-full" />
         </div>
         <h2 class="mt-6 text-3xl font-bold text-surface-900">
           Máximo Lavado

@@ -35,13 +35,26 @@
     </style>
 </head>
 <body>
-    <div class="watermark">MÁXIMO LAVADO</div>
+    <?php
+        $logoPath = public_path('images/maximo-lavado-logo.png');
+        $logoB64 = file_exists($logoPath) ? base64_encode(file_get_contents($logoPath)) : null;
+    ?>
+    <div class="watermark" style="opacity:0.05;">
+        <?php if($logoB64): ?>
+            <img src="data:image/png;base64,<?php echo e($logoB64); ?>" alt="Logo" style="width:500px;" />
+        <?php else: ?>
+            MÁXIMO LAVADO
+        <?php endif; ?>
+    </div>
 
     <!-- ENCABEZADO PRINCIPAL: EMISOR / FACTURA / AUTORIZACIÓN -->
     <table class="grid sin-borde" style="margin-bottom:6px;">
         <tr>
             <td class="w-33" style="border:none;">
-                <div class="bold" style="font-size:16px;"><?php echo e(strtoupper($factura->razon_social_emisor ?? 'MÁXIMO LAVADO')); ?></div>
+                <?php if($logoB64): ?>
+                    <img src="data:image/png;base64,<?php echo e($logoB64); ?>" alt="Logo" style="height:60px; margin-bottom:4px;" />
+                <?php endif; ?>
+                <div class="bold" style="font-size:13px;"><?php echo e(strtoupper($factura->razon_social_emisor ?? 'MÁXIMO LAVADO')); ?></div>
                 <div style="font-size:10px; margin-top:4px;">
                     RUC: <?php echo e($factura->ruc_emisor); ?><br>
                     Dirección Matriz: <?php echo e($factura->direccion_emisor); ?><br>
@@ -138,7 +151,7 @@
                     $pu = (float)$detalle->precio_unitario;
                     $cant = (float)$detalle->cantidad;
                     $sub = $cant * $pu;
-                    $ivaLinea = round($sub * 0.12, 2); // Asumiendo 12%
+                    $ivaLinea = round($sub * 0.15, 2); // IVA 15%
                 ?>
                 <tr>
                     <td class="text-center"><?php echo e(number_format($cant, 2)); ?></td>
@@ -162,7 +175,7 @@
         <?php if($factura->descuento > 0): ?>
             <tr><td class="bold">Descuento</td><td class="text-right">-<?php echo e(number_format($factura->descuento, 2)); ?></td></tr>
         <?php endif; ?>
-        <tr><td class="bold">IVA 12%</td><td class="text-right"><?php echo e(number_format($factura->iva, 2)); ?></td></tr>
+    <tr><td class="bold">IVA 15%</td><td class="text-right"><?php echo e(number_format($factura->iva, 2)); ?></td></tr>
         <tr><td class="bold">Total</td><td class="text-right bold"><?php echo e(number_format($factura->total, 2)); ?></td></tr>
     </table>
 

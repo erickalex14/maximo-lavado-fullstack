@@ -4,6 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <!-- Favicon / App Icons -->
+    <link rel="icon" type="image/png" href="/images/maximo-lavado-logo.png">
+    <link rel="apple-touch-icon" href="/images/maximo-lavado-logo.png">
+    <meta name="theme-color" content="#15803d">
     
     <title>{{ config('app.name', 'Máximo Lavado') }}</title>
     

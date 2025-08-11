@@ -17,16 +17,18 @@
     ]"
   >
     <!-- Logo -->
-    <div class="p-6 border-b border-surface-200">
-      <div class="flex items-center space-x-3">
-        <div class="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-          <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
-          </svg>
-        </div>
+    <div class="p-4 border-b border-surface-200">
+      <div class="flex items-center" :class="isOpen ? 'space-x-3' : 'justify-center'">
+        <img
+          src="/images/maximo-lavado-logo.png"
+          alt="Máximo Lavado"
+          class="select-none"
+          :class="isOpen ? 'h-10 w-auto' : 'h-10 w-auto'"
+          loading="lazy"
+        />
         <Transition name="fade">
-          <div v-if="isOpen">
-            <h2 class="text-lg font-bold text-surface-900">Máximo Lavado</h2>
+          <div v-if="isOpen" class="leading-tight">
+            <h2 class="text-base font-bold text-surface-900">Máximo Lavado</h2>
             <p class="text-xs text-surface-500">Sistema de Gestión</p>
           </div>
         </Transition>

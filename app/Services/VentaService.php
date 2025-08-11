@@ -428,15 +428,14 @@ class VentaService
         foreach ($detallesVenta as $detalle) {
             $subtotalLinea = $detalle['precio_unitario'] * $detalle['cantidad'];
             $subtotal += $subtotalLinea;
-            
-            // ⚡ CRÍTICO: IVA 12% para TODOS los tipos de items en Ecuador
-            // En Ecuador, la mayoría de productos y servicios tienen IVA del 12%
+
+            // ⚡ CRÍTICO: IVA 15% (actualizado) para items gravados estándar
+            // Ajuste temporal: El IVA general pasó de 12% a 15%
             if (in_array($detalle['tipo_item'], ['servicio', 'producto_automotriz', 'producto_despensa'])) {
-                $iva += $subtotalLinea * 0.12;
+                $iva += $subtotalLinea * 0.15;
             }
-            
-            // TODO: Implementar configuración de IVA por producto individual si es necesario
-            // Algunos productos específicos podrían tener IVA 0% pero son excepciones
+
+            // TODO: Parametrizar % IVA desde configuración/base de datos y soportar tarifas 0%, 8%, etc.
         }
         
         $total = $subtotal + $iva;

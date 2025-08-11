@@ -178,7 +178,7 @@ class Venta extends Model
     public function calcularTotales()
     {
         $this->subtotal = $this->detalles->sum('subtotal');
-        $this->impuesto = $this->subtotal * 0.12; // IVA Ecuador 12%
+    $this->impuesto = $this->subtotal * 0.15; // IVA Ecuador 15% (actualizado)
         $this->total = $this->subtotal - $this->descuento + $this->impuesto;
         $this->save();
     }
