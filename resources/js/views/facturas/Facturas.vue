@@ -12,21 +12,25 @@
           </p>
         </div>
         
-        <div class="flex gap-4">
-          <button
-            @click="showModal = true"
-            class="btn btn-primary"
-          >
+  <div class="flex gap-4">
+          <button @click="openCreate" class="btn btn-primary" :disabled="loading">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
-            Nueva Factura
+            Nueva
+          </button>
+          <button @click="refreshData" class="btn btn-outline-secondary" :disabled="loading">
+            <svg v-if="loading" class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Refrescar
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Métricas Cards -->
+    <!-- Métricas derivadas (calculadas en frontend) -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" v-if="metricas">
       <div class="metric-card bg-blue-50 border-blue-200">
         <div class="flex items-center justify-between">
@@ -85,9 +89,9 @@
       </div>
     </div>
 
-    <!-- Filtros -->
+    <!-- Filtros (Facturación Electrónica) -->
     <div class="filters-section mb-6">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">
             Buscar
@@ -95,31 +99,32 @@
           <input
             v-model="searchTerm"
             type="text"
-            placeholder="Buscar por número o cliente..."
+            placeholder="Buscar por número / razón social / identificación..."
             class="form-input"
             @input="debouncedSearch"
           />
         </div>
-        
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">
-            Cliente
+            Identificación Cliente
           </label>
-          <select v-model="selectedCliente" class="form-select" @change="applyFilters">
-            <option value="">Todos los clientes</option>
-            <option
-              v-for="cliente in clientes"
-              :key="cliente.cliente_id"
-              :value="cliente.cliente_id"
-            >
-              {{ cliente.nombre }}
-            </option>
+          <input v-model="clienteIdentificacion" type="text" class="form-input" placeholder="Ced/RUC" @change="applyFilters" />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Estado</label>
+          <select v-model="estado" class="form-select" @change="applyFilters">
+            <option value="">Todos</option>
+            <option value="borrador">Borrador</option>
+            <option value="autorizada">Autorizada</option>
+            <option value="anulada">Anulada</option>
+            <option value="error">Error</option>
           </select>
         </div>
         
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">
-            Fecha Inicio
+            Fecha Emisión Inicio
           </label>
           <input
             v-model="fechaInicio"
@@ -131,7 +136,7 @@
         
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">
-            Fecha Fin
+            Fecha Emisión Fin
           </label>
           <input
             v-model="fechaFin"
@@ -166,22 +171,22 @@
       </div>
     </div>
 
-    <!-- Tabla de facturas -->
+    <!-- Tabla de facturas electrónicas -->
     <div class="table-container">
       <div class="overflow-x-auto">
         <table class="data-table">
           <thead>
             <tr>
               <th>Número</th>
-              <th>Cliente</th>
-              <th>Fecha</th>
-              <th>Descripción</th>
+              <th>Cliente / Identificación</th>
+              <th>Emisión</th>
+              <th>Estado</th>
               <th>Total</th>
               <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-if="loading && facturas.length === 0">
+            <tr v-if="loading && facturasElectronicas.length === 0">
               <td colspan="6" class="text-center py-8">
                 <div class="flex items-center justify-center">
                   <svg class="animate-spin w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24">
@@ -193,7 +198,7 @@
               </td>
             </tr>
             
-            <tr v-else-if="!loading && facturas.length === 0">
+            <tr v-else-if="!loading && facturasElectronicas.length === 0">
               <td colspan="6" class="text-center py-8 text-gray-500">
                 <div class="flex flex-col items-center">
                   <svg class="w-12 h-12 mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -208,13 +213,20 @@
             <tr
               v-else
               v-for="factura in filteredFacturas"
-              :key="factura.factura_id"
+              :key="factura.id"
               class="hover:bg-gray-50"
             >
               <td class="font-medium">{{ factura.numero_factura }}</td>
-              <td>{{ factura.cliente?.nombre || 'N/A' }}</td>
-              <td>{{ formatDate(factura.fecha) }}</td>
-              <td>{{ factura.descripcion || 'Sin descripción' }}</td>
+              <td>
+                <div class="flex flex-col">
+                  <span>{{ factura.cliente_razon_social }}</span>
+                  <span class="text-xs text-gray-500">{{ factura.cliente_identificacion }}</span>
+                </div>
+              </td>
+              <td>{{ formatDate(factura.fecha_emision) }}</td>
+              <td>
+                <span :class="['badge', estadoBadgeClass(factura.estado)]">{{ factura.estado }}</span>
+              </td>
               <td class="font-semibold">${{ formatCurrency(factura.total) }}</td>
               <td>
                 <div class="flex items-center space-x-2">
@@ -228,24 +240,24 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
                   </button>
-                  
-                  <button
-                    @click="editFactura(factura)"
-                    class="action-btn action-btn-edit"
-                    title="Editar"
-                  >
+                  <button v-if="factura.estado==='borrador' || factura.estado==='error'" @click="autorizar(factura)" class="action-btn action-btn-edit" title="Autorizar">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>
                   </button>
-                  
-                  <button
-                    @click="deleteFactura(factura)"
-                    class="action-btn action-btn-delete"
-                    title="Eliminar"
-                  >
+                  <button v-if="factura.estado!=='anulada'" @click="anular(factura)" class="action-btn action-btn-delete" title="Anular">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-12.728 12.728M5.636 5.636l12.728 12.728" />
+                    </svg>
+                  </button>
+                  <button @click="descargarPDF(factura)" class="action-btn" title="PDF">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0-1.657-1.343-3-3-3H7v8h2c1.657 0 3-1.343 3-3v-2zM13 7h1a4 4 0 014 4v2a4 4 0 01-4 4h-1V7z" />
+                    </svg>
+                  </button>
+                  <button @click="descargarXML(factura)" class="action-btn" title="XML">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v10M16 7v10M4 11h16M4 13h16" />
                     </svg>
                   </button>
                 </div>
@@ -289,72 +301,75 @@
       </div>
     </div>
 
-    <!-- Modal de creación/edición -->
-    <FacturaModal
-      v-model:visible="showModal"
-      :mode="modalMode"
-      :factura="selectedFactura"
-      @saved="handleFacturaSaved"
-    />
-
-    <!-- Modal de vista -->
-    <FacturaViewModal
-      v-model:visible="showViewModal"
-      :factura="selectedFactura"
-      @edit="handleEditFromView"
-    />
+  <!-- Modales -->
+  <FacturaViewModal v-model:visible="showViewModal" :factura="selectedFactura" />
+  <FacturaElectronicaCreateModal v-model:visible="showCreateModal" @created="onCreated" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useFacturaStore } from '@/stores/factura';
-import FacturaModal from './FacturaModal.vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useFacturaElectronicaStore } from '@/stores/facturaElectronica';
 import FacturaViewModal from './FacturaViewModal.vue';
-import type { Factura } from '@/types';
+import FacturaElectronicaCreateModal from './FacturaElectronicaCreateModal.vue';
+import type { FacturaElectronica } from '@/types';
 
 // Store
-const facturaStore = useFacturaStore();
+const feStore = useFacturaElectronicaStore();
 
 // State
 const searchTerm = ref('');
-const selectedCliente = ref<number | ''>('');
+const clienteIdentificacion = ref('');
+const estado = ref('');
 const fechaInicio = ref('');
 const fechaFin = ref('');
-const showModal = ref(false);
 const showViewModal = ref(false);
-const modalMode = ref<'create' | 'edit'>('create');
-const selectedFactura = ref<Factura | null>(null);
+const selectedFactura = ref<FacturaElectronica | null>(null);
+const showCreateModal = ref(false);
 
 // Computed
-const loading = computed(() => facturaStore.loading);
-const facturas = computed(() => facturaStore.facturas);
-const clientes = computed(() => facturaStore.clientes);
-const metricas = computed(() => facturaStore.metricas);
-const pagination = computed(() => facturaStore.pagination);
+const loading = computed(() => feStore.loading);
+const facturasElectronicas = computed(() => feStore.facturasElectronicas);
+const pagination = computed(() => feStore.pagination);
+
+// Métricas derivadas
+const metricas = computed(() => {
+  if (!facturasElectronicas.value.length) return null;
+  const total_facturas = facturasElectronicas.value.length;
+  const total_facturado = facturasElectronicas.value.reduce((acc, f) => acc + Number(f.total || 0), 0);
+  const now = new Date();
+  const mes = now.getMonth();
+  const anio = now.getFullYear();
+  const facturas_mes_actual = facturasElectronicas.value.filter((f: FacturaElectronica) => {
+    const d = new Date(f.fecha_emision);
+    return d.getMonth() === mes && d.getFullYear() === anio;
+  }).length;
+  const promedio_facturacion = total_facturas ? (total_facturado / total_facturas) : 0;
+  return { total_facturas, total_facturado, facturas_mes_actual, promedio_facturacion };
+});
 
 // Filtros aplicados
 const filteredFacturas = computed(() => {
-  let result = facturas.value;
-
+  let result = facturasElectronicas.value;
   if (searchTerm.value) {
     const term = searchTerm.value.toLowerCase();
-    result = result.filter(f => 
+    result = result.filter(f =>
       f.numero_factura.toLowerCase().includes(term) ||
-      f.cliente?.nombre?.toLowerCase().includes(term) ||
-      f.descripcion?.toLowerCase().includes(term)
+      f.cliente_razon_social.toLowerCase().includes(term) ||
+      f.cliente_identificacion.toLowerCase().includes(term)
     );
   }
-
+  if (estado.value) {
+    result = result.filter(f => f.estado === estado.value);
+  }
   return result;
 });
 
 // Methods
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('es-CO', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
+  const num = Number(value);
+  if (isNaN(num)) return '0';
+  return new Intl.NumberFormat('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
 }
 
 function formatDate(date: string): string {
@@ -367,69 +382,88 @@ function debouncedSearch() {
 }
 
 async function applyFilters() {
-  await facturaStore.applyFilters({
+  await feStore.applyFilters({
     search: searchTerm.value,
-    cliente_id: selectedCliente.value || undefined,
-    fecha_inicio: fechaInicio.value,
-    fecha_fin: fechaFin.value
+    cliente_identificacion: clienteIdentificacion.value || undefined,
+    estado: (estado.value as 'borrador' | 'autorizada' | 'anulada' | 'error' | '') || undefined,
+    fecha_emision_inicio: fechaInicio.value || undefined,
+    fecha_emision_fin: fechaFin.value || undefined,
   });
 }
 
 function clearFilters() {
   searchTerm.value = '';
-  selectedCliente.value = '';
+  clienteIdentificacion.value = '';
+  estado.value = '';
   fechaInicio.value = '';
   fechaFin.value = '';
-  facturaStore.clearFilters();
+  feStore.clearFilters();
+  refreshData();
 }
 
 async function refreshData() {
-  await facturaStore.refreshAll();
+  console.debug('[Facturas] refreshData filtros', feStore.filtros);
+  await feStore.refreshAll();
+  console.debug('[Facturas] facturas cargadas', facturasElectronicas.value.length);
 }
 
-function viewFactura(factura: Factura) {
+function viewFactura(factura: FacturaElectronica) {
   selectedFactura.value = factura;
   showViewModal.value = true;
 }
 
-function editFactura(factura: Factura) {
-  selectedFactura.value = factura;
-  modalMode.value = 'edit';
-  showModal.value = true;
+function openCreate(){
+  showCreateModal.value = true;
 }
 
-function handleEditFromView(factura: Factura) {
-  showViewModal.value = false;
-  selectedFactura.value = factura;
-  modalMode.value = 'edit';
-  showModal.value = true;
+async function onCreated(id: number){
+  console.debug('[Facturas] factura creada id', id);
+  showCreateModal.value = false;
+  await refreshData();
+  // Seleccionar la nueva si está en la lista
+  const nueva = facturasElectronicas.value.find(f=>f.id===id);
+  if (nueva) viewFactura(nueva);
 }
 
-async function deleteFactura(factura: Factura) {
-  if (!confirm(`¿Estás seguro de que deseas eliminar la factura ${factura.numero_factura}?`)) {
-    return;
-  }
+// (debug removido)
 
-  try {
-    await facturaStore.deleteFactura(factura.factura_id);
-  } catch (error) {
-    console.error('Error al eliminar factura:', error);
-  }
+// Acciones específicas SRI
+async function autorizar(factura: FacturaElectronica) {
+  if (!confirm(`Autorizar factura ${factura.numero_factura}?`)) return;
+  await feStore.autorizarFactura(factura.id);
+  await refreshData();
+}
+
+async function anular(factura: FacturaElectronica) {
+  if (!confirm(`Anular factura ${factura.numero_factura}?`)) return;
+  await feStore.anularFactura(factura.id);
+  await refreshData();
+}
+
+async function descargarPDF(factura: FacturaElectronica) {
+  await feStore.descargarPDF(factura.id);
+}
+async function descargarXML(factura: FacturaElectronica) {
+  await feStore.descargarXML(factura.id);
 }
 
 async function changePage(page: number) {
-  await facturaStore.changePage(page);
+  await feStore.changePage(page);
 }
 
-function handleFacturaSaved() {
-  showModal.value = false;
-  selectedFactura.value = null;
-  modalMode.value = 'create';
+const estadoClasses: Record<'borrador' | 'autorizada' | 'anulada' | 'error', string> = {
+  borrador: 'badge-warning',
+  autorizada: 'badge-success',
+  anulada: 'badge-secondary',
+  error: 'badge-danger'
+};
+function estadoBadgeClass(e: string) {
+  return estadoClasses[e as keyof typeof estadoClasses] || 'badge-secondary';
 }
 
 // Lifecycle
 onMounted(async () => {
-  await facturaStore.refreshAll();
+  await feStore.refreshAll();
 });
 </script>
 

@@ -183,11 +183,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/usuarios', [UserController::class, 'store']);
     Route::get('/usuarios/activos', [UserController::class, 'getActiveUsers']);
     Route::get('/usuarios/estadisticas', [UserController::class, 'getStats']);
+    // Colocar rutas estáticas antes de la ruta con parámetro {id} para evitar que 'trashed' coincida como ID
+    Route::get('/usuarios/trashed', [UserController::class, 'trashed']);
     Route::get('/usuarios/{id}', [UserController::class, 'show']);
     Route::put('/usuarios/{id}', [UserController::class, 'update']);
     Route::delete('/usuarios/{id}', [UserController::class, 'destroy']);
     Route::put('/usuarios/{id}/restore', [UserController::class, 'restore']);
-    Route::get('/usuarios/trashed', [UserController::class, 'trashed']);
     Route::put('/usuarios/{id}/password', [UserController::class, 'updatePassword']);
     Route::put('/usuarios/{id}/reset-password', [UserController::class, 'resetPassword']);
     Route::put('/usuarios/{id}/verify-email', [UserController::class, 'verifyEmail']);

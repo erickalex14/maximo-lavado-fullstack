@@ -17,10 +17,16 @@ import {
   Tooltip,
   Legend,
   Filler,
+  LineController,
+  BarController,
 } from 'chart.js';
 
 // Registrar componentes de Chart.js
+// Registrar controladores + elementos necesarios para evitar:
+// "Error: 'line' is not a registered controller" / "'bar' is not a registered controller"
 ChartJS.register(
+  LineController,
+  BarController,
   CategoryScale,
   LinearScale,
   PointElement,
@@ -29,7 +35,7 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 );
 
 // Props

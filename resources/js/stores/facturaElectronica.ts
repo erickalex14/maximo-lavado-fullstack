@@ -72,18 +72,29 @@ export const useFacturaElectronicaStore = defineStore('facturaElectronica', () =
     
     try {
       loading.value = true;
-      const mergedFilters = { ...filtros.value, ...filters };
+      const mergedFilters = { ...filtros.value, ...filters } as FacturaElectronicaFilters;
+      console.debug('[FE Store] fetchFacturasElectronicas filtros ->', mergedFilters);
       const response = await facturaElectronicaService.getFacturasElectronicas(mergedFilters);
-      
-      facturasElectronicas.value = response.data;
-      pagination.value = {
-        current_page: response.current_page,
-        last_page: response.last_page,
-        per_page: response.per_page,
-        total: response.total
-      };
-      
-      // Actualizar filtros
+      if (!response) {
+        console.warn('[FE Store] Respuesta vacía de getFacturasElectronicas');
+        facturasElectronicas.value = [];
+      } else {
+        // Validar estructura
+        const raw = response as any;
+        if (!Array.isArray(raw.data)) {
+          console.error('[FE Store] Estructura inesperada', raw);
+          facturasElectronicas.value = [];
+        } else {
+          facturasElectronicas.value = raw.data.map((r:any)=> mapBackendFactura(r)) as FacturaElectronica[];
+        }
+        pagination.value = {
+          current_page: raw.current_page ?? 1,
+          last_page: raw.last_page ?? 1,
+          per_page: (raw.per_page ?? (raw.data?.length || 10)),
+          total: (raw.total ?? (raw.data?.length || 0))
+        };
+      }
+      console.debug('[FE Store] facturas cargadas ->', facturasElectronicas.value.length);
       Object.assign(filtros.value, mergedFilters);
     } catch (error) {
       console.error('Error al obtener facturas electrónicas:', error);
@@ -98,7 +109,7 @@ export const useFacturaElectronicaStore = defineStore('facturaElectronica', () =
     try {
       loading.value = true;
       const resp = await facturaElectronicaService.getFacturaElectronicaById(id);
-      facturaActual.value = resp?.data ?? null;
+  facturaActual.value = resp?.data ? mapBackendFactura(resp.data) : null;
       return facturaActual.value;
     } catch (error) {
       console.error('Error al obtener factura electrónica:', error);
@@ -114,7 +125,7 @@ export const useFacturaElectronicaStore = defineStore('facturaElectronica', () =
     try {
       loading.value = true;
       const resp = await facturaElectronicaService.createFacturaElectronica(data);
-      const nueva = resp?.data;
+  const nueva = resp?.data ? mapBackendFactura(resp.data) : null;
       if (nueva) {
         facturasElectronicas.value.unshift(nueva);
       }
@@ -132,7 +143,7 @@ export const useFacturaElectronicaStore = defineStore('facturaElectronica', () =
     try {
       loading.value = true;
       const resp = await facturaElectronicaService.updateFacturaElectronica(id, data);
-      const facturaActualizada = resp?.data;
+  const facturaActualizada = resp?.data ? mapBackendFactura(resp.data) : null;
       
       if (facturaActualizada) {
         const index = facturasElectronicas.value.findIndex(f => f.id === id);
@@ -181,7 +192,7 @@ export const useFacturaElectronicaStore = defineStore('facturaElectronica', () =
     try {
       processingAutorizacion.value = true;
       const resp = await facturaElectronicaService.procesarConSRI(id);
-      const facturaAutorizada = resp?.data;
+  const facturaAutorizada = resp?.data ? mapBackendFactura(resp.data) : null;
       
       if (facturaAutorizada) {
         // Actualizar en la lista
@@ -210,7 +221,7 @@ export const useFacturaElectronicaStore = defineStore('facturaElectronica', () =
     try {
       loading.value = true;
       const resp = await facturaElectronicaService.anular(id);
-      const facturaAnulada = resp?.data;
+  const facturaAnulada = resp?.data ? mapBackendFactura(resp.data) : null;
       
       if (facturaAnulada) {
         // Actualizar en la lista
@@ -294,7 +305,7 @@ export const useFacturaElectronicaStore = defineStore('facturaElectronica', () =
     try {
       loading.value = true;
       const resp = await facturaElectronicaService.getFacturaElectronicaById(id);
-      const fe = resp?.data;
+  const fe = resp?.data ? mapBackendFactura(resp.data) : null;
 
       if (fe) {
         // Actualizar en la lista
@@ -362,7 +373,14 @@ export const useFacturaElectronicaStore = defineStore('facturaElectronica', () =
   
   // Refrescar datos
   async function refreshAll() {
+    console.debug('[FE Store] refreshAll');
     await fetchFacturasElectronicas();
+  }
+  
+  // Forzar recarga ignorando bandera loading
+  async function debugLoad() {
+    loading.value = false;
+    await fetchFacturasElectronicas({});
   }
   
   return {
@@ -400,6 +418,51 @@ export const useFacturaElectronicaStore = defineStore('facturaElectronica', () =
     applyFilters,
     clearFilters,
     clearState,
-    refreshAll
+    refreshAll,
+    debugLoad
   };
 });
+
+// === Helpers de mapeo ===
+function mapBackendFactura(r:any): FacturaElectronica {
+  return {
+    id: r.factura_electronica_id ?? r.id ?? 0,
+    venta_id: r.venta_id,
+    numero_factura: buildNumero(r),
+    autorizacion: r.numero_autorizacion || r.clave_acceso || null,
+    fecha_emision: r.created_at || r.fecha_emision || '',
+    fecha_autorizacion: r.fecha_autorizacion || null,
+    estado: mapEstado(r.estado_sri),
+    xml_firmado: r.xml_autorizado || r.xml_documento || null,
+    clave_acceso: r.clave_acceso || null,
+    errores_sri: r.errores_sri || null,
+    cliente_razon_social: r.razon_social_comprador || r.cliente_razon_social || '',
+    cliente_identificacion: r.identificacion_comprador || r.cliente_identificacion || '',
+    cliente_direccion: r.direccion_comprador || '',
+    cliente_email: r.email_comprador || '',
+    cliente_telefono: r.telefono_comprador || '',
+    subtotal_0: 0,
+    subtotal_12: r.subtotal ?? 0,
+    iva: r.iva ?? 0,
+    total: r.total ?? 0,
+    venta: r.venta,
+    created_at: r.created_at || '',
+    updated_at: r.updated_at || '',
+    deleted_at: r.deleted_at || null
+  } as FacturaElectronica;
+}
+
+function buildNumero(r:any){
+  if (r.establecimiento && r.punto_emision && r.secuencial) {
+    return `${pad(r.establecimiento,3)}-${pad(r.punto_emision,3)}-${pad(r.secuencial,9)}`;
+  }
+  return r.numero_factura || r.secuencial || 'N/A';
+}
+function pad(v:any,l:number){ return String(v).padStart(l,'0'); }
+function mapEstado(estadoSri:string){
+  const e = (estadoSri||'').toUpperCase();
+  if (e==='AUTORIZADA') return 'autorizada';
+  if (e==='RECHAZADA') return 'error';
+  if (e==='ANULADA') return 'anulada';
+  return 'borrador';
+}

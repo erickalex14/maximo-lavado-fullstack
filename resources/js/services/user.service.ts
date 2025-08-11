@@ -22,38 +22,44 @@ export class UserService {
 
   // Obtener todos los usuarios
   async getUsers(): Promise<User[]> {
-    const response = await apiService.get<ApiResponse<User[]>>(this.baseUrl);
-    return response.data?.data || [];
+  const response = await apiService.get<ApiResponse<User[]>>(this.baseUrl);
+  console.debug('[UserService] getUsers raw', response);
+  return (response as any)?.data || [];
   }
 
   // Obtener usuarios activos
   async getActiveUsers(): Promise<User[]> {
-    const response = await apiService.get<ApiResponse<User[]>>(`${this.baseUrl}/activos`);
-    return response.data?.data || [];
+  const response = await apiService.get<ApiResponse<User[]>>(`${this.baseUrl}/activos`);
+  console.debug('[UserService] getActiveUsers raw', response);
+  return (response as any)?.data || [];
   }
 
   // Obtener usuarios eliminados
   async getTrashedUsers(): Promise<User[]> {
-    const response = await apiService.get<ApiResponse<User[]>>(`${this.baseUrl}/trashed`);
-    return response.data?.data || [];
+  const response = await apiService.get<ApiResponse<User[]>>(`${this.baseUrl}/trashed`);
+  console.debug('[UserService] getTrashedUsers raw', response);
+  return (response as any)?.data || [];
   }
 
   // Obtener un usuario por ID
   async getUserById(id: number): Promise<User> {
-    const response = await apiService.get<ApiResponse<User>>(`${this.baseUrl}/${id}`);
-    return response.data?.data!;
+  const response = await apiService.get<ApiResponse<User>>(`${this.baseUrl}/${id}`);
+  console.debug('[UserService] getUserById raw', response);
+  return (response as any)?.data!;
   }
 
   // Crear nuevo usuario
   async createUser(data: CreateUserRequest): Promise<User> {
-    const response = await apiService.post<ApiResponse<User>>(this.baseUrl, data);
-    return response.data?.data!;
+  const response = await apiService.post<ApiResponse<User>>(this.baseUrl, data);
+  console.debug('[UserService] createUser raw', response);
+  return (response as any)?.data!;
   }
 
   // Actualizar usuario
   async updateUser(id: number, data: UpdateUserRequest): Promise<User> {
-    const response = await apiService.put<ApiResponse<User>>(`${this.baseUrl}/${id}`, data);
-    return response.data?.data!;
+  const response = await apiService.put<ApiResponse<User>>(`${this.baseUrl}/${id}`, data);
+  console.debug('[UserService] updateUser raw', response);
+  return (response as any)?.data!;
   }
 
   // Eliminar usuario (soft delete)
@@ -84,7 +90,19 @@ export class UserService {
   // Obtener estadísticas
   async getUserStats(): Promise<UserStats> {
     const response = await apiService.get<ApiResponse<UserStats>>(`${this.baseUrl}/estadisticas`);
-    return response.data?.data!;
+    console.debug('[UserService] getUserStats raw', response);
+    const raw: any = (response as any)?.data || {};
+    // Normalizar posibles nombres diferentes
+    return {
+      total_users: raw.total_users ?? raw.total ?? 0,
+      active_users: raw.active_users ?? raw.activos ?? raw.verified_users ?? 0,
+      verified_users: raw.verified_users ?? raw.active_users ?? 0,
+      unverified_users: raw.unverified_users ?? (raw.total_users && raw.active_users != null ? raw.total_users - raw.active_users : 0),
+      deleted_users: raw.deleted_users ?? raw.eliminados ?? 0,
+      users_this_month: raw.users_this_month ?? raw.mes_actual ?? 0,
+      users_last_month: raw.users_last_month ?? raw.mes_anterior ?? 0,
+      growth_percentage: raw.growth_percentage ?? raw.verification_rate ?? 0
+    } as UserStats;
   }
 
   // Validaciones locales

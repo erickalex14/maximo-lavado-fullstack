@@ -100,7 +100,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
           };
         }
         // Log de depuración opcional (desactivar en prod)
-        if (process?.env?.NODE_ENV !== 'production') {
+  // Evitar ReferenceError: process is not defined en build ESM / navegador
+  const envMode = (import.meta as any)?.env?.MODE || (import.meta as any)?.env?.NODE_ENV;
+  if (envMode !== 'production') {
           // eslint-disable-next-line no-console
           console.debug('[Dashboard] chartData normalizada:', chartData.value);
         }

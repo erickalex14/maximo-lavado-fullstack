@@ -19,7 +19,7 @@ class FacturaElectronicaService {
    * Obtener todas las facturas electrónicas con paginación y filtros
    * GET /api/facturas-electronicas
    */
-  async getFacturasElectronicas(filters?: FacturaElectronicaFilters): Promise<PaginatedResponse<FacturaElectronica>> {
+  async getFacturasElectronicas(filters?: FacturaElectronicaFilters): Promise<PaginatedResponse<any>> {
     const params = new URLSearchParams();
     
     if (filters) {
@@ -31,8 +31,34 @@ class FacturaElectronicaService {
     }
     
     const url = `${this.BASE_URL}${params.toString() ? `?${params.toString()}` : ''}`;
-    const response = await apiService.get<PaginatedResponse<FacturaElectronica>>(url);
-    return response.data || { data: [], current_page: 1, last_page: 1, per_page: 15, total: 0, from: 0, to: 0 };
+    console.debug('[FacturaElectronicaService] GET', url, 'filters=', filters);
+    try {
+      // Usar instancia directa para ver respuesta cruda
+      const axiosResp = await apiService.instance.get(url);
+      const payload = axiosResp.data || {};
+      let lista:any[] = [];
+      if (Array.isArray(payload.facturas)) {
+        lista = payload.facturas;
+      } else if (Array.isArray(payload.data)) {
+        lista = payload.data;
+      } else if (payload.data && Array.isArray(payload.data.data)) {
+        lista = payload.data.data;
+      } else {
+        console.warn('[FacturaElectronicaService] Estructura inesperada (sin array)', payload);
+      }
+      return {
+        data: lista,
+        current_page: 1,
+        last_page: 1,
+        per_page: lista.length,
+        total: lista.length,
+        from: lista.length ? 1 : 0,
+        to: lista.length
+      };
+    } catch (err:any) {
+      console.error('[FacturaElectronicaService] Error request', err?.response?.status, err?.response?.data);
+      throw err;
+    }
   }
 
   /**
@@ -40,7 +66,9 @@ class FacturaElectronicaService {
    * POST /api/facturas-electronicas
    */
   async createFacturaElectronica(data: CreateFacturaElectronicaRequest): Promise<ApiResponse<FacturaElectronica>> {
-    return await apiService.post(this.BASE_URL, data);
+    const resp = await apiService.post(this.BASE_URL, data);
+    const factura = (resp as any).factura ?? (resp as any).data ?? null;
+    return { success: true, message: resp.message, data: factura };
   }
 
   /**
@@ -48,7 +76,9 @@ class FacturaElectronicaService {
    * GET /api/facturas-electronicas/{id}
    */
   async getFacturaElectronicaById(id: number): Promise<ApiResponse<FacturaElectronica>> {
-    return await apiService.get(`${this.BASE_URL}/${id}`);
+    const resp = await apiService.get(`${this.BASE_URL}/${id}`);
+    const factura = (resp as any).factura ?? (resp as any).data ?? null;
+    return { success: true, message: resp.message, data: factura };
   }
 
   /**
@@ -56,7 +86,9 @@ class FacturaElectronicaService {
    * PUT /api/facturas-electronicas/{id}
    */
   async updateFacturaElectronica(id: number, data: UpdateFacturaElectronicaRequest): Promise<ApiResponse<FacturaElectronica>> {
-    return await apiService.put(`${this.BASE_URL}/${id}`, data);
+    const resp = await apiService.put(`${this.BASE_URL}/${id}`, data);
+    const factura = (resp as any).factura ?? (resp as any).data ?? null;
+    return { success: true, message: resp.message, data: factura };
   }
 
   // === PROCESAMIENTO SRI ===
@@ -66,7 +98,9 @@ class FacturaElectronicaService {
    * POST /api/facturas-electronicas/{id}/procesar-sri
    */
   async procesarConSRI(id: number): Promise<ApiResponse<FacturaElectronica>> {
-    return await apiService.post(`${this.BASE_URL}/${id}/procesar-sri`);
+    const resp = await apiService.post(`${this.BASE_URL}/${id}/procesar-sri`);
+    const resultado = (resp as any).resultado ?? (resp as any).factura ?? null;
+    return { success: true, message: resp.message, data: resultado };
   }
 
   /**
@@ -74,7 +108,9 @@ class FacturaElectronicaService {
    * POST /api/facturas-electronicas/{id}/reenviar
    */
   async reenviarAlSRI(id: number): Promise<ApiResponse<FacturaElectronica>> {
-    return await apiService.post(`${this.BASE_URL}/${id}/reenviar`);
+    const resp = await apiService.post(`${this.BASE_URL}/${id}/reenviar`);
+    const resultado = (resp as any).resultado ?? null;
+    return { success: true, message: resp.message, data: resultado };
   }
 
   /**
@@ -82,7 +118,9 @@ class FacturaElectronicaService {
    * POST /api/facturas-electronicas/{id}/anular
    */
   async anular(id: number): Promise<ApiResponse<FacturaElectronica>> {
-    return await apiService.post(`${this.BASE_URL}/${id}/anular`);
+    const resp = await apiService.post(`${this.BASE_URL}/${id}/anular`);
+    const factura = (resp as any).factura ?? null;
+    return { success: true, message: resp.message, data: factura };
   }
 
   // === DOCUMENTOS ===
@@ -92,7 +130,9 @@ class FacturaElectronicaService {
    * GET /api/facturas-electronicas/{id}/xml
    */
   async getXML(id: number): Promise<ApiResponse<string>> {
-    return await apiService.get(`${this.BASE_URL}/${id}/xml`);
+    const resp = await apiService.get(`${this.BASE_URL}/${id}/xml`);
+    const xml = (resp as any).xml ?? (resp as any).data ?? '';
+    return { success: true, message: resp.message, data: xml };
   }
 
   /**
@@ -110,7 +150,9 @@ class FacturaElectronicaService {
    * GET /api/facturas-electronicas/venta/{ventaId}
    */
   async getByVenta(ventaId: number): Promise<ApiResponse<FacturaElectronica>> {
-    return await apiService.get(`${this.BASE_URL}/venta/${ventaId}`);
+    const resp = await apiService.get(`${this.BASE_URL}/venta/${ventaId}`);
+    const factura = (resp as any).factura ?? null;
+    return { success: true, message: resp.message, data: factura };
   }
 
   /**
@@ -118,7 +160,9 @@ class FacturaElectronicaService {
    * GET /api/facturas-electronicas/pendientes-sri
    */
   async getPendientesSRI(): Promise<ApiResponse<FacturaElectronica[]>> {
-    return await apiService.get(`${this.BASE_URL}/pendientes-sri`);
+    const resp = await apiService.get(`${this.BASE_URL}/pendientes-sri`);
+    const facturas = (resp as any).facturas ?? [];
+    return { success: true, message: resp.message, data: facturas };
   }
 
   /**
@@ -126,7 +170,9 @@ class FacturaElectronicaService {
    * GET /api/facturas-electronicas/estadisticas
    */
   async getEstadisticas(): Promise<ApiResponse<any>> {
-    return await apiService.get(`${this.BASE_URL}/estadisticas`);
+    const resp = await apiService.get(`${this.BASE_URL}/estadisticas`);
+    const estadisticas = (resp as any).estadisticas ?? (resp as any).data ?? null;
+    return { success: true, message: resp.message, data: estadisticas };
   }
 
   // === OPERACIONES EN LOTE ===
@@ -136,7 +182,9 @@ class FacturaElectronicaService {
    * POST /api/facturas-electronicas/procesar-lote
    */
   async procesarLote(facturaIds: number[]): Promise<ApiResponse<any>> {
-    return await apiService.post(`${this.BASE_URL}/procesar-lote`, { factura_ids: facturaIds });
+    const resp = await apiService.post(`${this.BASE_URL}/procesar-lote`, { factura_ids: facturaIds });
+    const resultado = (resp as any).resultado ?? null;
+    return { success: true, message: resp.message, data: resultado };
   }
 
   /**
@@ -144,7 +192,9 @@ class FacturaElectronicaService {
    * GET /api/facturas-electronicas/validar-sri
    */
   async validarConexionSRI(): Promise<ApiResponse<any>> {
-    return await apiService.get(`${this.BASE_URL}/validar-sri`);
+    const resp = await apiService.get(`${this.BASE_URL}/validar-sri`);
+    const conexion = (resp as any).conexion ?? null;
+    return { success: true, message: resp.message, data: conexion };
   }
 }
 
