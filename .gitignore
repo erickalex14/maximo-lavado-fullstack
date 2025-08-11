@@ -16,6 +16,9 @@
 /public/build
 /public/hot
 /public/storage
+# --- Allow public images (logo) ---
+!/public/images/
+!/public/images/maximo-lavado-logo.png
 /storage/*.key
 /storage/pail
 /vendor
