@@ -211,10 +211,12 @@ const formatDate = (date: string) => {
 };
 
 const formatCurrency = (amount: number): string => {
+  const num = Number(amount);
+  if (isNaN(num)) return '0.00';
   return new Intl.NumberFormat('es-CO', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(num);
 };
 
 const getTypeLabel = (tipo: string): string => {

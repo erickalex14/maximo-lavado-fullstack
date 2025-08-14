@@ -234,8 +234,8 @@ const filteredVentas = computed(() => {
 function formatCurrency(value: number | undefined | null): string {
   const num = typeof value === 'number' && !isNaN(value) ? value : 0;
   return new Intl.NumberFormat('es-CO', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(num);
 }
 

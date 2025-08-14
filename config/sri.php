@@ -42,6 +42,9 @@ return [
         'archivo' => env('SRI_CERTIFICADO_ARCHIVO', storage_path('certificates/certificado.p12')),
         'clave' => env('SRI_CERTIFICADO_CLAVE', ''),
         'validar_fecha' => env('SRI_VALIDAR_CERTIFICADO', true),
+    // Opcional: usar archivos PEM si el PKCS12 falla en OpenSSL 3 (Windows)
+    'pem_key' => env('SRI_CERTIFICADO_PEM_KEY', null), // ruta a private key en PEM
+    'pem_cert' => env('SRI_CERTIFICADO_PEM_CERT', null), // ruta a certificado X.509 en PEM
     ],
 
     // Configuración de archivos

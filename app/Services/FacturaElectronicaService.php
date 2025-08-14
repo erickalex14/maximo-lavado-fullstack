@@ -8,6 +8,8 @@ use App\Models\Venta;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Services\SRI\XMLSigner;
+use App\Services\SRI\SRIClient;
 
 class FacturaElectronicaService
 {
@@ -151,8 +153,108 @@ class FacturaElectronicaService
 
         try {
             return DB::transaction(function () use ($factura) {
-                // Simular procesamiento con SRI
-                // En producción aquí iría la integración real con el SRI
+                // Integración real con SRI si no está en modo mock
+                $usarMock = (bool) config('sri.debug.mock_sri_response', true);
+                if (!$usarMock) {
+                    try {
+                        // 1) Asegurar XML del comprobante y clave de acceso
+                        if (empty($factura->xml_documento)) {
+                            $this->generarXMLDocumento($factura);
+                            $factura = $this->facturaRepository->findById($factura->factura_electronica_id);
+                        }
+                        // Asegurar sincronía de claveAcceso entre XML y base de datos
+                        $xmlActual = $factura->xml_documento;
+                        $claveAcceso = null;
+                        if (preg_match('/<claveAcceso>([^<]+)<\/claveAcceso>/', $xmlActual, $m)) {
+                            $claveAcceso = $m[1];
+                        }
+                        if (!$claveAcceso) {
+                            $claveAcceso = $this->generarClaveAcceso($factura);
+                            $xmlConClave = str_replace(
+                                '</infoTributaria>',
+                                '    <claveAcceso>' . $claveAcceso . '</claveAcceso>' . "\n" . '</infoTributaria>',
+                                $xmlActual
+                            );
+                            $factura = $this->facturaRepository->update($factura->factura_electronica_id, [
+                                'xml_documento' => $xmlConClave,
+                                'clave_acceso' => $claveAcceso,
+                            ]);
+                        } else {
+                            $factura = $this->facturaRepository->update($factura->factura_electronica_id, [
+                                'clave_acceso' => $claveAcceso,
+                            ]);
+                        }
+
+                        // 2) Firmar XML
+                        $signer = new XMLSigner();
+                        $xmlFirmado = $signer->sign($factura->xml_documento);
+                        // Guardar XML firmado para inspección/envío
+                        $signedDir = storage_path('app/sri/signed');
+                        if (!is_dir($signedDir)) { @mkdir($signedDir, 0755, true); }
+                        $signedPath = $signedDir . DIRECTORY_SEPARATOR . 'factura_' . $factura->factura_electronica_id . '_firmada.xml';
+                        @file_put_contents($signedPath, $xmlFirmado);
+                        // Guardar XML firmado para diagnóstico
+                        try {
+                            $signedDir = storage_path('app/sri/signed');
+                            if (!is_dir($signedDir)) { @mkdir($signedDir, 0755, true); }
+                            $signedName = 'factura_' . $factura->factura_electronica_id . '_firmada.xml';
+                            file_put_contents($signedDir . DIRECTORY_SEPARATOR . $signedName, $xmlFirmado);
+                        } catch (\Throwable $eSave) {
+                            Log::warning('No se pudo guardar XML firmado para diagnóstico', [
+                                'error' => $eSave->getMessage()
+                            ]);
+                        }
+
+                        // 3) Enviar a SRI Recepción
+                        $sri = new SRIClient();
+                        $respRecep = $sri->enviarComprobante($xmlFirmado);
+
+                        if (($respRecep['estado'] ?? '') === 'RECIBIDA') {
+                            // 4) Consultar Autorización
+                            // pequeño backoff
+                            usleep(500000);
+                            $respAuth = $sri->autorizarComprobante($factura->clave_acceso);
+
+                            if (($respAuth['estado'] ?? '') === 'AUTORIZADO') {
+                                $xmlAut = $respAuth['xmlAutorizado'] ?: $this->generarXMLAutorizado($factura, $factura->clave_acceso);
+                                $this->facturaRepository->update($factura->factura_electronica_id, [
+                                    'estado_sri' => 'AUTORIZADA',
+                                    'numero_autorizacion' => $respAuth['numeroAutorizacion'] ?? null,
+                                    'fecha_autorizacion' => now(),
+                                    'xml_autorizado' => $xmlAut,
+                                    'mensaje_sri' => 'AUTORIZADA',
+                                    'errores_sri' => null,
+                                ]);
+                            } else {
+                                $this->facturaRepository->update($factura->factura_electronica_id, [
+                                    'estado_sri' => 'RECHAZADA',
+                                    'mensaje_sri' => $respAuth['error'] ?? ($respAuth['mensaje'] ?? 'No autorizado'),
+                                    'errores_sri' => [],
+                                ]);
+                            }
+                        } else {
+                            $this->facturaRepository->update($factura->factura_electronica_id, [
+                                'estado_sri' => 'RECHAZADA',
+                                'mensaje_sri' => $respRecep['error'] ?? 'DEVUELTA',
+                                'errores_sri' => $respRecep['mensajes'] ?? [],
+                            ]);
+                        }
+
+                        return $this->facturaRepository->findById($factura->factura_electronica_id);
+                    } catch (\Throwable $e) {
+                        // No lanzar 500: marcar como RECHAZADA y guardar mensaje
+                        $this->facturaRepository->update($factura->factura_electronica_id, [
+                            'estado_sri' => 'RECHAZADA',
+                            'mensaje_sri' => 'Error en firma/envío SRI: ' . $e->getMessage(),
+                            'errores_sri' => [
+                                ['codigo' => 'EX', 'mensaje' => $e->getMessage()]
+                            ],
+                        ]);
+                        return $this->facturaRepository->findById($factura->factura_electronica_id);
+                    }
+                }
+
+                // Fallback: simulación
                 $resultado = $this->simularProcesarSRI($factura);
 
                 if ($resultado['autorizada']) {
@@ -204,57 +306,22 @@ class FacturaElectronicaService
     public function procesarAutomaticoConSRI(FacturaElectronica $factura): FacturaElectronica
     {
         try {
-            // Simular procesamiento con SRI
-            Log::info('📤 Iniciando procesamiento automático con SRI', [
-                'factura_id' => $factura->factura_electronica_id,
-                'secuencial' => $factura->secuencial
-            ]);
-            
-            // Simular tiempo de procesamiento SRI (0.5-2 segundos)
-            usleep(rand(500000, 2000000));
-            
-            // Simular respuesta del SRI (95% éxito, 5% rechazo por validación automática)
-            $exito = (rand(1, 100) <= 95);
-            
-            if ($exito) {
-                $claveAcceso = $this->generarClaveAcceso($factura);
-                $numeroAutorizacion = 'AUT-' . time() . rand(1000, 9999);
-                
-                // 🔥 GENERAR XML AUTORIZADO COMPLETO 🔥
-                $xmlAutorizado = $this->generarXMLAutorizado($factura, $claveAcceso);
-                
-                $factura = $this->facturaRepository->update($factura->factura_electronica_id, [
-                    'estado_sri' => 'AUTORIZADA',
-                    'clave_acceso' => $claveAcceso,
-                    'fecha_autorizacion' => now(),
-                    'numero_autorizacion' => $numeroAutorizacion,
-                    'xml_autorizado' => $xmlAutorizado,
-                    'mensaje_sri' => 'AUTORIZADA - Comprobante procesado correctamente',
-                    'errores_sri' => null // Limpiar errores previos
-                ]);
-                
-                Log::info('✅ Factura procesada automáticamente - AUTORIZADA por SRI', [
+            // Asegurar estado y datos actualizados (puede venir de una transacción de venta)
+            $factura = $this->facturaRepository->findById($factura->factura_electronica_id) ?? $factura;
+
+            // Si ya no está en BORRADOR (por ejemplo, reintento), no reprocesar
+            if ($factura->estado_sri !== 'BORRADOR') {
+                Log::info('⏭️ Omitido procesamiento automático: estado no BORRADOR', [
                     'factura_id' => $factura->factura_electronica_id,
-                    'clave_acceso' => $claveAcceso,
-                    'numero_autorizacion' => $numeroAutorizacion,
-                    'estado' => 'AUTORIZADA'
+                    'estado_sri' => $factura->estado_sri,
                 ]);
-            } else {
-                $factura = $this->facturaRepository->update($factura->factura_electronica_id, [
-                    'estado_sri' => 'RECHAZADA',
-                    'mensaje_sri' => 'RECHAZADA - Error en datos tributarios',
-                    'errores_sri' => [
-                        [
-                            'codigo' => 'SRI001', 
-                            'mensaje' => 'Error simulado: Datos tributarios inconsistentes'
-                        ]
-                    ]
-                ]);
-                
-                Log::warning('❌ Factura RECHAZADA automáticamente por SRI', [
-                    'factura_id' => $factura->factura_electronica_id,
-                    'motivo' => 'Error en datos tributarios - verificar información'
-                ]);
+                return $factura;
+            }
+
+            $usarMock = (bool) config('sri.debug.mock_sri_response', true);
+            if (!$usarMock) {
+                // Delegar a la integración real (Recepción + Autorización)
+                return $this->procesarConSRI($factura->factura_electronica_id);
             }
             
             return $factura;
@@ -437,6 +504,84 @@ class FacturaElectronicaService
     }
 
     /**
+     * Validar configuración de SRI (certificado y clave) y devolver diagnóstico claro
+     */
+    public function validarConexionSRI(): array
+    {
+        $p12PathCfg = config('sri.certificado.archivo');
+        $p12Path = base_path(trim((string)$p12PathCfg, "\"' "));
+        $pwd = trim((string) config('sri.certificado.clave', ''), "\"' ");
+        $result = [
+            'ambiente' => config('sri.ambiente'),
+            'p12' => [
+                'config' => $p12PathCfg,
+                'resolved' => $p12Path,
+                'exists' => file_exists($p12Path),
+                'filesize' => @filesize($p12Path) ?: 0,
+                'read_ok' => false,
+                'pkcs12_ok' => false,
+                'mensaje' => null,
+            ],
+            'pem' => [
+                'key' => config('sri.certificado.pem_key'),
+                'cert' => config('sri.certificado.pem_cert', config('sri.certificado.pem')),
+                'key_exists' => null,
+                'cert_exists' => null,
+                'usable' => false,
+            ],
+        ];
+
+        // Probar P12
+        try {
+            if ($result['p12']['exists']) {
+                $content = @file_get_contents($p12Path);
+                $result['p12']['read_ok'] = $content !== false;
+                if ($content !== false) {
+                    $arr = [];
+                    $ok = @openssl_pkcs12_read($content, $arr, $pwd);
+                    $result['p12']['pkcs12_ok'] = (bool) $ok;
+                    if (!$ok) {
+                        $errors = [];
+                        while ($e = openssl_error_string()) { $errors[] = $e; }
+                        $result['p12']['mensaje'] = count($errors) ? implode(' | ', $errors) : 'Fallo al leer PKCS12 (clave/algoritmo)';
+                    } else {
+                        $result['p12']['mensaje'] = 'OK';
+                    }
+                } else {
+                    $result['p12']['mensaje'] = 'No se pudo leer el archivo';
+                }
+            } else {
+                $result['p12']['mensaje'] = 'Archivo no existe';
+            }
+        } catch (\Throwable $e) {
+            $result['p12']['mensaje'] = $e->getMessage();
+        }
+
+        // Probar PEM (si están configurados)
+        $pemKey = config('sri.certificado.pem_key');
+        $pemCert = config('sri.certificado.pem_cert', config('sri.certificado.pem'));
+        if ($pemKey && $pemCert) {
+            $pemKeyPath = base_path(trim((string)$pemKey, "\"' "));
+            $pemCertPath = base_path(trim((string)$pemCert, "\"' "));
+            $result['pem']['key_exists'] = file_exists($pemKeyPath);
+            $result['pem']['cert_exists'] = file_exists($pemCertPath);
+            $keyContent = $result['pem']['key_exists'] ? @file_get_contents($pemKeyPath) : false;
+            $crtContent = $result['pem']['cert_exists'] ? @file_get_contents($pemCertPath) : false;
+            $result['pem']['usable'] = ($keyContent && $crtContent);
+        }
+
+        // Resumen legible
+        $ok = ($result['p12']['pkcs12_ok'] === true) || ($result['pem']['usable'] === true);
+        return [
+            'success' => $ok,
+            'detalle' => $result,
+            'mensaje' => $ok
+                ? 'Certificados listos para firmar (P12 o PEM)'
+                : 'No se pudo usar P12 ni PEM. Revise clave, archivo o habilite legacy provider/PEM.'
+        ];
+    }
+
+    /**
      * Reenviar factura al SRI
      */
     public function reenviarAlSRI(int $facturaId): FacturaElectronica
@@ -483,45 +628,159 @@ class FacturaElectronicaService
      */
     private function construirXMLFactura(FacturaElectronica $factura): string
     {
-        // Simulación de XML SRI Ecuador
-        // En producción esto debe seguir exactamente el formato requerido por el SRI
+    // Construcción de XML SRI Ecuador (versión 1.1.0)
+    // Nota: Simplificado pero con estructura clave obligatoria
         $venta = $factura->venta;
+    $secuencial = str_pad($factura->secuencial, 9, '0', STR_PAD_LEFT);
+    $codDoc = '01';
+    $dirEstablecimiento = htmlspecialchars(config('sri.direccion_establecimiento'));
+    $ruc = $factura->ruc_emisor;
+    $razonSocial = htmlspecialchars($factura->razon_social_emisor);
+    $dirMatriz = htmlspecialchars(config('sri.direccion_matriz'));
+    $fechaRaw = $venta->fecha ?? now();
+    if ($fechaRaw instanceof \DateTimeInterface) {
+        $fechaEmision = $fechaRaw->format('d/m/Y');
+    } else {
+        try { $fechaEmision = \Carbon\Carbon::parse($fechaRaw)->format('d/m/Y'); }
+        catch (\Throwable $e) { $fechaEmision = now()->format('d/m/Y'); }
+    }
+    // Calcular totales en base a los detalles para asegurar consistencia con SRI
+    $detallesVenta = $venta->detalles ?? [];
+    $detallesArray = is_iterable($detallesVenta) ? $detallesVenta : [];
+    $sumBase = 0.0;
+    $sumDescuento = 0.0;
+    foreach ($detallesArray as $d) {
+        $cant = (float) ($d->cantidad ?? 0);
+        $pu = (float) ($d->precio_unitario ?? 0);
+        $desc = (float) ($d->descuento ?? 0);
+        $lineaBase = ($cant * $pu) - $desc;
+        if ($lineaBase < 0) { $lineaBase = 0; }
+        $sumBase += $lineaBase;
+        $sumDescuento += $desc;
+    }
+    // Si no hay detalles o sumBase es cero, usar subtotal/iva/total de la venta como respaldo
+    if ($sumBase <= 0 && isset($venta->subtotal)) {
+        $sumBase = (float) $venta->subtotal;
+        $sumDescuento = (float) ($venta->descuento ?? 0);
+    }
+    $ivaTotal = round($sumBase * 0.15, 2);
+    $totalSinImpuestos = number_format($sumBase, 2, '.', '');
+    $importeTotal = number_format($sumBase + $ivaTotal, 2, '.', '');
+    $propina = '0.00';
+    $moneda = 'DOLAR';
+    $identComprador = $factura->identificacion_comprador;
+    $razonComprador = htmlspecialchars($factura->razon_social_comprador);
+    $claveAcceso = $this->generarClaveAcceso($factura);
         
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-        $xml .= '<factura version="1.1.0">' . "\n";
+        $xml .= '<factura id="comprobante" version="1.1.0">' . "\n";
         $xml .= '  <infoTributaria>' . "\n";
         $xml .= '    <ambiente>' . $factura->ambiente . '</ambiente>' . "\n";
         $xml .= '    <tipoEmision>' . $factura->tipo_emision . '</tipoEmision>' . "\n";
-        $xml .= '    <razonSocial>' . htmlspecialchars($factura->razon_social_emisor) . '</razonSocial>' . "\n";
-        $xml .= '    <ruc>' . $factura->ruc_emisor . '</ruc>' . "\n";
+        $xml .= '    <razonSocial>' . $razonSocial . '</razonSocial>' . "\n";
+        $nombreComercial = config('sri.nombre_comercial');
+        if (!empty($nombreComercial)) {
+            $xml .= '    <nombreComercial>' . htmlspecialchars($nombreComercial) . '</nombreComercial>' . "\n";
+        }
+        $xml .= '    <ruc>' . $ruc . '</ruc>' . "\n";
+        $xml .= '    <claveAcceso>' . $claveAcceso . '</claveAcceso>' . "\n";
+        $xml .= '    <codDoc>' . $codDoc . '</codDoc>' . "\n";
         $xml .= '    <estab>' . $factura->establecimiento . '</estab>' . "\n";
         $xml .= '    <ptoEmi>' . $factura->punto_emision . '</ptoEmi>' . "\n";
-        $xml .= '    <secuencial>' . str_pad($factura->secuencial, 9, '0', STR_PAD_LEFT) . '</secuencial>' . "\n";
-        $xml .= '    <dirMatriz>' . htmlspecialchars($factura->direccion_emisor) . '</dirMatriz>' . "\n";
+        $xml .= '    <secuencial>' . $secuencial . '</secuencial>' . "\n";
+        $xml .= '    <dirMatriz>' . $dirMatriz . '</dirMatriz>' . "\n";
         $xml .= '  </infoTributaria>' . "\n";
         $xml .= '  <infoFactura>' . "\n";
-        $xml .= '    <fechaEmision>' . $venta->fecha->format('d/m/Y') . '</fechaEmision>' . "\n";
-        $xml .= '    <razonSocialComprador>' . htmlspecialchars($factura->razon_social_comprador) . '</razonSocialComprador>' . "\n";
-        $xml .= '    <identificacionComprador>' . $factura->identificacion_comprador . '</identificacionComprador>' . "\n";
-        $xml .= '    <totalSinImpuestos>' . number_format($venta->subtotal, 2, '.', '') . '</totalSinImpuestos>' . "\n";
-        $xml .= '    <totalDescuento>0.00</totalDescuento>' . "\n";
-        $xml .= '    <importeTotal>' . number_format($venta->total, 2, '.', '') . '</importeTotal>' . "\n";
+        $xml .= '    <fechaEmision>' . $fechaEmision . '</fechaEmision>' . "\n";
+        $xml .= '    <dirEstablecimiento>' . $dirEstablecimiento . '</dirEstablecimiento>' . "\n";
+        // Campos opcionales útiles
+        if (!empty(config('sri.contribuyente_regimen'))) {
+            $xml .= '    <contribuyenteEspecial>' . htmlspecialchars(config('sri.contribuyente_regimen')) . '</contribuyenteEspecial>' . "\n";
+        }
+        if (!empty(config('sri.lugar_emision'))) {
+            $xml .= '    <lugar>' . htmlspecialchars(config('sri.lugar_emision')) . '</lugar>' . "\n";
+        }
+        $xml .= '    <obligadoContabilidad>NO</obligadoContabilidad>' . "\n";
+        $xml .= '    <tipoIdentificacionComprador>' . $this->tipoIdentificacion($identComprador) . '</tipoIdentificacionComprador>' . "\n";
+        $xml .= '    <razonSocialComprador>' . $razonComprador . '</razonSocialComprador>' . "\n";
+        $xml .= '    <identificacionComprador>' . $identComprador . '</identificacionComprador>' . "\n";
+        if (!empty($factura->direccion_comprador)) {
+            $xml .= '    <direccionComprador>' . htmlspecialchars($factura->direccion_comprador) . '</direccionComprador>' . "\n";
+        }
+        $xml .= '    <totalSinImpuestos>' . $totalSinImpuestos . '</totalSinImpuestos>' . "\n";
+    $xml .= '    <totalDescuento>' . number_format($sumDescuento, 2, '.', '') . '</totalDescuento>' . "\n";
+    $xml .= '    <totalConImpuestos>' . "\n";
+    $xml .= '      <totalImpuesto>' . "\n";
+    $xml .= '        <codigo>2</codigo>' . "\n"; // IVA
+    $xml .= '        <codigoPorcentaje>4</codigoPorcentaje>' . "\n"; // 15%
+    $xml .= '        <baseImponible>' . $totalSinImpuestos . '</baseImponible>' . "\n";
+    $xml .= '        <valor>' . number_format($ivaTotal, 2, '.', '') . '</valor>' . "\n";
+    $xml .= '      </totalImpuesto>' . "\n";
+    $xml .= '    </totalConImpuestos>' . "\n";
+        $xml .= '    <propina>' . $propina . '</propina>' . "\n";
+    $xml .= '    <importeTotal>' . $importeTotal . '</importeTotal>' . "\n";
+    $xml .= '    <moneda>' . $moneda . '</moneda>' . "\n";
+    // Pagos (requerido en 1.1.0)
+    $xml .= '    <pagos>' . "\n";
+    $xml .= '      <pago>' . "\n";
+    $xml .= '        <formaPago>01</formaPago>' . "\n"; // 01: Sin utilización del sistema financiero (contado)
+    $xml .= '        <total>' . $importeTotal . '</total>' . "\n";
+    $xml .= '        <plazo>0</plazo>' . "\n";
+    $xml .= '        <unidadTiempo>dias</unidadTiempo>' . "\n";
+    $xml .= '      </pago>' . "\n";
+    $xml .= '    </pagos>' . "\n";
         $xml .= '  </infoFactura>' . "\n";
         $xml .= '  <detalles>' . "\n";
         
-        foreach ($venta->detalles as $detalle) {
+        $itemIndex = 1;
+        foreach ($detallesArray as $detalle) {
+            $desc = $detalle->descripcion ?? ($detalle->item_descripcion ?? ($detalle->item_nombre ?? 'Item'));
+            $baseItem = ($detalle->subtotal ?? (($detalle->cantidad ?? 0) * ($detalle->precio_unitario ?? 0))) - ($detalle->descuento ?? 0);
+            if ($baseItem < 0) { $baseItem = 0; }
+            $precioSinImp = number_format($baseItem, 2, '.', '');
+            $valorIvaItem = number_format($baseItem * 0.15, 2, '.', '');
             $xml .= '    <detalle>' . "\n";
-            $xml .= '      <descripcion>' . htmlspecialchars($detalle->descripcion) . '</descripcion>' . "\n";
-            $xml .= '      <cantidad>' . $detalle->cantidad . '</cantidad>' . "\n";
-            $xml .= '      <precioUnitario>' . number_format($detalle->precio_unitario, 2, '.', '') . '</precioUnitario>' . "\n";
-            $xml .= '      <precioTotalSinImpuesto>' . number_format($detalle->cantidad * $detalle->precio_unitario, 2, '.', '') . '</precioTotalSinImpuesto>' . "\n";
+            $xml .= '      <codigoPrincipal>' . ('ITEM-' . $itemIndex) . '</codigoPrincipal>' . "\n";
+            $xml .= '      <descripcion>' . htmlspecialchars($desc) . '</descripcion>' . "\n";
+            $xml .= '      <cantidad>' . (float) ($detalle->cantidad ?? 0) . '</cantidad>' . "\n";
+            $xml .= '      <precioUnitario>' . number_format((float) ($detalle->precio_unitario ?? 0), 2, '.', '') . '</precioUnitario>' . "\n";
+            $xml .= '      <descuento>' . number_format((float) ($detalle->descuento ?? 0), 2, '.', '') . '</descuento>' . "\n";
+            $xml .= '      <precioTotalSinImpuesto>' . $precioSinImp . '</precioTotalSinImpuesto>' . "\n";
+            $xml .= '      <impuestos>' . "\n";
+            $xml .= '        <impuesto>' . "\n";
+            $xml .= '          <codigo>2</codigo>' . "\n"; // IVA
+            $xml .= '          <codigoPorcentaje>4</codigoPorcentaje>' . "\n"; // 15%
+            $xml .= '          <tarifa>15</tarifa>' . "\n";
+            $xml .= '          <baseImponible>' . $precioSinImp . '</baseImponible>' . "\n";
+            $xml .= '          <valor>' . $valorIvaItem . '</valor>' . "\n";
+            $xml .= '        </impuesto>' . "\n";
+            $xml .= '      </impuestos>' . "\n";
             $xml .= '    </detalle>' . "\n";
+            $itemIndex++;
         }
         
         $xml .= '  </detalles>' . "\n";
+        // infoAdicional opcional
+        $xml .= '  <infoAdicional>' . "\n";
+        if (!empty($factura->email_comprador)) {
+            $xml .= '    <campoAdicional nombre="Email">' . htmlspecialchars($factura->email_comprador) . '</campoAdicional>' . "\n";
+        }
+        if (!empty($factura->direccion_comprador)) {
+            $xml .= '    <campoAdicional nombre="Direccion">' . htmlspecialchars($factura->direccion_comprador) . '</campoAdicional>' . "\n";
+        }
+        $xml .= '  </infoAdicional>' . "\n";
         $xml .= '</factura>' . "\n";
 
         return $xml;
+    }
+
+    private function tipoIdentificacion(string $id): string
+    {
+        $len = strlen($id);
+        if ($id === '9999999999999') return '07';
+        if ($len === 10) return '05'; // cédula
+        if ($len === 13) return '04'; // RUC
+        return '06'; // pasaporte/otros
     }
 
     /**
@@ -565,10 +824,10 @@ class FacturaElectronicaService
         $claveAcceso .= $factura->ambiente;
         $claveAcceso .= $factura->establecimiento . $factura->punto_emision;
         $claveAcceso .= str_pad($factura->secuencial, 9, '0', STR_PAD_LEFT);
-        $claveAcceso .= '12345678'; // Código numérico (8 dígitos aleatorios en producción)
+    $claveAcceso .= (string) random_int(10000000, 99999999); // Código numérico (8 dígitos aleatorios)
         $claveAcceso .= $factura->tipo_emision;
         
-        // Dígito verificador (Módulo 11)
+    // Dígito verificador (Módulo 11)
         $claveAcceso .= $this->calcularDigitoVerificador($claveAcceso);
         
         return $claveAcceso;
@@ -579,17 +838,18 @@ class FacturaElectronicaService
      */
     private function calcularDigitoVerificador(string $clave): int
     {
-        $multiplicadores = [2, 3, 4, 5, 6, 7, 2, 3, 4, 5, 6, 7, 2, 3, 4, 5, 6, 7, 2, 3, 4, 5, 6, 7, 2, 3, 4, 5, 6, 7, 2, 3, 4, 5, 6, 7, 2, 3, 4, 5, 6, 7, 2, 3, 4, 5, 6, 7];
+        $multiplicador = 2;
         $suma = 0;
-        
-        for ($i = 0; $i < strlen($clave); $i++) {
-            $suma += intval($clave[$i]) * $multiplicadores[$i];
+        for ($i = strlen($clave) - 1; $i >= 0; $i--) {
+            $suma += intval($clave[$i]) * $multiplicador;
+            $multiplicador++;
+            if ($multiplicador > 7) { $multiplicador = 2; }
         }
-        
         $residuo = $suma % 11;
-        $digitoVerificador = $residuo === 0 ? 0 : (11 - $residuo);
-        
-        return $digitoVerificador === 10 ? 1 : $digitoVerificador;
+        $digito = 11 - $residuo;
+        if ($digito === 11) return 0;
+        if ($digito === 10) return 1;
+        return $digito;
     }
 
     /**

@@ -368,8 +368,8 @@ const filteredFacturas = computed(() => {
 // Methods
 function formatCurrency(value: number): string {
   const num = Number(value);
-  if (isNaN(num)) return '0';
-  return new Intl.NumberFormat('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
+  if (isNaN(num)) return '0.00';
+  return new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
 }
 
 function formatDate(date: string): string {

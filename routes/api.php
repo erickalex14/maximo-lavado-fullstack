@@ -138,26 +138,27 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('facturas-electronicas')->group(function () {
         Route::get('/', [FacturaElectronicaController::class, 'index']);
         Route::post('/', [FacturaElectronicaController::class, 'store']);
-        Route::get('/{id}', [FacturaElectronicaController::class, 'show']);
-        Route::put('/{id}', [FacturaElectronicaController::class, 'update']);
+    // Colocar rutas estáticas antes o restringir {id} a numérico para evitar colisiones
+    Route::get('/validar-sri', [FacturaElectronicaController::class, 'validarConexionSRI']);
+    Route::get('/{id}', [FacturaElectronicaController::class, 'show'])->whereNumber('id');
+    Route::put('/{id}', [FacturaElectronicaController::class, 'update'])->whereNumber('id');
         
         // Procesamiento SRI
-        Route::post('/{id}/procesar-sri', [FacturaElectronicaController::class, 'procesarConSRI']);
-        Route::post('/{id}/reenviar', [FacturaElectronicaController::class, 'reenviarAlSRI']);
-        Route::post('/{id}/anular', [FacturaElectronicaController::class, 'anular']);
+    Route::post('/{id}/procesar-sri', [FacturaElectronicaController::class, 'procesarConSRI'])->whereNumber('id');
+    Route::post('/{id}/reenviar', [FacturaElectronicaController::class, 'reenviarAlSRI'])->whereNumber('id');
+    Route::post('/{id}/anular', [FacturaElectronicaController::class, 'anular'])->whereNumber('id');
         
         // Documentos
-        Route::get('/{id}/xml', [FacturaElectronicaController::class, 'getXML']);
-        Route::get('/{id}/pdf', [FacturaElectronicaController::class, 'downloadPDF']);
+    Route::get('/{id}/xml', [FacturaElectronicaController::class, 'getXML'])->whereNumber('id');
+    Route::get('/{id}/pdf', [FacturaElectronicaController::class, 'downloadPDF'])->whereNumber('id');
         
         // Consultas específicas
-        Route::get('/venta/{ventaId}', [FacturaElectronicaController::class, 'getByVenta']);
+    Route::get('/venta/{ventaId}', [FacturaElectronicaController::class, 'getByVenta'])->whereNumber('ventaId');
         Route::get('/pendientes-sri', [FacturaElectronicaController::class, 'getPendientesSRI']);
         Route::get('/estadisticas', [FacturaElectronicaController::class, 'getEstadisticas']);
         
         // Operaciones en lote
         Route::post('/procesar-lote', [FacturaElectronicaController::class, 'procesarLote']);
-        Route::get('/validar-sri', [FacturaElectronicaController::class, 'validarConexionSRI']);
     });
 
     // ========================================================

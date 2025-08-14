@@ -95,11 +95,16 @@ class VentaService
                     ]);
                 }
 
-                // PASO 9: PROCESAR FACTURA CON SRI (opcional, puede ser asíncrono)
+                // PASO 9: PROCESAR FACTURA CON SRI una sola vez
                 try {
-                    $this->facturaElectronicaService->procesarConSRI($facturaElectronica->factura_electronica_id);
+                    $usarMock = (bool) config('sri.debug.mock_sri_response', true);
+                    if ($usarMock) {
+                        $this->facturaElectronicaService->procesarAutomaticoConSRI($facturaElectronica);
+                    } else {
+                        // Si mock desactivado, ejecutar vía método principal con manejo interno de errores
+                        $this->facturaElectronicaService->procesarConSRI($facturaElectronica->factura_electronica_id);
+                    }
                 } catch (\Exception $e) {
-                    // No falla la transacción si el SRI tiene problemas, se puede reenviar después
                     Log::warning('Error al procesar factura con SRI (se puede reenviar)', [
                         'venta_id' => $venta->venta_id,
                         'factura_id' => $facturaElectronica->factura_electronica_id,

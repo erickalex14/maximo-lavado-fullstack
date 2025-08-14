@@ -114,9 +114,15 @@ class FacturaElectronicaController extends Controller
     {
         try {
             $resultado = $this->facturaElectronicaService->procesarConSRI($id);
-            
             return $this->successResponse($resultado, 'resultado', 'Factura procesada con SRI');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            // Si algo explotó fuera del control del servicio, devolver estado actualizado si existe
+            try {
+                $resultado = $this->facturaElectronicaService->getById($id);
+                if ($resultado) {
+                    return $this->successResponse($resultado, 'resultado', 'Factura actualizada con mensaje de error');
+                }
+            } catch (\Throwable $ignored) {}
             return $this->errorResponse('Error al procesar factura con SRI', $e);
         }
     }

@@ -312,7 +312,7 @@ async function confirmarVenta() {
   }
 }
 
-function formatCurrency(v: number) { return new Intl.NumberFormat('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v); }
+function formatCurrency(v: number) { return new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v || 0)); }
 
 onMounted(async () => {
   await Promise.all([
