@@ -34,8 +34,9 @@ return [
     'direccion_establecimiento' => env('SRI_DIRECCION_ESTABLECIMIENTO', 'AVENIDA ELOY ALFARO, CHONE'),
     
     // Establecimiento y punto de emisión
-    'establecimiento' => env('SRI_ESTABLECIMIENTO', '001'),
-    'punto_emision' => env('SRI_PUNTO_EMISION', '001'),
+    // Valores por defecto ajustados para pruebas según SRI: Establecimiento 002, Punto 100
+    'establecimiento' => env('SRI_ESTABLECIMIENTO', '002'),
+    'punto_emision' => env('SRI_PUNTO_EMISION', '101'),
 
     // Configuración de certificados digitales
     'certificado' => [

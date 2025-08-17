@@ -33,7 +33,7 @@ class XMLSigner
 
         // 1) Preferir PEM si está configurado y legible
         $pemKeyPathCfg = config('sri.certificado.pem_key');
-        $pemCertPathCfg = config('sri.certificado.pem_cert', config('sri.certificado.pem'));
+    $pemCertPathCfg = config('sri.certificado.pem_cert');
         if ($pemKeyPathCfg && $pemCertPathCfg) {
             $pemKeyPath = $this->resolvePath($pemKeyPathCfg);
             $pemCertPath = $this->resolvePath($pemCertPathCfg);
@@ -120,12 +120,13 @@ class XMLSigner
         }
         $dsig->setCanonicalMethod($canonMethod);
 
-        // Agregar referencia al nodo raíz con ID para cumplir SRI (URI="#comprobante")
+        // Preparar referencia al nodo raíz
         $root = $doc->documentElement; // e.g., <factura id="comprobante">
-        // Asegurar atributo id="comprobante" existe (SRI espera este Id)
         if (!$root->hasAttribute('id') || $root->getAttribute('id') === '') {
             $root->setAttribute('id', 'comprobante');
         }
+
+        // Referenciar nodo raíz con transform enveloped
         $dsig->addReference(
             $root,
             XMLSecurityDSig::SHA1,
@@ -133,25 +134,20 @@ class XMLSigner
             ['id_name' => 'id', 'overwrite' => false]
         );
 
-        // Crear clave firma y firmar
+        // Crear clave y firmar
         $key = new XMLSecurityKey(XMLSecurityKey::RSA_SHA1, ['type' => 'private']);
-    $key->loadKey($privateKey, false);
+        $key->loadKey($privateKey, false);
         $dsig->sign($key);
 
         // Adjuntar certificado X509
         $dsig->add509Cert($publicCert, true, false, ['subjectName' => true]);
 
-    // Anexar firma al nodo raíz (debe ser el último hijo)
-    $dsig->appendSignature($root);
+        // Anexar firma al nodo raíz (último hijo)
+        $dsig->appendSignature($root);
 
-    // Eliminar nodos vacíos o espacios en blanco accidentales
-    $doc->preserveWhiteSpace = false;
-    $doc->formatOutput = false;
-
-    // Retornar solo el nodo <factura> con firma como último hijo, sin doble declaración XML
-    $xmlFinal = $doc->saveXML($doc->documentElement);
-    // Prepend manualmente la declaración XML estándar y salto de línea obligatorio
-    return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" . $xmlFinal;
+        // Retornar solo el nodo <factura> con firma como último hijo
+        $xmlFinal = $doc->saveXML($doc->documentElement);
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" . $xmlFinal;
     }
 
     /**

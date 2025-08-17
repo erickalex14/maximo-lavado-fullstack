@@ -29,8 +29,25 @@ class SRIClient
                 'connection_timeout' => $this->timeout,
             ]);
 
-            $params = ['xml' => base64_encode($xmlFirmado)];
+            // Enviar contenido como base64Binary SIN doble codificación.
+            // SoapClient se encargará de codificar en base64 según el tipo XSD.
+            $params = ['xml' => new \SoapVar($xmlFirmado, XSD_BASE64BINARY)];
             $response = $client->__soapCall('validarComprobante', [$params]);
+
+            // Opcional: guardar request/response para depuración
+            try {
+                if ((bool) config('sri.debug.guardar_xml_request', false) || (bool) config('sri.debug.guardar_xml_response', false)) {
+                    $dbgDir = storage_path('app/sri/debug');
+                    if (!is_dir($dbgDir)) { @mkdir($dbgDir, 0755, true); }
+                    $ts = date('Ymd_His');
+                    if ((bool) config('sri.debug.guardar_xml_request', false)) {
+                        @file_put_contents($dbgDir . DIRECTORY_SEPARATOR . "recepcion_request_{$ts}.xml", $client->__getLastRequest());
+                    }
+                    if ((bool) config('sri.debug.guardar_xml_response', false)) {
+                        @file_put_contents($dbgDir . DIRECTORY_SEPARATOR . "recepcion_response_{$ts}.xml", $client->__getLastResponse());
+                    }
+                }
+            } catch (\Throwable $e) { /* ignore debug save errors */ }
 
             $estado = $response->RespuestaRecepcionComprobante->estado ?? 'DEVUELTA';
             $mensajes = $response->RespuestaRecepcionComprobante->comprobantes->comprobante->mensajes->mensaje ?? [];
@@ -59,6 +76,21 @@ class SRIClient
 
             $params = ['claveAccesoComprobante' => $claveAcceso];
             $response = $client->__soapCall('autorizacionComprobante', [$params]);
+
+            // Opcional: guardar request/response para depuración
+            try {
+                if ((bool) config('sri.debug.guardar_xml_request', false) || (bool) config('sri.debug.guardar_xml_response', false)) {
+                    $dbgDir = storage_path('app/sri/debug');
+                    if (!is_dir($dbgDir)) { @mkdir($dbgDir, 0755, true); }
+                    $ts = date('Ymd_His');
+                    if ((bool) config('sri.debug.guardar_xml_request', false)) {
+                        @file_put_contents($dbgDir . DIRECTORY_SEPARATOR . "autorizacion_request_{$ts}.xml", $client->__getLastRequest());
+                    }
+                    if ((bool) config('sri.debug.guardar_xml_response', false)) {
+                        @file_put_contents($dbgDir . DIRECTORY_SEPARATOR . "autorizacion_response_{$ts}.xml", $client->__getLastResponse());
+                    }
+                }
+            } catch (\Throwable $e) { /* ignore debug save errors */ }
 
             $autorizaciones = $response->RespuestaAutorizacionComprobante->autorizaciones->autorizacion ?? null;
             if (is_array($autorizaciones)) {

@@ -645,7 +645,7 @@ class FacturaElectronicaService
      */
     private function construirXMLFactura(FacturaElectronica $factura): string
     {
-    // Construcción de XML SRI Ecuador (versión 1.1.0)
+    // Construcción de XML SRI Ecuador (versión 1.0.0)
     // Nota: Simplificado pero con estructura clave obligatoria
         $venta = $factura->venta;
     $secuencial = str_pad($factura->secuencial, 9, '0', STR_PAD_LEFT);
@@ -680,7 +680,27 @@ class FacturaElectronicaService
         $sumBase = (float) $venta->subtotal;
         $sumDescuento = (float) ($venta->descuento ?? 0);
     }
-    $ivaTotal = round($sumBase * 0.15, 2);
+    // IVA: usar configuración para porcentaje/código y ser consistente en totales y detalles
+    $codigos = (array) config('sri.iva.codigo_porcentaje', []);
+    $permitidos = (array) config('sri.iva.porcentajes_validos', [0, 12, 15]);
+    // Intentar deducir porcentaje de IVA desde la venta si existen montos
+    $ivaPercent = null;
+    if ($sumBase > 0 && isset($venta->iva)) {
+        $calcPct = round(((float) $venta->iva / $sumBase) * 100);
+        // Elegir el permitido más cercano al calculado
+        $ivaPercent = array_reduce($permitidos, function ($carry, $p) use ($calcPct) {
+            if ($carry === null) return $p;
+            return (abs($p - $calcPct) < abs($carry - $calcPct)) ? $p : $carry;
+        }, null);
+    }
+    if ($ivaPercent === null) {
+        // Fallback por configuración: si 12 está configurado usar 12, si no 15, si no 0
+        $ivaPercent = in_array(12, $permitidos, true) ? 12 : (in_array(15, $permitidos, true) ? 15 : 0);
+    }
+    $codigoPorcentaje = (string) ($codigos[$ivaPercent] ?? ($ivaPercent === 0 ? '0' : '2'));
+    $ivaRateDec = $ivaPercent / 100;
+
+    $ivaTotal = round($sumBase * $ivaRateDec, 2);
     $totalSinImpuestos = number_format($sumBase, 2, '.', '');
     $importeTotal = number_format($sumBase + $ivaTotal, 2, '.', '');
     $propina = '0.00';
@@ -690,12 +710,12 @@ class FacturaElectronicaService
     $claveAcceso = $this->generarClaveAcceso($factura);
         
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-        $xml .= '<factura id="comprobante" version="1.1.0">' . "\n";
+    $xml .= '<factura id="comprobante" version="1.0.0">' . "\n";
         $xml .= '  <infoTributaria>' . "\n";
         $xml .= '    <ambiente>' . $factura->ambiente . '</ambiente>' . "\n";
         $xml .= '    <tipoEmision>' . $factura->tipo_emision . '</tipoEmision>' . "\n";
         $xml .= '    <razonSocial>' . $razonSocial . '</razonSocial>' . "\n";
-        $nombreComercial = config('sri.nombre_comercial');
+    $nombreComercial = $this->sanitizeXmlText(config('sri.nombre_comercial'));
         if (!empty($nombreComercial)) {
             $xml .= '    <nombreComercial>' . htmlspecialchars($nombreComercial) . '</nombreComercial>' . "\n";
         }
@@ -706,8 +726,12 @@ class FacturaElectronicaService
         $xml .= '    <ptoEmi>' . $factura->punto_emision . '</ptoEmi>' . "\n";
         $xml .= '    <secuencial>' . $secuencial . '</secuencial>' . "\n";
         $xml .= '    <dirMatriz>' . $dirMatriz . '</dirMatriz>' . "\n";
-        // Opcional: contribuyenteRimpe (cuando aplique)
-    $rimpe = config('sri.contribuyente_rimpe', null);
+        // Opcionales en orden del XSD: agenteRetencion, contribuyenteRimpe
+        $agente = config('sri.agente_retencion', null);
+        if (!empty($agente)) {
+            $xml .= '    <agenteRetencion>' . htmlspecialchars($agente) . '</agenteRetencion>' . "\n";
+        }
+        $rimpe = config('sri.contribuyente_rimpe', null);
         if (!empty($rimpe)) {
             $xml .= '    <contribuyenteRimpe>' . htmlspecialchars($rimpe) . '</contribuyenteRimpe>' . "\n";
         }
@@ -721,53 +745,40 @@ class FacturaElectronicaService
         $xml .= '    <razonSocialComprador>' . $razonComprador . '</razonSocialComprador>' . "\n";
         $xml .= '    <identificacionComprador>' . $identComprador . '</identificacionComprador>' . "\n";
         if (!empty($factura->direccion_comprador)) {
-            $xml .= '    <direccionComprador>' . htmlspecialchars($factura->direccion_comprador) . '</direccionComprador>' . "\n";
+            $xml .= '    <direccionComprador>' . htmlspecialchars($this->sanitizeXmlText($factura->direccion_comprador)) . '</direccionComprador>' . "\n";
         }
         $xml .= '    <totalSinImpuestos>' . $totalSinImpuestos . '</totalSinImpuestos>' . "\n";
         $xml .= '    <totalDescuento>' . number_format($sumDescuento, 2, '.', '') . '</totalDescuento>' . "\n";
         // Totales por impuesto (único bloque IVA estándar)
-        $codigos = (array) config('sri.iva.codigo_porcentaje', []);
-        $ivaPercent = array_key_exists(15, $codigos) ? 15 : (array_key_exists(12, $codigos) ? 12 : 12);
-        $codigoPorcentaje = (string) ($codigos[$ivaPercent] ?? '2');
-        $ivaRateDec = $ivaPercent / 100;
         $ivaTotalCalc = number_format($sumBase * $ivaRateDec, 2, '.', '');
     $xml .= '    <totalConImpuestos>' . "\n";
     $xml .= '      <totalImpuesto>' . "\n";
     $xml .= '        <codigo>2</codigo>' . "\n"; // IVA
     $xml .= '        <codigoPorcentaje>' . $codigoPorcentaje . '</codigoPorcentaje>' . "\n";
-    // Orden según XSD V1.1.0: baseImponible -> tarifa? -> valor
+    // En V1.0.0: baseImponible -> valor (tarifa no obligatoria en totales)
     $xml .= '        <baseImponible>' . $totalSinImpuestos . '</baseImponible>' . "\n";
-    // tarifa es opcional en totales, pero varios validadores la exigen si hay IVA distinto de 0
-    $xml .= '        <tarifa>' . number_format($ivaPercent, 2, '.', '') . '</tarifa>' . "\n";
     $xml .= '        <valor>' . $ivaTotalCalc . '</valor>' . "\n";
     $xml .= '      </totalImpuesto>' . "\n";
     $xml .= '    </totalConImpuestos>' . "\n";
-        $xml .= '    <propina>' . $propina . '</propina>' . "\n";
-        $xml .= '    <importeTotal>' . $importeTotal . '</importeTotal>' . "\n";
-        $xml .= '    <moneda>' . $moneda . '</moneda>' . "\n";
-        // Pagos (requerido en 1.1.0)
-        $xml .= '    <pagos>' . "\n";
-        $xml .= '      <pago>' . "\n";
-        $xml .= '        <formaPago>01</formaPago>' . "\n"; // 01: Sin utilización del sistema financiero (contado)
-        $xml .= '        <total>' . $importeTotal . '</total>' . "\n";
-        $xml .= '      </pago>' . "\n";
-        $xml .= '    </pagos>' . "\n";
+    $xml .= '    <propina>' . $propina . '</propina>' . "\n";
+    $xml .= '    <importeTotal>' . $importeTotal . '</importeTotal>' . "\n";
+    // Nota: moneda y pagos son opcionales en v1.0.0; se omiten para máxima compatibilidad con SRI
         $xml .= '  </infoFactura>' . "\n";
         $xml .= '  <detalles>' . "\n";
         
         $itemIndex = 1;
         foreach ($detallesArray as $detalle) {
             $desc = $detalle->descripcion ?? ($detalle->item_descripcion ?? ($detalle->item_nombre ?? 'Item'));
-            $desc = mb_substr((string) $desc, 0, 300);
+            $desc = mb_substr($this->sanitizeXmlText($desc), 0, 300);
             $baseItem = ($detalle->subtotal ?? (($detalle->cantidad ?? 0) * ($detalle->precio_unitario ?? 0))) - ($detalle->descuento ?? 0);
             if ($baseItem < 0) { $baseItem = 0; }
             $precioSinImp = number_format($baseItem, 2, '.', '');
             $valorIvaItem = number_format($baseItem * $ivaRateDec, 2, '.', '');
             $xml .= '    <detalle>' . "\n";
             $codigoPrincipal = $detalle->codigo ?? $detalle->sku ?? $detalle->codigo_principal ?? ('ITEM-' . $itemIndex);
-            $xml .= '      <codigoPrincipal>' . htmlspecialchars((string) $codigoPrincipal) . '</codigoPrincipal>' . "\n";
+            $xml .= '      <codigoPrincipal>' . htmlspecialchars($this->sanitizeXmlText((string) $codigoPrincipal)) . '</codigoPrincipal>' . "\n";
             if (!empty($detalle->codigo_auxiliar)) {
-                $xml .= '      <codigoAuxiliar>' . htmlspecialchars((string) $detalle->codigo_auxiliar) . '</codigoAuxiliar>' . "\n";
+                $xml .= '      <codigoAuxiliar>' . htmlspecialchars($this->sanitizeXmlText((string) $detalle->codigo_auxiliar)) . '</codigoAuxiliar>' . "\n";
             }
             $xml .= '      <descripcion>' . htmlspecialchars($desc) . '</descripcion>' . "\n";
             $xml .= '      <cantidad>' . number_format((float) ($detalle->cantidad ?? 0), 2, '.', '') . '</cantidad>' . "\n";
@@ -791,10 +802,10 @@ class FacturaElectronicaService
         // infoAdicional opcional
         $xml .= '  <infoAdicional>' . "\n";
         if (!empty($factura->email_comprador)) {
-            $xml .= '    <campoAdicional nombre="Email">' . htmlspecialchars($factura->email_comprador) . '</campoAdicional>' . "\n";
+            $xml .= '    <campoAdicional nombre="Email">' . htmlspecialchars($this->sanitizeXmlText($factura->email_comprador)) . '</campoAdicional>' . "\n";
         }
         if (!empty($factura->direccion_comprador)) {
-            $xml .= '    <campoAdicional nombre="Direccion">' . htmlspecialchars($factura->direccion_comprador) . '</campoAdicional>' . "\n";
+            $xml .= '    <campoAdicional nombre="Direccion">' . htmlspecialchars($this->sanitizeXmlText($factura->direccion_comprador)) . '</campoAdicional>' . "\n";
         }
         $xml .= '  </infoAdicional>' . "\n";
         $xml .= '</factura>' . "\n";
@@ -809,6 +820,18 @@ class FacturaElectronicaService
         if ($len === 10) return '05'; // cédula
         if ($len === 13) return '04'; // RUC
         return '06'; // pasaporte/otros
+    }
+
+    /**
+     * Sanitiza texto para XML 1.0 removiendo caracteres de control inválidos y normalizando saltos de línea.
+     */
+    private function sanitizeXmlText($text): string
+    {
+        if ($text === null) return '';
+        $s = (string) $text;
+        $s = str_replace(["\r\n", "\r"], "\n", $s);
+        $s = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $s) ?? '';
+        return $s;
     }
 
     /**
