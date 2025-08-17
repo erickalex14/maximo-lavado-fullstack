@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="http://ec.gob.sri.ws.recepcion"
+           targetNamespace="http://ec.gob.sri.ws.recepcion"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+  <xs:import namespace="http://ec.gob.sri.ws.comprobante" schemaLocation="ComprobanteOffline.xsd"/>
+  <!-- Aquí iría el contenido completo del esquema de factura, puedes completarlo con el XSD oficial si lo necesitas -->
+</xs:schema>

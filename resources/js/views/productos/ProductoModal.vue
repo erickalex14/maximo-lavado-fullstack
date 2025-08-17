@@ -3,7 +3,7 @@
     <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
       <div class="px-6 py-4 border-b">
         <h3 class="text-lg font-semibold text-gray-900">
-          {{ isEditing ? `Editar ${tipoLabel}` : `Nuevo ${tipoLabel}` }}
+          {{ modo === 'edit' ? `Editar ${tipoLabel}` : `Nuevo ${tipoLabel}` }}
         </h3>
       </div>
 
@@ -120,7 +120,7 @@
             class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
           >
             <span v-if="loading">Guardando...</span>
-            <span v-else>{{ isEditing ? 'Actualizar' : 'Crear' }}</span>
+            <span v-else>{{ modo === 'edit' ? 'Actualizar' : 'Crear' }}</span>
           </button>
         </div>
       </form>
@@ -142,6 +142,7 @@ interface Props {
   isOpen: boolean;
   tipo: 'automotriz' | 'despensa';
   producto?: ProductoAutomotriz | ProductoDespensa | null;
+  modo: 'create' | 'edit';
 }
 
 const props = defineProps<Props>();
@@ -153,8 +154,32 @@ const emit = defineEmits<{
 const productoStore = useProductoStore();
 
 // Computed properties
-const isEditing = computed(() => !!props.producto);
+const isEditing = computed(() => props.modo === 'edit'); // Conserva para lógica interna, pero UI usa props.modo
 const tipoLabel = computed(() => props.tipo === 'automotriz' ? 'Producto Automotriz' : 'Producto de Despensa');
+
+// ID del producto según el tipo
+const productId = computed<number | null>(() => {
+  const p: any = props.producto || null;
+  if (!p) return null;
+  if (props.tipo === 'automotriz') {
+    return (
+      p.producto_automotriz_id ??
+      p.id ??
+      p.producto_id ??
+      p.productoAutomotrizId ??
+      p.productoId ??
+      null
+    );
+  }
+  return (
+    p.producto_despensa_id ??
+    p.id ??
+    p.producto_id ??
+    p.productoDespensaId ??
+    p.productoId ??
+    null
+  );
+});
 
 // Estado del formulario
 const form = ref<(CreateProductoAutomotrizRequest | CreateProductoDespensaRequest) & { codigo?: string }>({
@@ -220,17 +245,28 @@ const submitForm = async () => {
     loading.value = true;
     errors.value = {};
 
+    // Diagnóstico para confirmar qué camino sigue
+    console.debug('ProductoModal.submitForm', {
+      tipo: props.tipo,
+      modo: props.modo,
+      productId: productId.value,
+      hasProducto: !!props.producto,
+      productoKeys: props.producto ? Object.keys(props.producto as any) : []
+    });
+
+
     if (props.tipo === 'automotriz') {
-      const formData = form.value as CreateProductoAutomotrizRequest;
-      if (isEditing.value && props.producto && 'producto_automotriz_id' in props.producto) {
-        await productoStore.updateProductoAutomotriz(props.producto.producto_automotriz_id, formData);
+  const { codigo = '', nombre, descripcion, precio_venta, stock, activo } = form.value;
+  const updateData = { codigo, nombre, descripcion, precio_venta, stock, activo };
+      if (props.modo === 'edit' && productId.value) {
+        await productoStore.updateProductoAutomotriz(productId.value, updateData);
       } else {
-        await productoStore.createProductoAutomotriz(formData);
+        await productoStore.createProductoAutomotriz(updateData);
       }
     } else {
       const { codigo, ...formData } = form.value as CreateProductoDespensaRequest & { codigo?: string };
-      if (isEditing.value && props.producto && 'producto_despensa_id' in props.producto) {
-        await productoStore.updateProductoDespensa(props.producto.producto_despensa_id, formData);
+      if (props.modo === 'edit' && productId.value) {
+        await productoStore.updateProductoDespensa(productId.value, formData);
       } else {
         await productoStore.createProductoDespensa(formData);
       }

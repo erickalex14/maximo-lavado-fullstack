@@ -112,7 +112,13 @@ class XMLSigner
         $doc->loadXML($xml);
 
         $dsig = new XMLSecurityDSig();
-        $dsig->setCanonicalMethod(XMLSecurityDSig::EXC_C14N);
+        // Usar método de canonicalización desde configuración (por defecto C14N 2001)
+        $canonCfg = (string) config('sri.firma.metodo_canonicalizacion', 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315');
+        $canonMethod = XMLSecurityDSig::C14N;
+        if ($canonCfg === 'http://www.w3.org/2001/10/xml-exc-c14n#') {
+            $canonMethod = XMLSecurityDSig::EXC_C14N;
+        }
+        $dsig->setCanonicalMethod($canonMethod);
 
         // Agregar referencia al nodo raíz con ID para cumplir SRI (URI="#comprobante")
         $root = $doc->documentElement; // e.g., <factura id="comprobante">
@@ -135,11 +141,17 @@ class XMLSigner
         // Adjuntar certificado X509
         $dsig->add509Cert($publicCert, true, false, ['subjectName' => true]);
 
-    // Anexar firma al nodo raíz
+    // Anexar firma al nodo raíz (debe ser el último hijo)
     $dsig->appendSignature($root);
 
-    // Devolver el XML completo firmado; SRI espera el documento con declaración XML
-    return $doc->saveXML();
+    // Eliminar nodos vacíos o espacios en blanco accidentales
+    $doc->preserveWhiteSpace = false;
+    $doc->formatOutput = false;
+
+    // Retornar solo el nodo <factura> con firma como último hijo, sin doble declaración XML
+    $xmlFinal = $doc->saveXML($doc->documentElement);
+    // Prepend manualmente la declaración XML estándar y salto de línea obligatorio
+    return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" . $xmlFinal;
     }
 
     /**

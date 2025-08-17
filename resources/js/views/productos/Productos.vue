@@ -259,6 +259,7 @@
       :is-open="showCreateModal || showEditModal"
       :tipo="selectedTipo"
       :producto="selectedProducto"
+      :modo="showEditModal ? 'edit' : 'create'"
       @close="closeModals"
       @success="handleProductoSaved"
     />
@@ -495,6 +496,7 @@ const changePageDespensa = async (page: number) => {
 };
 
 // Modales
+
 const openCreateModal = () => {
   if (activeTab.value === 'servicios') {
     selectedServicio.value = null;
@@ -502,6 +504,7 @@ const openCreateModal = () => {
   } else {
     selectedProducto.value = null;
     selectedTipo.value = activeTab.value === 'automotrices' ? 'automotriz' : 'despensa';
+    showEditModal.value = false;
     showCreateModal.value = true;
   }
 };
@@ -518,9 +521,11 @@ const viewProductoDespensa = (producto: ProductoDespensa) => {
   showViewModal.value = true;
 };
 
+
 const editProductoAutomotriz = (producto: ProductoAutomotriz) => {
   selectedProducto.value = producto;
   selectedTipo.value = 'automotriz';
+  showCreateModal.value = false;
   showEditModal.value = true;
   showViewModal.value = false;
 };
@@ -528,6 +533,7 @@ const editProductoAutomotriz = (producto: ProductoAutomotriz) => {
 const editProductoDespensa = (producto: ProductoDespensa) => {
   selectedProducto.value = producto;
   selectedTipo.value = 'despensa';
+  showCreateModal.value = false;
   showEditModal.value = true;
   showViewModal.value = false;
 };
@@ -567,10 +573,40 @@ const confirmDelete = (producto: ProductoAutomotriz | ProductoDespensa) => {
 const deleteProducto = async () => {
   if (selectedProducto.value) {
     try {
+      // Obtener ID robusto según el tipo y posibles claves alternativas
+      const getProductoId = (p: any, tipo: 'automotriz' | 'despensa'): number | null => {
+        if (!p) return null;
+        if (tipo === 'automotriz') {
+          return (
+            p.producto_automotriz_id ??
+            p.id ??
+            p.producto_id ??
+            p.productoAutomotrizId ??
+            p.productoId ??
+            null
+          );
+        }
+        return (
+          p.producto_despensa_id ??
+          p.id ??
+          p.producto_id ??
+          p.productoDespensaId ??
+          p.productoId ??
+          null
+        );
+      };
+
+      const id = getProductoId(selectedProducto.value, selectedTipo.value);
+      console.debug('deleteProducto -> tipo:', selectedTipo.value, 'id:', id, 'keys:', Object.keys(selectedProducto.value as any));
+      if (!id) {
+        console.error('No se pudo determinar el ID del producto a eliminar.');
+        return;
+      }
+
       if (selectedTipo.value === 'automotriz') {
-        await productoStore.deleteProductoAutomotriz((selectedProducto.value as ProductoAutomotriz).producto_automotriz_id);
+        await productoStore.deleteProductoAutomotriz(id);
       } else {
-        await productoStore.deleteProductoDespensa((selectedProducto.value as ProductoDespensa).producto_despensa_id);
+        await productoStore.deleteProductoDespensa(id);
       }
       showDeleteModal.value = false;
       selectedProducto.value = null;

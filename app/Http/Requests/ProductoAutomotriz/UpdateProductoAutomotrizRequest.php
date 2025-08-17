@@ -21,7 +21,8 @@ class UpdateProductoAutomotrizRequest extends FormRequest
      */
     public function rules(): array
     {
-        $productoId = $this->route('productoAutomotriz');
+    // El parámetro en la ruta es {id}, no {productoAutomotriz}
+    $productoId = $this->route('id');
         
         return [
             'codigo' => 'sometimes|string|max:50|unique:productos_automotrices,codigo,' . $productoId . ',producto_automotriz_id',
