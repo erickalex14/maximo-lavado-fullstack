@@ -655,12 +655,19 @@ class FacturaElectronicaService
     $razonSocial = htmlspecialchars($factura->razon_social_emisor);
     $dirMatriz = htmlspecialchars(config('sri.direccion_matriz'));
     $fechaRaw = $venta->fecha ?? now();
-    if ($fechaRaw instanceof \DateTimeInterface) {
-        $fechaEmision = $fechaRaw->format('d/m/Y');
-    } else {
-        try { $fechaEmision = \Carbon\Carbon::parse($fechaRaw)->format('d/m/Y'); }
-        catch (\Throwable $e) { $fechaEmision = now()->format('d/m/Y'); }
+    $hoy = now()->startOfDay();
+    try {
+        $fechaVenta = $fechaRaw instanceof \DateTimeInterface ? \Carbon\Carbon::instance($fechaRaw) : \Carbon\Carbon::parse($fechaRaw);
+        // Si la fecha de la venta es futura, usar hoy
+        if ($fechaVenta->greaterThan($hoy)) {
+            $fechaEmision = $hoy->format('d/m/Y');
+        } else {
+            $fechaEmision = $fechaVenta->format('d/m/Y');
+        }
+    } catch (\Throwable $e) {
+        $fechaEmision = $hoy->format('d/m/Y');
     }
+    
     // Calcular totales en base a los detalles para asegurar consistencia con SRI
     $detallesVenta = $venta->detalles ?? [];
     $detallesArray = is_iterable($detallesVenta) ? $detallesVenta : [];
