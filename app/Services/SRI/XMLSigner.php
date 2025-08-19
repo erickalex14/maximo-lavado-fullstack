@@ -107,8 +107,45 @@ class XMLSigner
         // Firmar
         $dsig->sign($key);
 
+
         // Incluir certificado (sin cadena completa)
         $dsig->add509Cert($publicCert, true);
+
+        // Extraer Issuer y SerialNumber del certificado PEM y agregar X509IssuerSerial correctamente
+        $certData = openssl_x509_parse($publicCert);
+        if ($certData && isset($certData['issuer']) && isset($certData['serialNumber'])) {
+            // Formatear el issuer como string RFC2253 (orden correcto: último primero)
+            $issuerParts = [];
+            foreach (array_reverse($certData['issuer']) as $k => $v) {
+                $issuerParts[] = $k . '=' . $v;
+            }
+            $issuerString = implode(',', $issuerParts);
+            $serial = $certData['serialNumber'];
+
+            // Buscar el nodo X509Data que ya contiene el certificado
+            $xpath = new \DOMXPath($doc);
+            $xpath->registerNamespace('ds', 'http://www.w3.org/2000/09/xmldsig#');
+            $x509DataNodes = $xpath->query('//ds:Signature/ds:KeyInfo/ds:X509Data');
+            if ($x509DataNodes->length > 0) {
+                $x509Data = $x509DataNodes->item(0);
+                // Verificar si ya existe X509IssuerSerial para evitar duplicados
+                $hasIssuerSerial = false;
+                foreach ($x509Data->childNodes as $child) {
+                    if ($child->localName === 'X509IssuerSerial') {
+                        $hasIssuerSerial = true;
+                        break;
+                    }
+                }
+                if (!$hasIssuerSerial) {
+                    $issuerSerial = $doc->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:X509IssuerSerial');
+                    $issuerName = $doc->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:X509IssuerName', $issuerString);
+                    $serialNumber = $doc->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:X509SerialNumber', $serial);
+                    $issuerSerial->appendChild($issuerName);
+                    $issuerSerial->appendChild($serialNumber);
+                    $x509Data->appendChild($issuerSerial);
+                }
+            }
+        }
 
         // Insertar firma como último hijo
         $dsig->appendSignature($root);
